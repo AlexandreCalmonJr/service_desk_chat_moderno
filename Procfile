@@ -1,1 +1,1 @@
-web: gunicorn app:app
+web: python app.py init_db && gunicorn app:app --workers 1 --timeout 120
