@@ -1,1 +1,1 @@
-web: flask db upgrade && python app.py init_db && gunicorn app:app --workers 1 --timeout 120
+web: flask db upgrade && python -m spacy download pt_core_news_sm && python app.py init_db && gunicorn app:app --workers 1 --timeout 120
