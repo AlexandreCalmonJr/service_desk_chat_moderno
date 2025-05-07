@@ -51,12 +51,13 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     c = conn.cursor()
-    # Tabela de usuários
+    # Tabela de usuários com campo is_admin
     c.execute('''CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        is_admin BOOLEAN DEFAULT FALSE
     )''')
     # Tabela de perguntas e respostas
     c.execute('''CREATE TABLE IF NOT EXISTS faq (
@@ -83,11 +84,12 @@ init_db()
 # --- Classe de Usuário para Flask-Login ---
 
 class User(UserMixin):
-    def __init__(self, id, name, email, password):
+    def __init__(self, id, name, email, password, is_admin):
         self.id = id
         self.name = name
         self.email = email
         self.password = password
+        self.is_admin = is_admin
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -97,7 +99,7 @@ def load_user(user_id):
     user = c.fetchone()
     conn.close()
     if user:
-        return User(user[0], user[1], user[2], user[3])
+        return User(user[0], user[1], user[2], user[3], user[4])
     return None
 
 # --- Rotas de Autenticação ---
@@ -115,7 +117,7 @@ def login():
         user = c.fetchone()
         conn.close()
         if user and check_password_hash(user[3], password):
-            user_obj = User(user[0], user[1], user[2], user[3])
+            user_obj = User(user[0], user[1], user[2], user[3], user[4])
             login_user(user_obj)
             flash('Login realizado com sucesso!', 'success')
             return redirect(url_for('index'))
@@ -130,11 +132,12 @@ def register():
         name = request.form.get('name')
         email = request.form.get('email')
         password = request.form.get('password')
+        is_admin = request.form.get('is_admin') == 'on'  # Checkbox para admin
         conn = get_db_connection()
         c = conn.cursor()
         try:
-            c.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
-                      (name, email, generate_password_hash(password)))
+            c.execute("INSERT INTO users (name, email, password, is_admin) VALUES (%s, %s, %s, %s)",
+                      (name, email, generate_password_hash(password), is_admin))
             conn.commit()
             flash('Cadastro realizado com sucesso! Faça login.', 'success')
             return redirect(url_for('login'))
@@ -269,6 +272,55 @@ def chat():
     except Exception as e:
         logger.error(f"Erro na rota /chat: {e}")
         return jsonify({"resposta": "Erro ao processar a solicitação."})
+
+@app.route('/admin/faq', methods=['GET', 'POST'])
+@login_required
+def admin_faq():
+    if not current_user.is_admin:
+        flash('Você não tem permissão para acessar esta página.', 'error')
+        return redirect(url_for('index'))
+    conn = get_db_connection()
+    c = conn.cursor()
+    if request.method == 'POST':
+        if 'add_question' in request.form:
+            question = request.form.get('question')
+            answer = request.form.get('answer')
+            if question and answer:
+                try:
+                    c.execute("INSERT INTO faq (question, answer) VALUES (%s, %s)", (question, answer))
+                    conn.commit()
+                    flash('FAQ adicionada com sucesso!', 'success')
+                except Exception as e:
+                    logger.error(f"Erro ao adicionar FAQ: {e}")
+                    flash('Erro ao adicionar FAQ.', 'error')
+            else:
+                flash('Preencha todos os campos.', 'error')
+        elif 'edit_id' in request.form:
+            faq_id = request.form.get('edit_id')
+            new_question = request.form.get('edit_question')
+            new_answer = request.form.get('edit_answer')
+            if faq_id and new_question and new_answer:
+                try:
+                    c.execute("UPDATE faq SET question = %s, answer = %s WHERE id = %s", (new_question, new_answer, faq_id))
+                    conn.commit()
+                    flash('FAQ atualizada com sucesso!', 'success')
+                except Exception as e:
+                    logger.error(f"Erro ao atualizar FAQ: {e}")
+                    flash('Erro ao atualizar FAQ.', 'error')
+        elif 'delete_id' in request.form:
+            faq_id = request.form.get('delete_id')
+            if faq_id:
+                try:
+                    c.execute("DELETE FROM faq WHERE id = %s", (faq_id,))
+                    conn.commit()
+                    flash('FAQ excluída com sucesso!', 'success')
+                except Exception as e:
+                    logger.error(f"Erro ao excluir FAQ: {e}")
+                    flash('Erro ao excluir FAQ.', 'error')
+    c.execute("SELECT * FROM faq")
+    faqs = c.fetchall()
+    conn.close()
+    return render_template('admin_faq.html', faqs=faqs)
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
