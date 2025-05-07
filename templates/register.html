@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro - Assistente de Service Desk</title>
+    <link href="/static/tailwind.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .auth-container {
+            max-width: 400px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+        }
+        .auth-container h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: #111827;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: border-color 0.2s ease;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .auth-button {
+            width: 100%;
+            background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+            color: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+        .auth-button:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
+        }
+        .auth-link {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .auth-link a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .auth-link a:hover {
+            text-decoration: underline;
+        }
+        .flash-message {
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .flash-message.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .flash-message.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h2>Cadastro</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <form method="POST" action="{{ url_for('register') }}">
+            <div class="form-group">
+                <label for="name">Nome</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="auth-button">Cadastrar</button>
+        </form>
+        <div class="auth-link">
+            <p>Já tem uma conta? <a href="{{ url_for('login') }}">Faça login</a></p>
+        </div>
+    </div>
+</body>
+</html>
