@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, session
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-import sqlite3
+import psycopg2
 import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
@@ -8,6 +8,7 @@ import spacy
 import re
 import logging
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -35,21 +36,31 @@ except Exception as e:
     logger.error(f"Erro ao carregar spaCy: {e}")
     raise
 
-# --- Configuração do Banco de Dados SQLite ---
+# --- Configuração do Banco de Dados PostgreSQL ---
+
+DATABASE_URL = os.environ.get('DATABASE_URL')  # Render injeta essa variável automaticamente
+
+def get_db_connection():
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except Exception as e:
+        logger.error(f"Erro ao conectar ao banco de dados: {e}")
+        raise
 
 def init_db():
-    conn = sqlite3.connect('database.db')
+    conn = get_db_connection()
     c = conn.cursor()
     # Tabela de usuários
     c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL
     )''')
     # Tabela de perguntas e respostas
     c.execute('''CREATE TABLE IF NOT EXISTS faq (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         question TEXT NOT NULL,
         answer TEXT NOT NULL
     )''')
@@ -62,7 +73,7 @@ def init_db():
             ("como configurar uma vpn", "1. Abra as configurações de rede do sistema operacional. 2. Adicione uma nova conexão VPN. 3. Insira o endereço do servidor VPN, usuário e senha fornecidos pelo administrador. 4. Conecte-se e teste a conexão."),
             ("impressora não funciona", "1. Verifique se a impressora está ligada e conectada. 2. Confirme que os drivers estão instalados. 3. Teste a impressão de uma página de teste. 4. Reinicie a impressora e o computador.")
         ]
-        c.executemany("INSERT INTO faq (question, answer) VALUES (?, ?)", faq_data)
+        c.executemany("INSERT INTO faq (question, answer) VALUES (%s, %s)", faq_data)
     conn.commit()
     conn.close()
 
@@ -80,9 +91,9 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = sqlite3.connect('database.db')
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    c.execute("SELECT * FROM users WHERE id = %s", (user_id,))
     user = c.fetchone()
     conn.close()
     if user:
@@ -98,9 +109,9 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        conn = sqlite3.connect('database.db')
+        conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = ?", (email,))
+        c.execute("SELECT * FROM users WHERE email = %s", (email,))
         user = c.fetchone()
         conn.close()
         if user and check_password_hash(user[3], password):
@@ -119,15 +130,15 @@ def register():
         name = request.form.get('name')
         email = request.form.get('email')
         password = request.form.get('password')
-        conn = sqlite3.connect('database.db')
+        conn = get_db_connection()
         c = conn.cursor()
         try:
-            c.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+            c.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
                       (name, email, generate_password_hash(password)))
             conn.commit()
             flash('Cadastro realizado com sucesso! Faça login.', 'success')
             return redirect(url_for('login'))
-        except sqlite3.IntegrityError:
+        except psycopg2.IntegrityError:
             flash('Email já cadastrado.', 'error')
         finally:
             conn.close()
@@ -143,9 +154,9 @@ def logout():
 # --- Lógica do Chat com Banco de Dados ---
 
 def buscar_resposta_faq(pergunta):
-    conn = sqlite3.connect('database.db')
+    conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT answer FROM faq WHERE LOWER(question) LIKE ?", ('%' + pergunta.lower() + '%',))
+    c.execute("SELECT answer FROM faq WHERE LOWER(question) LIKE %s", ('%' + pergunta.lower() + '%',))
     result = c.fetchone()
     conn.close()
     return result[0] if result else None
