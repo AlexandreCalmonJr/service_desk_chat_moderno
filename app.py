@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, session, send_file, Response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_migrate import Migrate, upgrade
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from flask_script import Manager
 import psycopg2
 import nltk
 from nltk.tokenize import word_tokenize
@@ -40,9 +39,6 @@ db = SQLAlchemy(app)
 
 # Configurar Flask-Migrate
 migrate = Migrate(app, db)
-
-# Configurar Flask-Script
-manager = Manager(app)
 
 # Configurar Flask-Login
 login_manager = LoginManager()
@@ -360,15 +356,11 @@ def export_faq_pdf():
         mimetype="application/pdf"
     )
 
-# --- Comandos para Gerenciar Migrações ---
+# --- Inicialização Automática no Deploy ---
 
-@manager.command
 def init_db():
     """Inicializa o banco de dados com dados padrão."""
     with app.app_context():
-        # Criar as tabelas (será gerenciado pelo Flask-Migrate)
-        db.create_all()
-        # Inserir FAQs padrão se a tabela estiver vazia
         if not FAQ.query.first():
             faq_data = [
                 FAQ(question="computador não liga", answer="1. Verificar cabo de energia e conexões. 2. Testar fonte de alimentação com multímetro. 3. Substituir fonte se defeituosa. 4. Testar inicialização."),
@@ -378,14 +370,9 @@ def init_db():
             ]
             db.session.bulk_save_objects(faq_data)
             db.session.commit()
-        print("Banco de dados inicializado com sucesso!")
-
-@manager.command
-def apply_migrations():
-    """Aplica todas as migrações pendentes."""
-    with app.app_context():
-        upgrade()
-        print("Migrações aplicadas com sucesso!")
+        logger.info("Banco de dados inicializado com sucesso!")
 
 if __name__ == '__main__':
-    manager.run()
+    with app.app_context():
+        init_db()
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
