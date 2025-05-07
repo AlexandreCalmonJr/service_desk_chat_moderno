@@ -1,5 +1,8 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, session, send_file, Response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_migrate import Migrate, upgrade
+from flask_sqlalchemy import SQLAlchemy
+from flask_script import Manager
 import psycopg2
 import nltk
 from nltk.tokenize import word_tokenize
@@ -30,6 +33,17 @@ except Exception as e:
 app = Flask(__name__)
 app.secret_key = 'sua_chave_secreta_aqui'  # Substitua por uma chave segura
 
+# Configurar banco de dados com SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# Configurar Flask-Migrate
+migrate = Migrate(app, db)
+
+# Configurar Flask-Script
+manager = Manager(app)
+
 # Configurar Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -42,71 +56,25 @@ except Exception as e:
     logger.error(f"Erro ao carregar spaCy: {e}")
     raise
 
-# --- Configuração do Banco de Dados PostgreSQL ---
+# --- Modelos do Banco de Dados ---
 
-DATABASE_URL = os.environ.get('DATABASE_URL')  # Render injeta essa variável automaticamente
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
 
-def get_db_connection():
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        return conn
-    except Exception as e:
-        logger.error(f"Erro ao conectar ao banco de dados: {e}")
-        raise
-
-def init_db():
-    conn = get_db_connection()
-    c = conn.cursor()
-    # Tabela de usuários com campo is_admin
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        is_admin BOOLEAN DEFAULT FALSE
-    )''')
-    # Tabela de perguntas e respostas
-    c.execute('''CREATE TABLE IF NOT EXISTS faq (
-        id SERIAL PRIMARY KEY,
-        question TEXT NOT NULL,
-        answer TEXT NOT NULL
-    )''')
-    # Inserir perguntas e respostas padrão (se a tabela estiver vazia)
-    c.execute("SELECT COUNT(*) FROM faq")
-    if c.fetchone()[0] == 0:
-        faq_data = [
-            ("computador não liga", "1. Verificar cabo de energia e conexões. 2. Testar fonte de alimentação com multímetro. 3. Substituir fonte se defeituosa. 4. Testar inicialização."),
-            ("erro ao acessar sistema", "1. Verificar credenciais de login. 2. Reiniciar o sistema. 3. Atualizar o software para a versão mais recente. 4. Testar acesso novamente."),
-            ("como configurar uma vpn", "1. Abra as configurações de rede do sistema operacional. 2. Adicione uma nova conexão VPN. 3. Insira o endereço do servidor VPN, usuário e senha fornecidos pelo administrador. 4. Conecte-se e teste a conexão."),
-            ("impressora não funciona", "1. Verifique se a impressora está ligada e conectada. 2. Confirme que os drivers estão instalados. 3. Teste a impressão de uma página de teste. 4. Reinicie a impressora e o computador.")
-        ]
-        c.executemany("INSERT INTO faq (question, answer) VALUES (%s, %s)", faq_data)
-    conn.commit()
-    conn.close()
-
-# Inicializar o banco de dados
-init_db()
-
-# --- Classe de Usuário para Flask-Login ---
-
-class User(UserMixin):
-    def __init__(self, id, name, email, password, is_admin):
-        self.id = id
-        self.name = name
-        self.email = email
-        self.password = password
-        self.is_admin = is_admin
+class FAQ(db.Model):
+    __tablename__ = 'faq'
+    id = db.Column(db.Integer, primary_key=True)
+    question = db.Column(db.String(255), nullable=False)
+    answer = db.Column(db.Text, nullable=False)
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-    user = c.fetchone()
-    conn.close()
-    if user:
-        return User(user[0], user[1], user[2], user[3], user[4])
-    return None
+    return User.query.get(int(user_id))
 
 # --- Rotas de Autenticação ---
 
@@ -117,14 +85,9 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = %s", (email,))
-        user = c.fetchone()
-        conn.close()
-        if user and check_password_hash(user[3], password):
-            user_obj = User(user[0], user[1], user[2], user[3], user[4])
-            login_user(user_obj)
+        user = User.query.filter_by(email=email).first()
+        if user and check_password_hash(user.password, password):
+            login_user(user)
             flash('Login realizado com sucesso!', 'success')
             return redirect(url_for('index'))
         flash('Email ou senha incorretos.', 'error')
@@ -139,18 +102,16 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
         is_admin = request.form.get('is_admin') == 'on'
-        conn = get_db_connection()
-        c = conn.cursor()
         try:
-            c.execute("INSERT INTO users (name, email, password, is_admin) VALUES (%s, %s, %s, %s)",
-                      (name, email, generate_password_hash(password), is_admin))
-            conn.commit()
+            new_user = User(name=name, email=email, password=generate_password_hash(password), is_admin=is_admin)
+            db.session.add(new_user)
+            db.session.commit()
             flash('Cadastro realizado com sucesso! Faça login.', 'success')
             return redirect(url_for('login'))
-        except psycopg2.IntegrityError:
+        except Exception as e:
+            db.session.rollback()
             flash('Email já cadastrado.', 'error')
-        finally:
-            conn.close()
+            logger.error(f"Erro ao cadastrar usuário: {e}")
     return render_template('register.html')
 
 @app.route('/logout')
@@ -163,12 +124,8 @@ def logout():
 # --- Lógica do Chat com Banco de Dados ---
 
 def buscar_resposta_faq(pergunta):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT answer FROM faq WHERE LOWER(question) LIKE %s", ('%' + pergunta.lower() + '%',))
-    result = c.fetchone()
-    conn.close()
-    return result[0] if result else None
+    faq = FAQ.query.filter(FAQ.question.ilike(f'%{pergunta}%')).first()
+    return faq.answer if faq else None
 
 def fallback_resumo_encerramento(categoria):
     if categoria.lower() == "hardware":
@@ -285,18 +242,18 @@ def admin_faq():
     if not current_user.is_admin:
         flash('Você não tem permissão para acessar esta página.', 'error')
         return redirect(url_for('index'))
-    conn = get_db_connection()
-    c = conn.cursor()
     if request.method == 'POST':
         if 'add_question' in request.form:
             question = request.form.get('question')
             answer = request.form.get('answer')
             if question and answer:
                 try:
-                    c.execute("INSERT INTO faq (question, answer) VALUES (%s, %s)", (question, answer))
-                    conn.commit()
+                    new_faq = FAQ(question=question, answer=answer)
+                    db.session.add(new_faq)
+                    db.session.commit()
                     flash('FAQ adicionada com sucesso!', 'success')
                 except Exception as e:
+                    db.session.rollback()
                     logger.error(f"Erro ao adicionar FAQ: {e}")
                     flash('Erro ao adicionar FAQ.', 'error')
             else:
@@ -307,25 +264,28 @@ def admin_faq():
             new_answer = request.form.get('edit_answer')
             if faq_id and new_question and new_answer:
                 try:
-                    c.execute("UPDATE faq SET question = %s, answer = %s WHERE id = %s", (new_question, new_answer, faq_id))
-                    conn.commit()
+                    faq = FAQ.query.get(faq_id)
+                    faq.question = new_question
+                    faq.answer = new_answer
+                    db.session.commit()
                     flash('FAQ atualizada com sucesso!', 'success')
                 except Exception as e:
+                    db.session.rollback()
                     logger.error(f"Erro ao atualizar FAQ: {e}")
                     flash('Erro ao atualizar FAQ.', 'error')
         elif 'delete_id' in request.form:
             faq_id = request.form.get('delete_id')
             if faq_id:
                 try:
-                    c.execute("DELETE FROM faq WHERE id = %s", (faq_id,))
-                    conn.commit()
+                    faq = FAQ.query.get(faq_id)
+                    db.session.delete(faq)
+                    db.session.commit()
                     flash('FAQ excluída com sucesso!', 'success')
                 except Exception as e:
+                    db.session.rollback()
                     logger.error(f"Erro ao excluir FAQ: {e}")
                     flash('Erro ao excluir FAQ.', 'error')
-    c.execute("SELECT * FROM faq")
-    faqs = c.fetchall()
-    conn.close()
+    faqs = FAQ.query.all()
     return render_template('admin_faq.html', faqs=faqs)
 
 @app.route('/admin/faq/export/csv')
@@ -334,18 +294,14 @@ def export_faq_csv():
     if not current_user.is_admin:
         flash('Você não tem permissão para acessar esta página.', 'error')
         return redirect(url_for('index'))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM faq")
-    faqs = c.fetchall()
-    conn.close()
+    faqs = FAQ.query.all()
 
     # Gerar o arquivo CSV
     si = StringIO()
     writer = csv.writer(si)
     writer.writerow(['ID', 'Pergunta', 'Resposta'])
     for faq in faqs:
-        writer.writerow([faq[0], faq[1], faq[2]])
+        writer.writerow([faq.id, faq.question, faq.answer])
     output = si.getvalue()
     si.close()
 
@@ -361,11 +317,7 @@ def export_faq_pdf():
     if not current_user.is_admin:
         flash('Você não tem permissão para acessar esta página.', 'error')
         return redirect(url_for('index'))
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM faq")
-    faqs = c.fetchall()
-    conn.close()
+    faqs = FAQ.query.all()
 
     # Gerar o arquivo PDF
     buffer = BytesIO()
@@ -380,7 +332,7 @@ def export_faq_pdf():
     # Tabela de FAQs
     data = [['ID', 'Pergunta', 'Resposta']]
     for faq in faqs:
-        data.append([str(faq[0]), faq[1], faq[2]])
+        data.append([str(faq.id), faq.question, faq.answer])
     table = Table(data)
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -408,5 +360,32 @@ def export_faq_pdf():
         mimetype="application/pdf"
     )
 
+# --- Comandos para Gerenciar Migrações ---
+
+@manager.command
+def init_db():
+    """Inicializa o banco de dados com dados padrão."""
+    with app.app_context():
+        # Criar as tabelas (será gerenciado pelo Flask-Migrate)
+        db.create_all()
+        # Inserir FAQs padrão se a tabela estiver vazia
+        if not FAQ.query.first():
+            faq_data = [
+                FAQ(question="computador não liga", answer="1. Verificar cabo de energia e conexões. 2. Testar fonte de alimentação com multímetro. 3. Substituir fonte se defeituosa. 4. Testar inicialização."),
+                FAQ(question="erro ao acessar sistema", answer="1. Verificar credenciais de login. 2. Reiniciar o sistema. 3. Atualizar o software para a versão mais recente. 4. Testar acesso novamente."),
+                FAQ(question="como configurar uma vpn", answer="1. Abra as configurações de rede do sistema operacional. 2. Adicione uma nova conexão VPN. 3. Insira o endereço do servidor VPN, usuário e senha fornecidos pelo administrador. 4. Conecte-se e teste a conexão."),
+                FAQ(question="impressora não funciona", answer="1. Verifique se a impressora está ligada e conectada. 2. Confirme que os drivers estão instalados. 3. Teste a impressão de uma página de teste. 4. Reinicie a impressora e o computador.")
+            ]
+            db.session.bulk_save_objects(faq_data)
+            db.session.commit()
+        print("Banco de dados inicializado com sucesso!")
+
+@manager.command
+def apply_migrations():
+    """Aplica todas as migrações pendentes."""
+    with app.app_context():
+        upgrade()
+        print("Migrações aplicadas com sucesso!")
+
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    manager.run()
