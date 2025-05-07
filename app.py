@@ -15,7 +15,7 @@ nltk.download('stopwords')
 app = Flask(__name__)
 
 # Carregar modelo e tokenizer local (FLAN-T5-base)
-model_name = "google/flan-t5-base"
+model_name = model_name = "google/flan-t5-small"
 tokenizer = T5Tokenizer.from_pretrained(model_name)
 model = T5ForConditionalGeneration.from_pretrained(model_name)
 
