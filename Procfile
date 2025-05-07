@@ -1,1 +1,1 @@
-web: python app.py init_db && gunicorn app:app --workers 1 --timeout 120
+web: flask db upgrade && python app.py init_db && gunicorn app:app --workers 1 --timeout 120
