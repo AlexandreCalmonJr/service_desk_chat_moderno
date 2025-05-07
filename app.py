@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, session
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, session, send_file, Response
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import psycopg2
 import nltk
@@ -9,6 +9,12 @@ import re
 import logging
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
+import csv
+from io import StringIO, BytesIO
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -132,7 +138,7 @@ def register():
         name = request.form.get('name')
         email = request.form.get('email')
         password = request.form.get('password')
-        is_admin = request.form.get('is_admin') == 'on'  # Checkbox para admin
+        is_admin = request.form.get('is_admin') == 'on'
         conn = get_db_connection()
         c = conn.cursor()
         try:
@@ -321,6 +327,86 @@ def admin_faq():
     faqs = c.fetchall()
     conn.close()
     return render_template('admin_faq.html', faqs=faqs)
+
+@app.route('/admin/faq/export/csv')
+@login_required
+def export_faq_csv():
+    if not current_user.is_admin:
+        flash('Você não tem permissão para acessar esta página.', 'error')
+        return redirect(url_for('index'))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM faq")
+    faqs = c.fetchall()
+    conn.close()
+
+    # Gerar o arquivo CSV
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow(['ID', 'Pergunta', 'Resposta'])
+    for faq in faqs:
+        writer.writerow([faq[0], faq[1], faq[2]])
+    output = si.getvalue()
+    si.close()
+
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=faqs.csv"}
+    )
+
+@app.route('/admin/faq/export/pdf')
+@login_required
+def export_faq_pdf():
+    if not current_user.is_admin:
+        flash('Você não tem permissão para acessar esta página.', 'error')
+        return redirect(url_for('index'))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM faq")
+    faqs = c.fetchall()
+    conn.close()
+
+    # Gerar o arquivo PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+
+    # Título
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph("Lista de FAQs", styles['Title']))
+    elements.append(Paragraph("<br/><br/>", styles['Normal']))
+
+    # Tabela de FAQs
+    data = [['ID', 'Pergunta', 'Resposta']]
+    for faq in faqs:
+        data.append([str(faq[0]), faq[1], faq[2]])
+    table = Table(data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(table)
+
+    # Construir o PDF
+    doc.build(elements)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="faqs.pdf",
+        mimetype="application/pdf"
+    )
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
