@@ -41,12 +41,13 @@ class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
+    image_url = db.Column(db.String(500), nullable=True)  # Novo campo para URL da imagem
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
 
     @property
     def formatted_answer(self):
-        return format_faq_response(self.question, self.answer)
+        return format_faq_response(self.question, self.answer, self.image_url)
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -108,13 +109,13 @@ def extract_faqs_from_pdf(file_path):
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
             answer = lines[i + 1]
-            faqs.append({"question": question, "answer": answer})
+            faqs.append({"question": question, "answer": answer, "image_url": None})  # PDF não suporta imagens diretamente
         return faqs
     except Exception as e:
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
-def format_faq_response(question, answer):
+def format_faq_response(question, answer, image_url=None):
     sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
 
@@ -146,6 +147,10 @@ def format_faq_response(question, answer):
                     if item:
                         formatted_response += f"{item}<br>"
             formatted_response += "<br>"
+
+    # Adicionar a imagem, se existir
+    if image_url:
+        formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
 
     return formatted_response
 
@@ -254,9 +259,12 @@ def chat():
         if int(faq_id) in faq_ids:
             selected_faq = FAQ.query.get(int(faq_id))
             if selected_faq:
-                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer)
+                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer, selected_faq.image_url)
                 resposta['html'] = True
-                session.pop('faq_selection', None)
+                # Reenviar as opções para o frontend
+                faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
+                resposta['state'] = 'faq_selection'
+                resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
                 return jsonify(resposta)
         resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
         return jsonify(resposta)
@@ -274,7 +282,7 @@ def chat():
             if faq_matches:
                 if len(faq_matches) == 1:
                     faq = faq_matches[0]
-                    resposta['text'] = format_faq_response(faq.question, faq.answer)
+                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
                     resposta['html'] = True
                 else:
                     faq_ids = [faq.id for faq in faq_matches]
@@ -302,13 +310,14 @@ def admin_faq():
             category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
+            image_url = request.form.get('image_url')  # Novo campo no formulário
             if category_id and question and answer:
-                faq = FAQ(category_id=category_id, question=question, answer=answer)
+                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url)
                 db.session.add(faq)
                 db.session.commit()
                 flash('FAQ adicionada com sucesso!', 'success')
             else:
-                flash('Preencha todos os campos.', 'error')
+                flash('Preencha todos os campos obrigatórios.', 'error')
         elif 'import_faqs' in request.form:
             file = request.files['faq_file']
             if file and file.filename.endswith(('.json', '.csv', '.pdf')):
@@ -327,6 +336,7 @@ def admin_faq():
                                 category_name = item.get('category')
                                 question = item.get('question')
                                 answer = item.get('answer', '')
+                                image_url = item.get('image_url')  # Novo campo no JSON
                                 if not category_name or not question:
                                     flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
                                     continue
@@ -335,21 +345,26 @@ def admin_faq():
                                     category = Category(name=category_name)
                                     db.session.add(category)
                                     db.session.commit()
-                                faq = FAQ(category_id=category.id, question=question, answer=answer)
+                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url)
                                 db.session.add(faq)
                     elif file.filename.endswith('.csv'):
                         category_id = request.form['category_import']
                         with open(file_path, 'r', encoding='utf-8') as f:
                             reader = csv.DictReader(f)
                             for row in reader:
-                                faq = FAQ(category_id=category_id, question=row.get('question'), answer=row.get('answer', ''))
+                                faq = FAQ(
+                                    category_id=category_id,
+                                    question=row.get('question'),
+                                    answer=row.get('answer', ''),
+                                    image_url=row.get('image_url')  # Novo campo no CSV
+                                )
                                 db.session.add(faq)
                     elif file.filename.endswith('.pdf'):
                         category_id = request.form['category_import']
                         faqs_extracted = extract_faqs_from_pdf(file_path)
                         for faq in faqs_extracted:
                             if faq['question'] and faq['answer']:
-                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'])
+                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
                                 db.session.add(new_faq)
                     db.session.commit()
                     flash('FAQs importadas com sucesso!', 'success')
