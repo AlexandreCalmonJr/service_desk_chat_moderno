@@ -76,26 +76,6 @@
                 </div>
                 <button type="submit" name="import_faqs" class="chat-button w-full">Importar FAQs</button>
             </form>
-
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Editar/Excluir FAQs</h3>
-            {% if faqs %}
-                <ul class="space-y-3">
-                    {% for faq in faqs %}
-                        <li class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
-                            <strong class="block text-gray-900 dark:text-gray-100">{{ faq.question }} (Categoria: {{ faq.category.name }})</strong>
-                            <p class="text-gray-700 dark:text-gray-300 mt-1">{{ faq.answer }}</p>
-                            <div class="mt-2 flex space-x-2">
-                                <button onclick="editFaq({{ faq.id }}, '{{ faq.question }}', '{{ faq.answer }}', {{ faq.category_id }})" class="text-sm px-3 py-1 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition">Editar</button>
-                                <form method="POST" action="/admin/faq/delete/{{ faq.id }}" onsubmit="return confirm('Tem certeza que deseja excluir esta FAQ?');">
-                                    <button type="submit" class="text-sm px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Excluir</button>
-                                </form>
-                            </div>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
-            {% endif %}
         </div>
     </main>
 
@@ -105,14 +85,6 @@
             const themeToggle = document.querySelector('.theme-toggle i');
             themeToggle.classList.toggle('fa-moon');
             themeToggle.classList.toggle('fa-sun');
-        }
-
-        function editFaq(id, question, answer, categoryId) {
-            document.getElementById('category').value = categoryId;
-            document.getElementById('question').value = question;
-            document.getElementById('answer').value = answer;
-            document.querySelector('form[action="/admin/faq"]').setAttribute('action', `/admin/faq/edit/${id}`);
-            document.querySelector('button[name="add_question"]').textContent = 'Salvar Alterações';
         }
     </script>
 </body>
