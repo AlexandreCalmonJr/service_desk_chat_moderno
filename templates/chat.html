@@ -1,0 +1,139 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><div class="chat-container w-full max-w-3xl flex flex-col h-[calc(100vh-8rem)]">
+    <div class="chat-body flex-1 overflow-y-auto p-4" id="chat-body">
+        <div class="chat-message bot">
+            <div class="avatar"><i class="fas fa-robot"></i></div>
+            <div class="message-bubble">Sou seu assistente de Service Desk. Como posso ajudar hoje? Tente "Encerrar chamado <ID>", "Sugerir solução para <problema>", ou perguntas como "Como configurar uma VPN?".</div>
+        </div>
+    </div>
+    <div class="chat-footer p-4 bg-white dark:bg-gray-800 shadow-inner">
+        <div class="typing-indicator" id="typing-indicator">
+            <span>Digitando...</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <input type="file" id="file-upload" accept=".xlsx" class="text-sm text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
+            <textarea id="chat-input" class="chat-input flex-1" rows="2" placeholder="Digite sua mensagem ou envie um arquivo XLSX..."></textarea>
+            <button onclick="enviarMensagem()" class="chat-button">Enviar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chatBody = document.getElementById('chat-body');
+    const chatInput = document.getElementById('chat-input');
+    const typingIndicator = document.getElementById('typing-indicator');
+
+    document.getElementById('file-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const base64Data = event.target.result.split(',')[1];
+                gk_fileData[file.name] = base64Data;
+                gk_xlsxFileLookup[file.name] = true;
+                gk_isXlsx = file.name.toLowerCase().endsWith('.xlsx');
+                adicionarMensagem(`Arquivo "${file.name}" carregado. Envie uma mensagem para processar os dados.`, 'bot');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    async function enviarMensagem() {
+        const mensagem = chatInput.value.trim();
+        if (!mensagem && !document.getElementById('file-upload').files.length) return;
+
+        let userMessage = mensagem;
+        if (document.getElementById('file-upload').files.length) {
+            const file = document.getElementById('file-upload').files[0];
+            userMessage = mensagem || `Processar arquivo: ${file.name}`;
+            const csvData = loadFileData(file.name);
+            if (csvData) {
+                userMessage += `\nConteúdo: ${csvData.substring(0, 100)}...`;
+            }
+        }
+
+        adicionarMensagem(userMessage, 'user');
+        chatInput.value = '';
+        document.getElementById('file-upload').value = '';
+        typingIndicator.style.display = 'flex';
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensagem: userMessage })
+            });
+            const data = await response.json();
+            adicionarMensagem(data.resposta, 'bot');
+        } catch (error) {
+            adicionarMensagem('Erro ao processar a solicitação.', 'bot');
+        } finally {
+            typingIndicator.style.display = 'none';
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+    }
+
+    function adicionarMensagem(texto, tipo) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${tipo}`;
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar';
+        avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+        const bubbleDiv = document.createElement('div');
+        bubbleDiv.className = 'message-bubble';
+        bubbleDiv.textContent = texto;
+        messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
+        messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
+        chatBody.appendChild(messageDiv);
+    }
+
+    chatInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            enviarMensagem();
+        }
+    });
+
+    window.addEventListener('load', () => {
+        chatBody.scrollTop = chatBody.scrollHeight;
+    });
+</script>

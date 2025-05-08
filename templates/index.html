@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -47,112 +8,72 @@
     <link href="/static/styles.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+
+        function filledCell(cell) {
+            return cell !== '' && cell != null;
+        }
+
+        function loadFileData(filename) {
+            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+                try {
+                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                    var firstSheetName = workbook.SheetNames[0];
+                    var worksheet = workbook.Sheets[firstSheetName];
+
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                    var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                    var headerRowIndex = filteredData.findIndex((row, index) =>
+                        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                    );
+                    if (headerRowIndex === -1 || headerRowIndex > 25) {
+                        headerRowIndex = 0;
+                    }
+
+                    var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                    return csv;
+                } catch (e) {
+                    console.error(e);
+                    return "";
+                }
+            }
+            return gk_fileData[filename] || "";
+        }
+    </script>
 </head>
-<body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <h1>Assistente de Service Desk</h1>
-            <p>Digite comandos como "Encerrar chamado 12345", "Sugerir solução para computador não liga", ou perguntas como "Como configurar uma VPN?"</p>
+<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
+        <div class="flex items-center space-x-3">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
+            <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
+        </div>
+        <div class="flex items-center space-x-3">
+            {% if current_user.is_admin %}
+                <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
+            {% endif %}
+            <a href="/logout" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
             <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon"></i>
+                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
             </button>
         </div>
-        <div class="chat-body" id="chat-body">
-            <div class="chat-message bot">
-                <div class="avatar"><i class="fas fa-robot"></i></div>
-                <div class="message-bubble">Olá, {{ user.name }}! Sou seu assistente de Service Desk. Como posso ajudar hoje? Tente "Encerrar chamado <ID>", "Sugerir solução para <problema>", ou perguntas como "Como configurar uma VPN?".</div>
-            </div>
-            <div class="chat-message bot">
-                <div class="avatar"><i class="fas fa-robot"></i></div>
-                <div class="message-bubble">
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Escolha uma opção ou digite um comando abaixo:</p>
-                    <div class="space-y-2">
-                        {% if current_user.is_admin %}
-                            <a href="/admin/faq" class="block w-full text-center bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 py-2 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition">
-                                Gerenciar FAQs (Admin)
-                            </a>
-                        {% endif %}
-                        <a href="/logout" class="block w-full text-center bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition">
-                            Sair
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="chat-footer">
-            <div class="typing-indicator" id="typing-indicator">
-                <span>Digitando...</span>
-            </div>
-            <textarea id="chat-input" class="chat-input" rows="2" placeholder="Digite sua mensagem..."></textarea>
-            <button onclick="enviarMensagem()" class="chat-button">Enviar</button>
-        </div>
-    </div>
+    </header>
+    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
+        {% include 'chat.html' %}
+    </main>
 
     <script>
-        const chatBody = document.getElementById('chat-body');
-        const chatInput = document.getElementById('chat-input');
-        const typingIndicator = document.getElementById('typing-indicator');
-
-        // Alternar tema claro/escuro
         function toggleTheme() {
             document.body.classList.toggle('dark');
             const themeToggle = document.querySelector('.theme-toggle i');
             themeToggle.classList.toggle('fa-moon');
             themeToggle.classList.toggle('fa-sun');
         }
-
-        async function enviarMensagem() {
-            const mensagem = chatInput.value.trim();
-            if (!mensagem) return;
-
-            // Adicionar mensagem do usuário
-            adicionarMensagem(mensagem, 'user');
-            chatInput.value = '';
-            typingIndicator.style.display = 'flex';
-            chatBody.scrollTop = chatBody.scrollHeight;
-
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mensagem })
-                });
-                const data = await response.json();
-                adicionarMensagem(data.resposta, 'bot');
-            } catch (error) {
-                adicionarMensagem('Erro ao processar a solicitação.', 'bot');
-            } finally {
-                typingIndicator.style.display = 'none';
-                chatBody.scrollTop = chatBody.scrollHeight;
-            }
-        }
-
-        function adicionarMensagem(texto, tipo) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message ${tipo}`;
-            const avatarDiv = document.createElement('div');
-            avatarDiv.className = 'avatar';
-            avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
-            const bubbleDiv = document.createElement('div');
-            bubbleDiv.className = 'message-bubble';
-            bubbleDiv.textContent = texto;
-            messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
-            messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
-            chatBody.appendChild(messageDiv);
-        }
-
-        // Enviar mensagem com Enter (sem Shift)
-        chatInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                enviarMensagem();
-            }
-        });
-
-        // Carregar mensagens iniciais (se houver)
-        window.addEventListener('load', () => {
-            chatBody.scrollTop = chatBody.scrollHeight;
-        });
     </script>
 </body>
 </html>
