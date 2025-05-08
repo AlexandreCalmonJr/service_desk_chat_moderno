@@ -120,7 +120,7 @@
         avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
         const bubbleDiv = document.createElement('div');
         bubbleDiv.className = 'message-bubble';
-        bubbleDiv.textContent = texto;
+        bubbleDiv.innerHTML = texto;
         messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
         messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
         chatBody.appendChild(messageDiv);
