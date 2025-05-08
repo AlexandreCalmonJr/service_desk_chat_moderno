@@ -1,7 +1,6 @@
 from flask import Flask, request, render_template, redirect, url_for, flash
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
@@ -12,12 +11,10 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql+psycopg://sdeskdb_user:urrIL42GcKewOyEQDey6KKNcas8NLH2x@dpg-d0dsicndiees73a8op40-a/sdeskdb')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://sdeskdb_user:urrIL42GcKewOyEQDey6KKNcas8NLH2x@dpg-d0dsicndiees73a8op40-a/sdeskdb')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 db = SQLAlchemy(app)
-
-# Configurar Flask-Migrate
-migrate = Migrate(app, db)
 
 # Configurar Flask-Login
 login_manager = LoginManager()
@@ -113,6 +110,7 @@ def admin_faq():
 def init_db():
     """Inicializa o banco de dados com dados padrão."""
     with app.app_context():
+        db.create_all()  # Cria as tabelas
         if not FAQ.query.first():
             faq_data = [
                 FAQ(question="computador não liga", answer="Verifique a energia e a fonte."),
@@ -123,7 +121,5 @@ def init_db():
         logger.info("Banco de dados inicializado com sucesso!")
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Cria as tabelas localmente
-        init_db()
+    init_db()
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
