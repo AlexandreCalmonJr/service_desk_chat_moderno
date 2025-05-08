@@ -1,37 +1,24 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Assistente de Service Desk</title>
-    <link href="/static/tailwind.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-</head>
-<body class="font-sans bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen flex justify-center items-center">
-    <div class="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
-        <h2 class="text-2xl font-bold text-center mb-6 text-gray-800">Login</h2>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="py-3 px-4 mb-4 text-center rounded-md {% if category == 'success' %}bg-green-100 text-green-800 {% else %} bg-red-100 text-red-800 {% endif %}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        <form method="POST" action="{{ url_for('login') }}">
-            <div class="mb-4">
-                <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email</label>
-                <input type="email" id="email" name="email" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500">
+{% extends 'base.html' %}
+
+{% block messages %}
+<div class="chat-message bot">
+    <div class="avatar"><i class="fas fa-robot"></i></div>
+    <div class="message-bubble">Por favor, faça login para continuar.</div>
+</div>
+<div class="chat-message">
+    <div class="message-bubble" style="background: transparent; box-shadow: none; padding: 0;">
+        <form method="POST" action="{{ url_for('login') }}" class="space-y-4">
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                <input type="email" id="email" name="email" required class="mt-1 block w-full chat-input" style="border-radius: 12px;">
             </div>
-            <div class="mb-6">
-                <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Senha</label>
-                <input type="password" id="password" name="password" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500">
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Senha</label>
+                <input type="password" id="password" name="password" required class="mt-1 block w-full chat-input" style="border-radius: 12px;">
             </div>
-            <button type="submit" class="bg-gradient-to-r from-blue-500 to-blue-400 hover:from-blue-400 hover:to-blue-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Entrar</button>
+            <button type="submit" class="chat-button w-full">Entrar</button>
         </form>
-        <div class="text-center mt-4">
-            <p class="text-gray-600 text-sm">Não tem uma conta? <a href="{{ url_for('register') }}" class="font-bold text-blue-500 hover:underline">Cadastre-se</a></p>
-        </div>
+        <p class="text-center mt-3 text-sm text-gray-600 dark:text-gray-400">Não tem uma conta? <a href="{{ url_for('register') }}" class="text-blue-600 dark:text-blue-400">Registre-se</a></p>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

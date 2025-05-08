@@ -1,32 +1,36 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="container mx-auto mt-8 p-4 bg-white shadow-md rounded-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Gerenciar FAQs</h2>
-    <form method="POST" action="{{ url_for('admin_faq') }}" class="mb-6">
-        <div class="mb-4">
-            <label for="question" class="block text-gray-700 text-sm font-bold mb-2">Pergunta</label>
-            <input type="text" id="question" name="question" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500">
-        </div>
-        <div class="mb-4">
-            <label for="answer" class="block text-gray-700 text-sm font-bold mb-2">Resposta</label>
-            <textarea id="answer" name="answer" rows="3" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500"></textarea>
-        </div>
-        <button type="submit" name="add_question" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Adicionar FAQ</button>
-    </form>
-
-    <h3 class="text-xl font-bold mt-8 mb-4 text-gray-800">FAQs Existentes</h3>
-    {% if faqs %}
-        <ul class="list-none">
-            {% for faq in faqs %}
-                <li class="mb-4 p-4 border-b border-gray-200">
-                    <strong class="block font-semibold text-gray-700">{{ faq.question }}</strong>
-                    <p class="text-gray-600">{{ faq.answer }}</p>
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p class="text-gray-500">Nenhuma FAQ cadastrada.</p>
-    {% endif %}
+{% block messages %}
+<div class="chat-message bot">
+    <div class="avatar"><i class="fas fa-robot"></i></div>
+    <div class="message-bubble">Bem-vindo ao gerenciamento de FAQs, {{ user.name }}!</div>
+</div>
+<div class="chat-message">
+    <div class="message-bubble" style="background: transparent; box-shadow: none; padding: 0;">
+        <form method="POST" action="{{ url_for('admin_faq') }}" class="space-y-4">
+            <div>
+                <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Pergunta</label>
+                <input type="text" id="question" name="question" required class="mt-1 block w-full chat-input" style="border-radius: 12px;">
+            </div>
+            <div>
+                <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Resposta</label>
+                <textarea id="answer" name="answer" rows="3" required class="mt-1 block w-full chat-input" style="border-radius: 12px;"></textarea>
+            </div>
+            <button type="submit" name="add_question" class="chat-button w-full">Adicionar FAQ</button>
+        </form>
+        <h3 class="mt-5 text-lg font-semibold text-gray-900 dark:text-gray-100">FAQs Existentes</h3>
+        {% if faqs %}
+            <ul class="mt-2 space-y-2">
+                {% for faq in faqs %}
+                    <li class="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                        <strong class="text-gray-900 dark:text-gray-100">{{ faq.question }}</strong>
+                        <p class="text-gray-700 dark:text-gray-300">{{ faq.answer }}</p>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="mt-2 text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
