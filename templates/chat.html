@@ -41,7 +41,7 @@
             adicionarMensagem(data.text, 'bot', data.html, data.options);
             chatState = data.state || 'normal';
             if (chatState === 'faq_selection') {
-                chatInput.placeholder = 'Ou digite uma nova mensagem...';
+                chatInput.placeholder = 'Clique em uma FAQ acima ou digite uma nova mensagem...';
             } else {
                 chatInput.placeholder = 'Digite sua mensagem...';
             }

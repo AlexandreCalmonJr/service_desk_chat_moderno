@@ -277,7 +277,6 @@ def chat():
                     resposta['text'] = format_faq_response(faq.question, faq.answer)
                     resposta['html'] = True
                 else:
-                    # Armazenar apenas os IDs das FAQs na sessão
                     faq_ids = [faq.id for faq in faq_matches]
                     session['faq_selection'] = faq_ids
                     resposta['state'] = 'faq_selection'
@@ -285,11 +284,8 @@ def chat():
                     resposta['html'] = True
                     resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
             else:
-                faqs = FAQ.query.limit(3).all()
-                if faqs:
-                    options = [format_faq_response(faq.question, faq.answer) for faq in faqs]
-                    resposta['text'] = "Aqui estão algumas FAQs que podem ajudar:<br>" + "<br><br>".join(options)
-                    resposta['html'] = True
+                resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
+                resposta['html'] = False
 
     return jsonify(resposta)
 
