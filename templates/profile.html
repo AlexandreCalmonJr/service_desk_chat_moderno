@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Chat Avançado</title>
+    <title>Assistente de Service Desk - Perfil</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/styles.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,6 +16,7 @@
             <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
         </div>
         <div class="flex items-center space-x-3">
+            <a href="/" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Voltar ao Chat</a>
             {% if current_user.is_admin %}
                 <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
             {% endif %}
@@ -27,8 +28,24 @@
             </button>
         </div>
     </header>
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
-        {% include 'chat.html' %}
+    <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
+        <div class="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 text-center mb-6">Perfil do Usuário</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome</label>
+                    <p class="text-gray-900 dark:text-gray-100">{{ current_user.name }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <p class="text-gray-900 dark:text-gray-100">{{ current_user.email }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Usuário</label>
+                    <p class="text-gray-900 dark:text-gray-100">{{ 'Administrador' if current_user.is_admin else 'Usuário' }}</p>
+                </div>
+            </div>
+        </div>
     </main>
 
     <script>

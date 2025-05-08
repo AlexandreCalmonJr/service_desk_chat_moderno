@@ -29,10 +29,16 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
 
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+
 class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -44,9 +50,16 @@ class Ticket(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Inicialização do banco de dados
+# Inicialização do banco de dados e categorias padrão
 with app.app_context():
     db.create_all()
+    # Adicionar categorias padrão se não existirem
+    categories = ['Hardware', 'Software', 'Rede', 'Outros']
+    for category_name in categories:
+        if not Category.query.filter_by(name=category_name).first():
+            category = Category(name=category_name)
+            db.session.add(category)
+    db.session.commit()
 
 # Funções de utilidade
 def process_ticket_command(message):
@@ -95,7 +108,6 @@ def extract_faqs_from_pdf(file_path):
         return []
 
 def format_faq_response(question, answer):
-    # Dividir a resposta em seções com base em marcadores (ex.: "Pré-requisitos:", "Etapa 1:", etc.)
     sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
 
@@ -121,7 +133,6 @@ def format_faq_response(question, answer):
             formatted_response += "<strong>✅ Pós-instalação</strong><br>"
         else:
             if current_section:
-                # Dividir itens dentro da seção (assumir que cada item é separado por ponto ou vírgula)
                 items = re.split(r'[,.]\s*(?=[A-Z])', part)
                 for item in items:
                     item = item.strip()
@@ -144,6 +155,23 @@ def find_faq_by_keywords(message):
 @login_required
 def index():
     return render_template('index.html')
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html')
+
+@app.route('/faqs')
+@login_required
+def faqs():
+    faqs = FAQ.query.all()
+    faqs_by_category = {}
+    for faq in faqs:
+        category_name = faq.category.name
+        if category_name not in faqs_by_category:
+            faqs_by_category[category_name] = []
+        faqs_by_category[category_name].append(faq)
+    return render_template('faqs.html', faqs_by_category=faqs_by_category)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -190,11 +218,6 @@ def chat():
     mensagem = data.get('mensagem', '').strip()
     resposta = {
         'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!",
-        'options': [
-            {'text': 'Encerrar Chamado', 'action': 'prompt', 'value': 'Encerrar chamado '},
-            {'text': 'Sugerir Solução', 'action': 'prompt', 'value': 'Sugerir solução para '},
-            {'text': 'Ver FAQs', 'action': 'link', 'value': '/admin/faq'}
-        ],
         'html': False
     }
 
@@ -202,18 +225,10 @@ def chat():
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
         resposta['text'] = ticket_response
-        resposta['options'] = [
-            {'text': 'Voltar ao Chat', 'action': 'link', 'value': '/'},
-            {'text': 'Encerrar Outro Chamado', 'action': 'prompt', 'value': 'Encerrar chamado '}
-        ]
     else:
         solution_response = suggest_solution(mensagem)
         if solution_response:
             resposta['text'] = solution_response
-            resposta['options'] = [
-                {'text': 'Voltar ao Chat', 'action': 'link', 'value': '/'},
-                {'text': 'Sugerir Outra Solução', 'action': 'prompt', 'value': 'Sugerir solução para '}
-            ]
         else:
             # Buscar FAQ por palavras-chave
             question, answer = find_faq_by_keywords(mensagem)
@@ -221,10 +236,6 @@ def chat():
                 formatted_response = format_faq_response(question, answer)
                 resposta['text'] = formatted_response
                 resposta['html'] = True
-                resposta['options'] = [
-                    {'text': 'Voltar ao Chat', 'action': 'link', 'value': '/'},
-                    {'text': 'Fazer Outra Pergunta', 'action': 'prompt', 'value': ''}
-                ]
             else:
                 # Sugestão de FAQs relevantes
                 faqs = FAQ.query.limit(3).all()
@@ -232,10 +243,6 @@ def chat():
                     options = [format_faq_response(faq.question, faq.answer) for faq in faqs]
                     resposta['text'] = "Aqui estão algumas FAQs que podem ajudar:<br>" + "<br><br>".join(options)
                     resposta['html'] = True
-                    resposta['options'] = [
-                        {'text': 'Fazer Pergunta', 'action': 'prompt', 'value': ''},
-                        {'text': 'Ver Todas FAQs', 'action': 'link', 'value': '/admin/faq'}
-                    ]
 
     return jsonify(resposta)
 
@@ -246,19 +253,22 @@ def admin_faq():
         flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
         return redirect(url_for('index'))
     
+    categories = Category.query.all()
     faqs = FAQ.query.all()
     if request.method == 'POST':
         if 'add_question' in request.form:
+            category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
-            if question and answer:
-                faq = FAQ(question=question, answer=answer)
+            if category_id and question and answer:
+                faq = FAQ(category_id=category_id, question=question, answer=answer)
                 db.session.add(faq)
                 db.session.commit()
                 flash('FAQ adicionada com sucesso!', 'success')
             else:
                 flash('Preencha todos os campos.', 'error')
         elif 'import_faqs' in request.form:
+            category_id = request.form['category_import']
             file = request.files['faq_file']
             if file and file.filename.endswith(('.json', '.csv', '.pdf')):
                 filename = secure_filename(file.filename)
@@ -268,26 +278,54 @@ def admin_faq():
                     with open(file_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                         for item in data:
-                            faq = FAQ(question=item.get('question'), answer=item.get('answer', ''))
+                            faq = FAQ(category_id=category_id, question=item.get('question'), answer=item.get('answer', ''))
                             db.session.add(faq)
                 elif file.filename.endswith('.csv'):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         reader = csv.DictReader(f)
                         for row in reader:
-                            faq = FAQ(question=row.get('question'), answer=row.get('answer', ''))
+                            faq = FAQ(category_id=category_id, question=row.get('question'), answer=row.get('answer', ''))
                             db.session.add(faq)
                 elif file.filename.endswith('.pdf'):
                     faqs_extracted = extract_faqs_from_pdf(file_path)
                     for faq in faqs_extracted:
                         if faq['question'] and faq['answer']:
-                            new_faq = FAQ(question=faq['question'], answer=faq['answer'])
+                            new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'])
                             db.session.add(new_faq)
                 db.session.commit()
                 flash('FAQs importadas com sucesso!', 'success')
                 os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
-    return render_template('admin_faq.html', faqs=faqs)
+    return render_template('admin_faq.html', categories=categories, faqs=faqs)
+
+@app.route('/admin/faq/edit/<int:faq_id>', methods=['POST'])
+@login_required
+def edit_faq(faq_id):
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('index'))
+    
+    faq = FAQ.query.get_or_404(faq_id)
+    faq.category_id = request.form['category']
+    faq.question = request.form['question']
+    faq.answer = request.form['answer']
+    db.session.commit()
+    flash('FAQ atualizada com sucesso!', 'success')
+    return redirect(url_for('admin_faq'))
+
+@app.route('/admin/faq/delete/<int:faq_id>', methods=['POST'])
+@login_required
+def delete_faq(faq_id):
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('index'))
+    
+    faq = FAQ.query.get_or_404(faq_id)
+    db.session.delete(faq)
+    db.session.commit()
+    flash('FAQ excluída com sucesso!', 'success')
+    return redirect(url_for('admin_faq'))
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Chat Avançado</title>
+    <title>Assistente de Service Desk - FAQs</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/styles.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,6 +16,7 @@
             <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
         </div>
         <div class="flex items-center space-x-3">
+            <a href="/" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Voltar ao Chat</a>
             {% if current_user.is_admin %}
                 <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
             {% endif %}
@@ -27,8 +28,29 @@
             </button>
         </div>
     </header>
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
-        {% include 'chat.html' %}
+    <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
+        <div class="w-full max-w-2xl p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">FAQs Registradas</h2>
+            {% if faqs %}
+                <div class="space-y-6">
+                    {% for category, faq_list in faqs_by_category.items() %}
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">{{ category }}</h3>
+                            <ul class="space-y-3">
+                                {% for faq in faq_list %}
+                                    <li class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
+                                        <strong class="block text-gray-900 dark:text-gray-100">{{ faq.question }}</strong>
+                                        <p class="text-gray-700 dark:text-gray-300 mt-1">{{ faq.answer }}</p>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
+            {% endif %}
+        </div>
     </main>
 
     <script>

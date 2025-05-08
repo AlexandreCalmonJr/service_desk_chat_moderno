@@ -10,82 +10,23 @@
             <span>Digitando...</span>
         </div>
         <div class="flex items-center space-x-2">
-            <input type="file" id="file-upload" accept=".xlsx" class="text-sm text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
-            <textarea id="chat-input" class="chat-input flex-1" rows="2" placeholder="Digite sua mensagem ou envie um arquivo XLSX..."></textarea>
+            <textarea id="chat-input" class="chat-input flex-1" rows="2" placeholder="Digite sua mensagem..."></textarea>
             <button onclick="enviarMensagem()" class="chat-button">Enviar</button>
         </div>
     </div>
 </div>
 
 <script>
-    var gk_isXlsx = false;
-    var gk_xlsxFileLookup = {};
-    var gk_fileData = {};
-
-    function filledCell(cell) {
-        return cell !== '' && cell != null;
-    }
-
-    function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                    row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                    headerRowIndex = 0;
-                }
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
-                return XLSX.utils.sheet_to_csv(csv, { header: 1 });
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-    }
-
     const chatBody = document.getElementById('chat-body');
     const chatInput = document.getElementById('chat-input');
     const typingIndicator = document.getElementById('typing-indicator');
 
-    document.getElementById('file-upload').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const base64Data = event.target.result.split(',')[1];
-                gk_fileData[file.name] = base64Data;
-                gk_xlsxFileLookup[file.name] = true;
-                gk_isXlsx = file.name.toLowerCase().endsWith('.xlsx');
-                adicionarMensagem(`Arquivo "${file.name}" carregado. Envie uma mensagem para processar os dados.`, 'bot', []);
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-
     async function enviarMensagem() {
         const mensagem = chatInput.value.trim();
-        if (!mensagem && !document.getElementById('file-upload').files.length) return;
+        if (!mensagem) return;
 
-        let userMessage = mensagem;
-        if (document.getElementById('file-upload').files.length) {
-            const file = document.getElementById('file-upload').files[0];
-            userMessage = mensagem || `Processar arquivo: ${file.name}`;
-            const csvData = loadFileData(file.name);
-            if (csvData) {
-                userMessage += `\nConteúdo: ${csvData.substring(0, 100)}...`;
-            }
-        }
-
-        adicionarMensagem(userMessage, 'user', []);
+        adicionarMensagem(mensagem, 'user');
         chatInput.value = '';
-        document.getElementById('file-upload').value = '';
         typingIndicator.style.display = 'flex';
         chatBody.scrollTop = chatBody.scrollHeight;
 
@@ -93,19 +34,19 @@
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mensagem: userMessage })
+                body: JSON.stringify({ mensagem: mensagem })
             });
             const data = await response.json();
-            adicionarMensagem(data.text, 'bot', data.options, data.html);
+            adicionarMensagem(data.text, 'bot', data.html);
         } catch (error) {
-            adicionarMensagem('Erro ao processar a solicitação.', 'bot', []);
+            adicionarMensagem('Erro ao processar a solicitação.', 'bot');
         } finally {
             typingIndicator.style.display = 'none';
             chatBody.scrollTop = chatBody.scrollHeight;
         }
     }
 
-    function adicionarMensagem(texto, tipo, options = [], isHtml = false) {
+    function adicionarMensagem(texto, tipo, isHtml = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${tipo} mb-4 flex items-start`;
         const avatarDiv = document.createElement('div');
@@ -120,30 +61,6 @@
         }
         messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
         messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
-
-        if (options.length > 0) {
-            const optionsDiv = document.createElement('div');
-            optionsDiv.className = 'mt-2 flex flex-wrap gap-2';
-            options.forEach(opt => {
-                if (opt.action === 'prompt') {
-                    const button = document.createElement('button');
-                    button.className = 'px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm';
-                    button.textContent = opt.text;
-                    button.onclick = () => {
-                        chatInput.value = opt.value;
-                        chatInput.focus();
-                    };
-                    optionsDiv.appendChild(button);
-                } else if (opt.action === 'link') {
-                    const link = document.createElement('a');
-                    link.href = opt.value;
-                    link.className = 'px-3 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition text-sm';
-                    link.textContent = opt.text;
-                    optionsDiv.appendChild(link);
-                }
-            });
-            messageDiv.appendChild(optionsDiv);
-        }
 
         chatBody.appendChild(messageDiv);
     }
