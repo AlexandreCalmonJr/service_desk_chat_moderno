@@ -1,36 +1,90 @@
-{% extends 'base.html' %}
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends 'base.html' %}
 
 {% block messages %}
 <div class="chat-message bot">
     <div class="avatar"><i class="fas fa-robot"></i></div>
     <div class="message-bubble">Bem-vindo ao gerenciamento de FAQs, {{ user.name }}!</div>
 </div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="chat-message bot">
+                <div class="avatar"><i class="fas fa-robot"></i></div>
+                <div class="message-bubble {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
+                    {{ message }}
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
 <div class="chat-message">
     <div class="message-bubble" style="background: transparent; box-shadow: none; padding: 0;">
-        <form method="POST" action="{{ url_for('admin_faq') }}" class="space-y-4">
+        <form method="POST" action="{{ url_for('admin_faq') }}" class="space-y-4 mb-6">
             <div>
-                <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Pergunta</label>
-                <input type="text" id="question" name="question" required class="mt-1 block w-full chat-input" style="border-radius: 12px;">
+                <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pergunta</label>
+                <input type="text" id="question" name="question" required class="chat-input w-full" placeholder="Digite a pergunta">
             </div>
             <div>
-                <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Resposta</label>
-                <textarea id="answer" name="answer" rows="3" required class="mt-1 block w-full chat-input" style="border-radius: 12px;"></textarea>
+                <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
+                <textarea id="answer" name="answer" rows="3" required class="chat-input w-full" placeholder="Digite a resposta"></textarea>
             </div>
             <button type="submit" name="add_question" class="chat-button w-full">Adicionar FAQ</button>
         </form>
-        <h3 class="mt-5 text-lg font-semibold text-gray-900 dark:text-gray-100">FAQs Existentes</h3>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">FAQs Existentes</h3>
         {% if faqs %}
-            <ul class="mt-2 space-y-2">
+            <ul class="space-y-3">
                 {% for faq in faqs %}
-                    <li class="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                        <strong class="text-gray-900 dark:text-gray-100">{{ faq.question }}</strong>
-                        <p class="text-gray-700 dark:text-gray-300">{{ faq.answer }}</p>
+                    <li class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
+                        <strong class="block text-gray-900 dark:text-gray-100">{{ faq.question }}</strong>
+                        <p class="text-gray-700 dark:text-gray-300 mt-1">{{ faq.answer }}</p>
                     </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="mt-2 text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
+            <p class="text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
         {% endif %}
+        <a href="{{ url_for('index') }}" class="block mt-4 text-center text-blue-600 hover:underline dark:text-blue-400">Voltar para a Home</a>
     </div>
 </div>
 {% endblock %}

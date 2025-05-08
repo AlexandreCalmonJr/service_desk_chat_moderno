@@ -1,7 +1,6 @@
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template, redirect, url_for, flash, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
@@ -11,15 +10,14 @@ from sqlalchemy.exc import OperationalError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flo
+
+ask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://sdeskdb_user:urrIL42GcKewOyEQDey6KKNcas8NLH2x@dpg-d0dsicndiees73a8op40-a/sdeskdb')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 db = SQLAlchemy(app)
-
-# Configurar Flask-Migrate
-migrate = Migrate(app, db)
 
 # Configurar Flask-Login
 login_manager = LoginManager()
@@ -139,6 +137,21 @@ def admin_faq():
         faqs = []
     return render_template('admin_faq.html', faqs=faqs)
 
+@app.route('/chat', methods=['POST'])
+@login_required
+def chat():
+    data = request.get_json()
+    mensagem = data.get('mensagem', '').lower()
+    if 'encerrar chamado' in mensagem:
+        numero_chamado = mensagem.split('encerrar chamado ')[1]
+        return jsonify({'resposta': f'Chamado {numero_chamado} encerrado com sucesso!'})
+    elif 'sugerir solução para' in mensagem:
+        problema = mensagem.split('sugerir solução para ')[1]
+        return jsonify({'resposta': f'Sugestão para {problema}: Verifique os cabos e a energia.'})
+    elif 'como configurar uma vpn' in mensagem:
+        return jsonify({'resposta': 'Para configurar uma VPN, acesse as configurações de rede e insira as credenciais fornecidas pelo TI.'})
+    return jsonify({'resposta': 'Desculpe, não entendi. Tente "Encerrar chamado <ID>" ou "Sugerir solução para <problema>".'})
+
 def init_db():
     """Inicializa o banco de dados com dados padrão."""
     with app.app_context():
@@ -156,6 +169,6 @@ def init_db():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Cria as tabelas localmente
+        db.create_all()  # Cria as tabelas se não existirem
         init_db()
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
