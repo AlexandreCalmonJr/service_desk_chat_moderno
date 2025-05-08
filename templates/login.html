@@ -7,118 +7,30 @@
     <link href="/static/tailwind.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .auth-container {
-            max-width: 400px;
-            width: 100%;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            padding: 2rem;
-        }
-        .auth-container h2 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 1.5rem;
-            color: #111827;
-        }
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        .form-group label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: #374151;
-            margin-bottom: 0.5rem;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            transition: border-color 0.2s ease;
-        }
-        .form-group input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        .auth-button {
-            width: 100%;
-            background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
-            color: white;
-            padding: 0.75rem;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: transform 0.2s ease, background 0.2s ease;
-        }
-        .auth-button:hover {
-            transform: translateY(-2px);
-            background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
-        }
-        .auth-link {
-            text-align: center;
-            margin-top: 1rem;
-        }
-        .auth-link a {
-            color: #3b82f6;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .auth-link a:hover {
-            text-decoration: underline;
-        }
-        .flash-message {
-            padding: 0.75rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
-        .flash-message.success {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        .flash-message.error {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-    </style>
 </head>
-<body>
-    <div class="auth-container">
-        <h2>Login</h2>
+<body class="font-sans bg-gradient-to-br from-gray-100 to-gray-200 min-h-screen flex justify-center items-center">
+    <div class="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
+        <h2 class="text-2xl font-bold text-center mb-6 text-gray-800">Login</h2>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="flash-message {{ category }}">{{ message }}</div>
+                    <div class="py-3 px-4 mb-4 text-center rounded-md {% if category == 'success' %}bg-green-100 text-green-800 {% else %} bg-red-100 text-red-800 {% endif %}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
         <form method="POST" action="{{ url_for('login') }}">
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
+            <div class="mb-4">
+                <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                <input type="email" id="email" name="email" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500">
             </div>
-            <div class="form-group">
-                <label for="password">Senha</label>
-                <input type="password" id="password" name="password" required>
+            <div class="mb-6">
+                <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Senha</label>
+                <input type="password" id="password" name="password" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:border-blue-500">
             </div>
-            <button type="submit" class="auth-button">Entrar</button>
+            <button type="submit" class="bg-gradient-to-r from-blue-500 to-blue-400 hover:from-blue-400 hover:to-blue-500 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Entrar</button>
         </form>
-        <div class="auth-link">
-            <p>Não tem uma conta? <a href="{{ url_for('register') }}">Cadastre-se</a></p>
+        <div class="text-center mt-4">
+            <p class="text-gray-600 text-sm">Não tem uma conta? <a href="{{ url_for('register') }}" class="font-bold text-blue-500 hover:underline">Cadastre-se</a></p>
         </div>
     </div>
 </body>
