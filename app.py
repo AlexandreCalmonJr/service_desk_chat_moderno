@@ -8,10 +8,19 @@ import csv
 import json
 import re
 from PyPDF2 import PdfReader
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///service_desk.db'
+# Usar SQLite localmente e PostgreSQL no Render
+if os.getenv('DATABASE_URL'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL').replace("postgres://", "postgresql://")
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///service_desk.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -45,8 +54,12 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # Inicialização do banco de dados
-with app.app_context():
-    db.create_all()
+try:
+    with app.app_context():
+        db.create_all()
+        logger.info("Banco de dados inicializado com sucesso.")
+except Exception as e:
+    logger.error(f"Erro ao inicializar o banco de dados: {str(e)}")
 
 # Funções de utilidade
 def process_ticket_command(message):
@@ -57,8 +70,14 @@ def process_ticket_command(message):
         if ticket:
             if ticket.status == 'Aberto':
                 ticket.status = 'Fechado'
-                db.session.commit()
-                return f"Chamado {ticket_id} encerrado com sucesso."
+                try:
+                    db.session.commit()
+                    logger.info(f"Chamado {ticket_id} encerrado com sucesso.")
+                    return f"Chamado {ticket_id} encerrado com sucesso."
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Erro ao encerrar chamado {ticket_id}: {str(e)}")
+                    return "Erro ao encerrar o chamado."
             else:
                 return f"Chamado {ticket_id} já está fechado."
         return f"Chamado {ticket_id} não encontrado."
@@ -143,9 +162,15 @@ def register():
         else:
             user = User(name=name, email=email, password=password, is_admin=is_admin)
             db.session.add(user)
-            db.session.commit()
-            flash('Registro concluído! Faça login.', 'success')
-            return redirect(url_for('login'))
+            try:
+                db.session.commit()
+                logger.info(f"Usuário {email} registrado com sucesso.")
+                flash('Registro concluído! Faça login.', 'success')
+                return redirect(url_for('login'))
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Erro ao registrar usuário {email}: {str(e)}")
+                flash('Erro ao registrar usuário.', 'error')
     return render_template('register.html')
 
 @app.route('/logout')
@@ -162,7 +187,6 @@ def chat():
     mensagem = data.get('mensagem', '').strip()
     resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Como configurar uma VPN?'."
 
-    # Processar comandos
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
         resposta = ticket_response
@@ -171,7 +195,6 @@ def chat():
         if solution_response:
             resposta = solution_response
         else:
-            # Buscar nas FAQs
             faq_response = search_faq(mensagem)
             if faq_response:
                 resposta = faq_response
@@ -193,8 +216,14 @@ def admin_faq():
             if question and answer:
                 faq = FAQ(question=question, answer=answer)
                 db.session.add(faq)
-                db.session.commit()
-                flash('FAQ adicionada com sucesso!', 'success')
+                try:
+                    db.session.commit()
+                    logger.info(f"FAQ adicionada: {question}")
+                    flash('FAQ adicionada com sucesso!', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Erro ao adicionar FAQ: {str(e)}")
+                    flash('Erro ao adicionar FAQ.', 'error')
             else:
                 flash('Preencha todos os campos.', 'error')
         elif 'import_faqs' in request.form:
@@ -203,27 +232,34 @@ def admin_faq():
                 filename = secure_filename(file.filename)
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(file_path)
-                if file.filename.endswith('.json'):
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        for item in data:
-                            faq = FAQ(question=item.get('question'), answer=item.get('answer', ''))
-                            db.session.add(faq)
-                elif file.filename.endswith('.csv'):
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            faq = FAQ(question=row.get('question'), answer=row.get('answer', ''))
-                            db.session.add(faq)
-                elif file.filename.endswith('.pdf'):
-                    faqs_extracted = extract_faqs_from_pdf(file_path)
-                    for faq in faqs_extracted:
-                        if faq['question'] and faq['answer']:
-                            new_faq = FAQ(question=faq['question'], answer=faq['answer'])
-                            db.session.add(new_faq)
-                db.session.commit()
-                flash('FAQs importadas com sucesso!', 'success')
-                os.remove(file_path)
+                try:
+                    if file.filename.endswith('.json'):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            for item in data:
+                                faq = FAQ(question=item.get('question'), answer=item.get('answer', ''))
+                                db.session.add(faq)
+                    elif file.filename.endswith('.csv'):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                faq = FAQ(question=row.get('question'), answer=row.get('answer', ''))
+                                db.session.add(faq)
+                    elif file.filename.endswith('.pdf'):
+                        faqs_extracted = extract_faqs_from_pdf(file_path)
+                        for faq in faqs_extracted:
+                            if faq['question'] and faq['answer']:
+                                new_faq = FAQ(question=faq['question'], answer=faq['answer'])
+                                db.session.add(new_faq)
+                    db.session.commit()
+                    logger.info(f"FAQs importadas do arquivo {filename}")
+                    flash('FAQs importadas com sucesso!', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Erro ao importar FAQs do arquivo {filename}: {str(e)}")
+                    flash('Erro ao importar FAQs.', 'error')
+                finally:
+                    os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
     return render_template('admin_faq.html', faqs=faqs)
