@@ -46,7 +46,7 @@ def load_user(user_id):
 
 # Inicialização do banco de dados
 with app.app_context():
-     db.create_all()
+    db.create_all()
 
 # Funções de utilidade
 def process_ticket_command(message):
@@ -93,6 +93,43 @@ def extract_faqs_from_pdf(file_path):
     except Exception as e:
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
+
+def format_faq_response(question, answer):
+    # Dividir a resposta em seções com base em marcadores (ex.: "Pré-requisitos:", "Etapa 1:", etc.)
+    sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
+    formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
+
+    current_section = None
+    for part in sections:
+        part = part.strip()
+        if not part:
+            continue
+        if part.startswith("Pré-requisitos:"):
+            current_section = "Pré-requisitos"
+            formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
+        elif part.startswith("Etapa"):
+            current_section = "Etapa"
+            formatted_response += f"<strong>🔧 {part}</strong><br>"
+        elif part.startswith("Atenção:"):
+            current_section = "Atenção"
+            formatted_response += "<strong>⚠️ Atenção</strong><br>"
+        elif part.startswith("Finalizar:"):
+            current_section = "Finalizar"
+            formatted_response += "<strong>⏳ Finalizar</strong><br>"
+        elif part.startswith("Pós-instalação:"):
+            current_section = "Pós-instalação"
+            formatted_response += "<strong>✅ Pós-instalação</strong><br>"
+        else:
+            if current_section:
+                # Dividir itens dentro da seção (assumir que cada item é separado por ponto ou vírgula)
+                items = re.split(r'[,.]\s*(?=[A-Z])', part)
+                for item in items:
+                    item = item.strip()
+                    if item:
+                        formatted_response += f"{item}<br>"
+            formatted_response += "<br>"
+
+    return formatted_response
 
 def find_faq_by_keywords(message):
     words = re.findall(r'\w+', message.lower())
@@ -181,7 +218,8 @@ def chat():
             # Buscar FAQ por palavras-chave
             question, answer = find_faq_by_keywords(mensagem)
             if question and answer:
-                resposta['text'] = f"<strong>Pergunta:</strong> {question}<br><strong>Resposta:</strong> {answer}"
+                formatted_response = format_faq_response(question, answer)
+                resposta['text'] = formatted_response
                 resposta['html'] = True
                 resposta['options'] = [
                     {'text': 'Voltar ao Chat', 'action': 'link', 'value': '/'},
@@ -191,7 +229,7 @@ def chat():
                 # Sugestão de FAQs relevantes
                 faqs = FAQ.query.limit(3).all()
                 if faqs:
-                    options = [f'<strong>{faq.question}</strong><br>{faq.answer}<br>' for faq in faqs]
+                    options = [format_faq_response(faq.question, faq.answer) for faq in faqs]
                     resposta['text'] = "Aqui estão algumas FAQs que podem ajudar:<br>" + "<br><br>".join(options)
                     resposta['html'] = True
                     resposta['options'] = [

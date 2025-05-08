@@ -107,7 +107,7 @@
 
     function adicionarMensagem(texto, tipo, options = [], isHtml = false) {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message ${tipo} mb-4`;
+        messageDiv.className = `chat-message ${tipo} mb-4 flex items-start`;
         const avatarDiv = document.createElement('div');
         avatarDiv.className = 'avatar mr-2';
         avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
