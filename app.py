@@ -250,16 +250,16 @@ def chat():
     # Verificar se o usuário está selecionando uma FAQ
     if 'faq_selection' in session and mensagem.startswith('faq_'):
         faq_id = mensagem.replace('faq_', '')
-        faq_options = session.get('faq_selection', [])
-        selected_faq = next((faq for faq in faq_options if str(faq.id) == faq_id), None)
-        if selected_faq:
-            resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer)
-            resposta['html'] = True
-            session.pop('faq_selection', None)
-            return jsonify(resposta)
-        else:
-            resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
-            return jsonify(resposta)
+        faq_ids = session.get('faq_selection', [])
+        if int(faq_id) in faq_ids:
+            selected_faq = FAQ.query.get(int(faq_id))
+            if selected_faq:
+                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer)
+                resposta['html'] = True
+                session.pop('faq_selection', None)
+                return jsonify(resposta)
+        resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
+        return jsonify(resposta)
 
     # Processar comandos
     ticket_response = process_ticket_command(mensagem)
@@ -277,7 +277,9 @@ def chat():
                     resposta['text'] = format_faq_response(faq.question, faq.answer)
                     resposta['html'] = True
                 else:
-                    session['faq_selection'] = faq_matches
+                    # Armazenar apenas os IDs das FAQs na sessão
+                    faq_ids = [faq.id for faq in faq_matches]
+                    session['faq_selection'] = faq_ids
                     resposta['state'] = 'faq_selection'
                     resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
                     resposta['html'] = True
