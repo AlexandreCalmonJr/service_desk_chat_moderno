@@ -7,7 +7,7 @@ import os
 import csv
 import json
 import re
-from pypdf import PdfReader
+from PyPDF2 import PdfReader
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
@@ -46,7 +46,7 @@ def load_user(user_id):
 
 # Inicialização do banco de dados
 with app.app_context():
-    db.create_all()
+     db.create_all()
 
 # Funções de utilidade
 def process_ticket_command(message):
