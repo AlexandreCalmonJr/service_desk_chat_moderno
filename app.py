@@ -167,7 +167,6 @@ def find_faq_by_keywords(message):
         if score > 0:
             matches.append((faq, score))
 
-    # Ordenar por pontuação (maior primeiro)
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches] if matches else []
 
@@ -175,7 +174,7 @@ def find_faq_by_keywords(message):
 @app.route('/')
 @login_required
 def index():
-    session.pop('faq_selection', None)  # Limpar estado ao acessar a página inicial
+    session.pop('faq_selection', None)
     return render_template('index.html')
 
 @app.route('/profile', methods=['GET', 'POST'])
@@ -244,21 +243,22 @@ def chat():
     resposta = {
         'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!",
         'html': False,
-        'state': 'normal'
+        'state': 'normal',
+        'options': []
     }
 
     # Verificar se o usuário está selecionando uma FAQ
-    if 'faq_selection' in session and mensagem.isdigit():
+    if 'faq_selection' in session and mensagem.startswith('faq_'):
+        faq_id = mensagem.replace('faq_', '')
         faq_options = session.get('faq_selection', [])
-        choice = int(mensagem) - 1
-        if 0 <= choice < len(faq_options):
-            selected_faq = faq_options[choice]
+        selected_faq = next((faq for faq in faq_options if str(faq.id) == faq_id), None)
+        if selected_faq:
             resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer)
             resposta['html'] = True
-            session.pop('faq_selection', None)  # Limpar estado
+            session.pop('faq_selection', None)
             return jsonify(resposta)
         else:
-            resposta['text'] = "Opção inválida. Por favor, escolha um número válido ou faça uma nova pergunta."
+            resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
             return jsonify(resposta)
 
     # Processar comandos
@@ -270,26 +270,19 @@ def chat():
         if solution_response:
             resposta['text'] = solution_response
         else:
-            # Buscar FAQs por palavras-chave
             faq_matches = find_faq_by_keywords(mensagem)
             if faq_matches:
                 if len(faq_matches) == 1:
-                    # Se houver apenas uma FAQ, exibir diretamente
                     faq = faq_matches[0]
                     resposta['text'] = format_faq_response(faq.question, faq.answer)
                     resposta['html'] = True
                 else:
-                    # Se houver múltiplas FAQs, listar e pedir para o usuário escolher
                     session['faq_selection'] = faq_matches
                     resposta['state'] = 'faq_selection'
-                    options_text = "Encontrei várias FAQs relacionadas. Qual você deseja?\n\n"
-                    for i, faq in enumerate(faq_matches, 1):
-                        options_text += f"{i}. {faq.question}<br>"
-                    options_text += "<br>Digite o número da FAQ que você deseja (ex.: 1)."
-                    resposta['text'] = options_text
+                    resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
                     resposta['html'] = True
+                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
             else:
-                # Sugestão de FAQs relevantes
                 faqs = FAQ.query.limit(3).all()
                 if faqs:
                     options = [format_faq_response(faq.question, faq.answer) for faq in faqs]
@@ -324,35 +317,48 @@ def admin_faq():
                 filename = secure_filename(file.filename)
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(file_path)
-                if file.filename.endswith('.json'):
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        for item in data:
-                            category_name = item.get('category')
-                            category = Category.query.filter_by(name=category_name).first()
-                            if not category:
-                                category = Category(name=category_name)
-                                db.session.add(category)
-                                db.session.commit()
-                            faq = FAQ(category_id=category.id, question=item.get('question'), answer=item.get('answer', ''))
-                            db.session.add(faq)
-                elif file.filename.endswith('.csv'):
-                    category_id = request.form['category_import']
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        for row in reader:
-                            faq = FAQ(category_id=category_id, question=row.get('question'), answer=row.get('answer', ''))
-                            db.session.add(faq)
-                elif file.filename.endswith('.pdf'):
-                    category_id = request.form['category_import']
-                    faqs_extracted = extract_faqs_from_pdf(file_path)
-                    for faq in faqs_extracted:
-                        if faq['question'] and faq['answer']:
-                            new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'])
-                            db.session.add(new_faq)
-                db.session.commit()
-                flash('FAQs importadas com sucesso!', 'success')
-                os.remove(file_path)
+                try:
+                    if file.filename.endswith('.json'):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            if not isinstance(data, list):
+                                flash('Arquivo JSON deve conter uma lista de FAQs.', 'error')
+                                os.remove(file_path)
+                                return redirect(url_for('admin_faq'))
+                            for item in data:
+                                category_name = item.get('category')
+                                question = item.get('question')
+                                answer = item.get('answer', '')
+                                if not category_name or not question:
+                                    flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
+                                    continue
+                                category = Category.query.filter_by(name=category_name).first()
+                                if not category:
+                                    category = Category(name=category_name)
+                                    db.session.add(category)
+                                    db.session.commit()
+                                faq = FAQ(category_id=category.id, question=question, answer=answer)
+                                db.session.add(faq)
+                    elif file.filename.endswith('.csv'):
+                        category_id = request.form['category_import']
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                faq = FAQ(category_id=category_id, question=row.get('question'), answer=row.get('answer', ''))
+                                db.session.add(faq)
+                    elif file.filename.endswith('.pdf'):
+                        category_id = request.form['category_import']
+                        faqs_extracted = extract_faqs_from_pdf(file_path)
+                        for faq in faqs_extracted:
+                            if faq['question'] and faq['answer']:
+                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'])
+                                db.session.add(new_faq)
+                    db.session.commit()
+                    flash('FAQs importadas com sucesso!', 'success')
+                except Exception as e:
+                    flash(f'Erro ao importar FAQs: {str(e)}', 'error')
+                finally:
+                    os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
     return render_template('admin_faq.html', categories=categories)

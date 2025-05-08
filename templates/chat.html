@@ -20,7 +20,7 @@
     const chatBody = document.getElementById('chat-body');
     const chatInput = document.getElementById('chat-input');
     const typingIndicator = document.getElementById('typing-indicator');
-    let chatState = 'normal';  // Estado do chat: 'normal' ou 'faq_selection'
+    let chatState = 'normal';
 
     async function enviarMensagem() {
         const mensagem = chatInput.value.trim();
@@ -38,10 +38,10 @@
                 body: JSON.stringify({ mensagem: mensagem })
             });
             const data = await response.json();
-            adicionarMensagem(data.text, 'bot', data.html);
+            adicionarMensagem(data.text, 'bot', data.html, data.options);
             chatState = data.state || 'normal';
             if (chatState === 'faq_selection') {
-                chatInput.placeholder = 'Digite o número da FAQ (ex.: 1)';
+                chatInput.placeholder = 'Ou digite uma nova mensagem...';
             } else {
                 chatInput.placeholder = 'Digite sua mensagem...';
             }
@@ -53,7 +53,30 @@
         }
     }
 
-    function adicionarMensagem(texto, tipo, isHtml = false) {
+    async function selecionarFAQ(faqId) {
+        adicionarMensagem(`Selecionando FAQ ${faqId}`, 'user');
+        typingIndicator.style.display = 'flex';
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensagem: `faq_${faqId}` })
+            });
+            const data = await response.json();
+            adicionarMensagem(data.text, 'bot', data.html);
+            chatState = data.state || 'normal';
+            chatInput.placeholder = 'Digite sua mensagem...';
+        } catch (error) {
+            adicionarMensagem('Erro ao processar a solicitação.', 'bot');
+        } finally {
+            typingIndicator.style.display = 'none';
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+    }
+
+    function adicionarMensagem(texto, tipo, isHtml = false, options = []) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${tipo} mb-4 flex items-start`;
         const avatarDiv = document.createElement('div');
@@ -66,6 +89,21 @@
         } else {
             bubbleDiv.textContent = texto;
         }
+
+        // Adicionar botões de opções, se existirem
+        if (options.length > 0) {
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'mt-2 space-y-2';
+            options.forEach(option => {
+                const button = document.createElement('button');
+                button.className = 'w-full text-left px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition';
+                button.textContent = option.question;
+                button.onclick = () => selecionarFAQ(option.id);
+                optionsDiv.appendChild(button);
+            });
+            bubbleDiv.appendChild(optionsDiv);
+        }
+
         messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
         messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
 
