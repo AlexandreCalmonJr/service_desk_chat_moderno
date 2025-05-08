@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -7,6 +7,7 @@ import os
 import csv
 import json
 import re
+import uuid
 from PyPDF2 import PdfReader
 import logging
 
@@ -16,21 +17,24 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-# Usar SQLite localmente e PostgreSQL no Render
 if os.getenv('DATABASE_URL'):
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL').replace("postgres://", "postgresql://")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///service_desk.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['PDF_FOLDER'] = os.path.join('uploads', 'pdfs')
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
+if not os.path.exists(app.config['PDF_FOLDER']):
+    os.makedirs(app.config['PDF_FOLDER'])
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# Modelos
+chat_messages = []
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -42,6 +46,7 @@ class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
+    pdf_path = db.Column(db.String(200))
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -53,7 +58,6 @@ class Ticket(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Inicialização do banco de dados
 try:
     with app.app_context():
         db.create_all()
@@ -61,7 +65,6 @@ try:
 except Exception as e:
     logger.error(f"Erro ao inicializar o banco de dados: {str(e)}")
 
-# Funções de utilidade
 def process_ticket_command(message):
     match = re.match(r"Encerrar chamado (\d+)", message, re.IGNORECASE)
     if match:
@@ -108,8 +111,8 @@ def search_faq(query):
             best_score = score
             best_match = faq
 
-    if best_match:
-        return f"Encontrei uma FAQ relacionada: **{best_match.question}**\n{best_match.answer}"
+    if best_match and best_match.pdf_path:
+        return f"Encontrei uma FAQ relacionada: <a href='/view_pdf/{best_match.id}' target='_blank'>**{best_match.question}**</a>\nResposta: {best_match.answer}"
     return None
 
 def extract_faqs_from_pdf(file_path):
@@ -130,10 +133,11 @@ def extract_faqs_from_pdf(file_path):
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
-# Rotas
 @app.route('/')
 @login_required
 def index():
+    if not chat_messages:
+        chat_messages.append({"texto": "Sou seu assistente de Service Desk. Como posso ajudar hoje? Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Como configurar uma VPN?'.", "tipo": "bot"})
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -183,9 +187,12 @@ def logout():
 @app.route('/chat', methods=['POST'])
 @login_required
 def chat():
+    global chat_messages
     data = request.get_json()
     mensagem = data.get('mensagem', '').strip()
     resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Como configurar uma VPN?'."
+
+    chat_messages.append({"texto": mensagem, "tipo": "user"})
 
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
@@ -199,11 +206,14 @@ def chat():
             if faq_response:
                 resposta = faq_response
 
-    return jsonify({'resposta': resposta})
+    chat_messages.append({"texto": resposta, "tipo": "bot"})
+
+    return jsonify({'resposta': resposta, 'mensagens': chat_messages})
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
 def admin_faq():
+    global chat_messages
     if not current_user.is_admin:
         flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
         return redirect(url_for('index'))
@@ -220,6 +230,7 @@ def admin_faq():
                     db.session.commit()
                     logger.info(f"FAQ adicionada: {question}")
                     flash('FAQ adicionada com sucesso!', 'success')
+                    chat_messages.append({"texto": f"Nova FAQ adicionada: **{question}**\n{answer}", "tipo": "bot"})
                 except Exception as e:
                     db.session.rollback()
                     logger.error(f"Erro ao adicionar FAQ: {str(e)}")
@@ -231,26 +242,35 @@ def admin_faq():
             if file and file.filename.endswith(('.json', '.csv', '.pdf')):
                 filename = secure_filename(file.filename)
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
+                pdf_path = None
+                if file.filename.endswith('.pdf'):
+                    unique_filename = f"{uuid.uuid4()}_{filename}"
+                    pdf_path = os.path.join(app.config['PDF_FOLDER'], unique_filename)
+                    file.save(pdf_path)
+                else:
+                    file.save(file_path)
                 try:
                     if file.filename.endswith('.json'):
                         with open(file_path, 'r', encoding='utf-8') as f:
                             data = json.load(f)
                             for item in data:
-                                faq = FAQ(question=item.get('question'), answer=item.get('answer', ''))
+                                faq = FAQ(question=item.get('question'), answer=item.get('answer', ''), pdf_path=pdf_path if file.filename.endswith('.pdf') else None)
                                 db.session.add(faq)
+                                chat_messages.append({"texto": f"FAQ importada: **{item.get('question')}**\n{item.get('answer', '')}", "tipo": "bot"})
                     elif file.filename.endswith('.csv'):
                         with open(file_path, 'r', encoding='utf-8') as f:
                             reader = csv.DictReader(f)
                             for row in reader:
-                                faq = FAQ(question=row.get('question'), answer=row.get('answer', ''))
+                                faq = FAQ(question=row.get('question'), answer=row.get('answer', ''), pdf_path=pdf_path if file.filename.endswith('.pdf') else None)
                                 db.session.add(faq)
+                                chat_messages.append({"texto": f"FAQ importada: **{row.get('question')}**\n{row.get('answer', '')}", "tipo": "bot"})
                     elif file.filename.endswith('.pdf'):
                         faqs_extracted = extract_faqs_from_pdf(file_path)
                         for faq in faqs_extracted:
                             if faq['question'] and faq['answer']:
-                                new_faq = FAQ(question=faq['question'], answer=faq['answer'])
+                                new_faq = FAQ(question=faq['question'], answer=faq['answer'], pdf_path=pdf_path)
                                 db.session.add(new_faq)
+                                chat_messages.append({"texto": f"FAQ importada do PDF '{filename}': <a href='/view_pdf/{new_faq.id}' target='_blank'>**{faq['question']}**</a>\n{faq['answer']}", "tipo": "bot"})
                     db.session.commit()
                     logger.info(f"FAQs importadas do arquivo {filename}")
                     flash('FAQs importadas com sucesso!', 'success')
@@ -259,10 +279,40 @@ def admin_faq():
                     logger.error(f"Erro ao importar FAQs do arquivo {filename}: {str(e)}")
                     flash('Erro ao importar FAQs.', 'error')
                 finally:
-                    os.remove(file_path)
+                    if not file.filename.endswith('.pdf'):
+                        os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
     return render_template('admin_faq.html', faqs=faqs)
+
+@app.route('/admin/faq/delete/<int:faq_id>', methods=['POST'])
+@login_required
+def delete_faq(faq_id):
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
+        return redirect(url_for('admin_faq'))
+    
+    faq = FAQ.query.get_or_404(faq_id)
+    try:
+        db.session.delete(faq)
+        db.session.commit()
+        logger.info(f"FAQ ID {faq_id} excluída com sucesso.")
+        flash('FAQ excluída com sucesso!', 'success')
+        chat_messages.append({"texto": f"FAQ '{faq.question}' foi excluída.", "tipo": "bot"})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao excluir FAQ ID {faq_id}: {str(e)}")
+        flash('Erro ao excluir FAQ.', 'error')
+    return redirect(url_for('admin_faq'))
+
+@app.route('/view_pdf/<int:faq_id>')
+@login_required
+def view_pdf(faq_id):
+    faq = FAQ.query.get_or_404(faq_id)
+    if faq.pdf_path and os.path.exists(faq.pdf_path):
+        return send_from_directory(app.config['PDF_FOLDER'], os.path.basename(faq.pdf_path))
+    flash('Arquivo PDF não encontrado.', 'error')
+    return redirect(url_for('admin_faq'))
 
 if __name__ == '__main__':
     app.run(debug=True)
