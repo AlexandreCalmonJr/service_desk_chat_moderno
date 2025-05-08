@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
@@ -30,6 +31,8 @@ if not os.path.exists(app.config['PDF_FOLDER']):
     os.makedirs(app.config['PDF_FOLDER'])
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
@@ -100,19 +103,33 @@ def suggest_solution(message):
 
 def search_faq(query):
     faqs = FAQ.query.all()
-    query_words = query.lower().split()
+    query_words = set(query.lower().split())  # Usar set para remover duplicatas
     best_match = None
     best_score = 0
 
+    logger.debug(f"Buscando FAQ para query: {query}")
+    logger.debug(f"Palavras da query: {query_words}")
+    logger.debug(f"FAQs disponíveis: {[(faq.question, faq.answer) for faq in faqs]}")
+
     for faq in faqs:
-        faq_question = faq.question.lower()
-        score = sum(1 for word in query_words if word in faq_question)
-        if score > best_score:
+        faq_question_words = set(faq.question.lower().split())
+        # Calcular a interseção entre as palavras da query e da FAQ
+        common_words = query_words.intersection(faq_question_words)
+        score = len(common_words)
+        logger.debug(f"FAQ: {faq.question}, Palavras em comum: {common_words}, Score: {score}")
+
+        # Relaxar a condição para considerar FAQs com pelo menos uma palavra em comum
+        if score > 0 and score > best_score:
             best_score = score
             best_match = faq
 
-    if best_match and best_match.pdf_path:
-        return f"Encontrei uma FAQ relacionada: <a href='/view_pdf/{best_match.id}' target='_blank'>**{best_match.question}**</a>\nResposta: {best_match.answer}"
+    if best_match:
+        logger.info(f"FAQ encontrada: {best_match.question} (Score: {best_score})")
+        if best_match.pdf_path:
+            return f"Encontrei uma FAQ relacionada: <a href='/view_pdf/{best_match.id}' target='_blank'>**{best_match.question}**</a>\nResposta: {best_match.answer}"
+        return f"Encontrei uma FAQ relacionada: **{best_match.question}**\nResposta: {best_match.answer}"
+    else:
+        logger.info("Nenhuma FAQ encontrada.")
     return None
 
 def extract_faqs_from_pdf(file_path):
@@ -137,7 +154,7 @@ def extract_faqs_from_pdf(file_path):
 @login_required
 def index():
     if not chat_messages:
-        chat_messages.append({"texto": "Sou seu assistente de Service Desk. Como posso ajudar hoje? Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Como configurar uma VPN?'.", "tipo": "bot"})
+        chat_messages.append({"texto": "Sou seu assistente de Service Desk. Como posso ajudar hoje? Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta qualquer para buscar uma FAQ, como 'Manual do Totem'.", "tipo": "bot"})
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -190,7 +207,7 @@ def chat():
     global chat_messages
     data = request.get_json()
     mensagem = data.get('mensagem', '').strip()
-    resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Como configurar uma VPN?'."
+    resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta qualquer para buscar uma FAQ, como 'Manual do Totem'."
 
     chat_messages.append({"texto": mensagem, "tipo": "user"})
 
@@ -294,6 +311,8 @@ def delete_faq(faq_id):
     
     faq = FAQ.query.get_or_404(faq_id)
     try:
+        if faq.pdf_path and os.path.exists(faq.pdf_path):
+            os.remove(faq.pdf_path)
         db.session.delete(faq)
         db.session.commit()
         logger.info(f"FAQ ID {faq_id} excluída com sucesso.")
