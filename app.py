@@ -1,9 +1,11 @@
 from flask import Flask, request, render_template, redirect, url_for, flash
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
+from sqlalchemy.exc import OperationalError
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +17,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgres
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 db = SQLAlchemy(app)
+
+# Configurar Flask-Migrate
+migrate = Migrate(app, db)
 
 # Configurar Flask-Login
 login_manager = LoginManager()
@@ -38,7 +43,17 @@ class FAQ(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        return User.query.get(int(user_id))
+    except OperationalError as e:
+        logger.error(f"Erro ao carregar usuário: {e}")
+        return None
+
+# Manipulador de erros 500
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Erro interno: {error}")
+    return "Erro interno do servidor. Por favor, tente novamente mais tarde.", 500
 
 # Rotas de Autenticação
 @app.route('/login', methods=['GET', 'POST'])
@@ -48,12 +63,16 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-        user = User.query.filter_by(email=email).first()
-        if user and check_password_hash(user.password, password):
-            login_user(user)
-            flash('Login realizado com sucesso!', 'success')
-            return redirect(url_for('index'))
-        flash('Email ou senha incorretos.', 'error')
+        try:
+            user = User.query.filter_by(email=email).first()
+            if user and check_password_hash(user.password, password):
+                login_user(user)
+                flash('Login realizado com sucesso!', 'success')
+                return redirect(url_for('index'))
+            flash('Email ou senha incorretos.', 'error')
+        except OperationalError as e:
+            logger.error(f"Erro ao fazer login: {e}")
+            flash('Erro ao acessar o banco de dados. Tente novamente mais tarde.', 'error')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -65,14 +84,18 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
         is_admin = request.form.get('is_admin') == 'on'
-        if User.query.filter_by(email=email).first():
-            flash('Email já cadastrado.', 'error')
-            return render_template('register.html')
-        new_user = User(name=name, email=email, password=generate_password_hash(password), is_admin=is_admin)
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Cadastro realizado com sucesso! Faça login.', 'success')
-        return redirect(url_for('login'))
+        try:
+            if User.query.filter_by(email=email).first():
+                flash('Email já cadastrado.', 'error')
+                return render_template('register.html')
+            new_user = User(name=name, email=email, password=generate_password_hash(password), is_admin=is_admin)
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Cadastro realizado com sucesso! Faça login.', 'success')
+            return redirect(url_for('login'))
+        except OperationalError as e:
+            logger.error(f"Erro ao registrar usuário: {e}")
+            flash('Erro ao acessar o banco de dados. Tente novamente mais tarde.', 'error')
     return render_template('register.html')
 
 @app.route('/logout')
@@ -98,28 +121,41 @@ def admin_faq():
             question = request.form.get('question')
             answer = request.form.get('answer')
             if question and answer:
-                new_faq = FAQ(question=question, answer=answer)
-                db.session.add(new_faq)
-                db.session.commit()
-                flash('FAQ adicionada com sucesso!', 'success')
+                try:
+                    new_faq = FAQ(question=question, answer=answer)
+                    db.session.add(new_faq)
+                    db.session.commit()
+                    flash('FAQ adicionada com sucesso!', 'success')
+                except OperationalError as e:
+                    logger.error(f"Erro ao adicionar FAQ: {e}")
+                    flash('Erro ao acessar o banco de dados. Tente novamente mais tarde.', 'error')
             else:
                 flash('Preencha todos os campos.', 'error')
-    faqs = FAQ.query.all()
+    try:
+        faqs = FAQ.query.all()
+    except OperationalError as e:
+        logger.error(f"Erro ao listar FAQs: {e}")
+        flash('Erro ao acessar o banco de dados. Tente novamente mais tarde.', 'error')
+        faqs = []
     return render_template('admin_faq.html', faqs=faqs)
 
 def init_db():
     """Inicializa o banco de dados com dados padrão."""
     with app.app_context():
-        db.create_all()  # Cria as tabelas
-        if not FAQ.query.first():
-            faq_data = [
-                FAQ(question="computador não liga", answer="Verifique a energia e a fonte."),
-                FAQ(question="erro ao acessar sistema", answer="Reinicie e verifique as credenciais.")
-            ]
-            db.session.bulk_save_objects(faq_data)
-            db.session.commit()
-        logger.info("Banco de dados inicializado com sucesso!")
+        try:
+            if not FAQ.query.first():
+                faq_data = [
+                    FAQ(question="computador não liga", answer="Verifique a energia e a fonte."),
+                    FAQ(question="erro ao acessar sistema", answer="Reinicie e verifique as credenciais.")
+                ]
+                db.session.bulk_save_objects(faq_data)
+                db.session.commit()
+            logger.info("Banco de dados inicializado com sucesso!")
+        except OperationalError as e:
+            logger.error(f"Erro ao inicializar o banco de dados: {e}")
 
 if __name__ == '__main__':
-    init_db()
+    with app.app_context():
+        db.create_all()  # Cria as tabelas localmente
+        init_db()
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
