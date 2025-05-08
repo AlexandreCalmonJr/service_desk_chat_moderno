@@ -50,7 +50,7 @@ with app.app_context():
 
 # Funções de utilidade
 def process_ticket_command(message):
-    match = re.match(r"Encerrar chamado (\d+)", message)
+    match = re.match(r"Encerrar chamado (\d+)", message, re.IGNORECASE)
     if match:
         ticket_id = match.group(1)
         ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
@@ -65,7 +65,7 @@ def process_ticket_command(message):
     return None
 
 def suggest_solution(message):
-    match = re.match(r"Sugerir solução para (.+)", message)
+    match = re.match(r"Sugerir solução para (.+)", message, re.IGNORECASE)
     if match:
         problem = match.group(1).lower()
         solutions = {
@@ -76,6 +76,23 @@ def suggest_solution(message):
         return solutions.get(problem, "Desculpe, não tenho uma solução para esse problema no momento.")
     return None
 
+def search_faq(query):
+    faqs = FAQ.query.all()
+    query_words = query.lower().split()
+    best_match = None
+    best_score = 0
+
+    for faq in faqs:
+        faq_question = faq.question.lower()
+        score = sum(1 for word in query_words if word in faq_question)
+        if score > best_score:
+            best_score = score
+            best_match = faq
+
+    if best_match:
+        return f"Encontrei uma FAQ relacionada: **{best_match.question}**\n{best_match.answer}"
+    return None
+
 def extract_faqs_from_pdf(file_path):
     try:
         faqs = []
@@ -84,10 +101,7 @@ def extract_faqs_from_pdf(file_path):
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
 
-        # Dividir o texto em linhas e remover linhas vazias
         lines = [line.strip() for line in text.split("\n") if line.strip()]
-        
-        # Assumir que perguntas e respostas alternam (linha ímpar: pergunta, linha par: resposta)
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
             answer = lines[i + 1]
@@ -146,7 +160,7 @@ def logout():
 def chat():
     data = request.get_json()
     mensagem = data.get('mensagem', '').strip()
-    resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>' ou 'Sugerir solução para <problema>'."
+    resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Como configurar uma VPN?'."
 
     # Processar comandos
     ticket_response = process_ticket_command(mensagem)
@@ -156,6 +170,11 @@ def chat():
         solution_response = suggest_solution(mensagem)
         if solution_response:
             resposta = solution_response
+        else:
+            # Buscar nas FAQs
+            faq_response = search_faq(mensagem)
+            if faq_response:
+                resposta = faq_response
 
     return jsonify({'resposta': resposta})
 
