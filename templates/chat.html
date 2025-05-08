@@ -20,6 +20,7 @@
     const chatBody = document.getElementById('chat-body');
     const chatInput = document.getElementById('chat-input');
     const typingIndicator = document.getElementById('typing-indicator');
+    let chatState = 'normal';  // Estado do chat: 'normal' ou 'faq_selection'
 
     async function enviarMensagem() {
         const mensagem = chatInput.value.trim();
@@ -38,6 +39,12 @@
             });
             const data = await response.json();
             adicionarMensagem(data.text, 'bot', data.html);
+            chatState = data.state || 'normal';
+            if (chatState === 'faq_selection') {
+                chatInput.placeholder = 'Digite o número da FAQ (ex.: 1)';
+            } else {
+                chatInput.placeholder = 'Digite sua mensagem...';
+            }
         } catch (error) {
             adicionarMensagem('Erro ao processar a solicitação.', 'bot');
         } finally {

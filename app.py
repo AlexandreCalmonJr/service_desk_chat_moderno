@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -152,8 +152,7 @@ def format_faq_response(question, answer):
 def find_faq_by_keywords(message):
     words = re.findall(r'\w+', message.lower())
     faqs = FAQ.query.all()
-    best_match = None
-    best_score = 0
+    matches = []
 
     for faq in faqs:
         score = 0
@@ -165,16 +164,18 @@ def find_faq_by_keywords(message):
             if word in combined_text:
                 score += 1
 
-        if score > best_score:
-            best_score = score
-            best_match = (faq.question, faq.answer)
+        if score > 0:
+            matches.append((faq, score))
 
-    return best_match if best_score > 0 else (None, None)
+    # Ordenar por pontuação (maior primeiro)
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return [match[0] for match in matches] if matches else []
 
 # Rotas
 @app.route('/')
 @login_required
 def index():
+    session.pop('faq_selection', None)  # Limpar estado ao acessar a página inicial
     return render_template('index.html')
 
 @app.route('/profile', methods=['GET', 'POST'])
@@ -242,9 +243,25 @@ def chat():
     mensagem = data.get('mensagem', '').strip()
     resposta = {
         'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!",
-        'html': False
+        'html': False,
+        'state': 'normal'
     }
 
+    # Verificar se o usuário está selecionando uma FAQ
+    if 'faq_selection' in session and mensagem.isdigit():
+        faq_options = session.get('faq_selection', [])
+        choice = int(mensagem) - 1
+        if 0 <= choice < len(faq_options):
+            selected_faq = faq_options[choice]
+            resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer)
+            resposta['html'] = True
+            session.pop('faq_selection', None)  # Limpar estado
+            return jsonify(resposta)
+        else:
+            resposta['text'] = "Opção inválida. Por favor, escolha um número válido ou faça uma nova pergunta."
+            return jsonify(resposta)
+
+    # Processar comandos
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
         resposta['text'] = ticket_response
@@ -253,12 +270,26 @@ def chat():
         if solution_response:
             resposta['text'] = solution_response
         else:
-            question, answer = find_faq_by_keywords(mensagem)
-            if question and answer:
-                formatted_response = format_faq_response(question, answer)
-                resposta['text'] = formatted_response
-                resposta['html'] = True
+            # Buscar FAQs por palavras-chave
+            faq_matches = find_faq_by_keywords(mensagem)
+            if faq_matches:
+                if len(faq_matches) == 1:
+                    # Se houver apenas uma FAQ, exibir diretamente
+                    faq = faq_matches[0]
+                    resposta['text'] = format_faq_response(faq.question, faq.answer)
+                    resposta['html'] = True
+                else:
+                    # Se houver múltiplas FAQs, listar e pedir para o usuário escolher
+                    session['faq_selection'] = faq_matches
+                    resposta['state'] = 'faq_selection'
+                    options_text = "Encontrei várias FAQs relacionadas. Qual você deseja?\n\n"
+                    for i, faq in enumerate(faq_matches, 1):
+                        options_text += f"{i}. {faq.question}<br>"
+                    options_text += "<br>Digite o número da FAQ que você deseja (ex.: 1)."
+                    resposta['text'] = options_text
+                    resposta['html'] = True
             else:
+                # Sugestão de FAQs relevantes
                 faqs = FAQ.query.limit(3).all()
                 if faqs:
                     options = [format_faq_response(faq.question, faq.answer) for faq in faqs]
