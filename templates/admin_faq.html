@@ -1,62 +1,196 @@
-{% extends 'base.html' %}
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
 
-{% block messages %}
-<div class="chat-message bot">
-    <div class="avatar"><i class="fas fa-robot"></i></div>
-    <div class="message-bubble">Bem-vindo ao gerenciamento de FAQs, {{ user.name }}!</div>
-</div>
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        {% for category, message in messages %}
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente de Service Desk - Gerenciar FAQs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/styles.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Assistente de Service Desk</h1>
+            <p>Digite comandos como "Encerrar chamado 12345", "Sugerir solução para computador não liga", ou perguntas como "Como configurar uma VPN?"</p>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+        <div class="chat-body" id="chat-body">
             <div class="chat-message bot">
                 <div class="avatar"><i class="fas fa-robot"></i></div>
-                <div class="message-bubble {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
-                    {{ message }}
+                <div class="message-bubble">Bem-vindo ao gerenciamento de FAQs, {{ user.name }}!</div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="chat-message bot">
+                            <div class="avatar"><i class="fas fa-robot"></i></div>
+                            <div class="message-bubble {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
+                                {{ message }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="chat-message">
+                <div class="message-bubble" style="background: transparent; box-shadow: none; padding: 0;">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Adicionar Nova FAQ</h3>
+                    <form method="POST" action="/admin/faq" class="space-y-4 mb-6">
+                        <div>
+                            <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pergunta</label>
+                            <input type="text" id="question" name="question" required class="chat-input w-full" placeholder="Digite a pergunta">
+                        </div>
+                        <div>
+                            <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
+                            <textarea id="answer" name="answer" rows="3" required class="chat-input w-full" placeholder="Digite a resposta"></textarea>
+                        </div>
+                        <button type="submit" name="add_question" class="chat-button w-full">Adicionar FAQ</button>
+                    </form>
+
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Importar FAQs</h3>
+                    <form method="POST" action="/admin/faq" enctype="multipart/form-data" class="space-y-4 mb-6">
+                        <div>
+                            <label for="faq_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selecione um arquivo (JSON ou CSV)</label>
+                            <input type="file" id="faq_file" name="faq_file" accept=".json,.csv" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
+                        </div>
+                        <button type="submit" name="import_faqs" class="chat-button w-full">Importar FAQs</button>
+                    </form>
+
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">FAQs Existentes</h3>
+                    {% if faqs %}
+                        <ul class="space-y-3">
+                            {% for faq in faqs %}
+                                <li class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
+                                    <strong class="block text-gray-900 dark:text-gray-100">{{ faq.question }}</strong>
+                                    <p class="text-gray-700 dark:text-gray-300 mt-1">{{ faq.answer }}</p>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
+                    {% endif %}
+                    <a href="/" class="block mt-4 text-center text-blue-600 hover:underline dark:text-blue-400">Voltar para a Home</a>
                 </div>
             </div>
-        {% endfor %}
-    {% endif %}
-{% endwith %}
-
-<div class="chat-message">
-    <div class="message-bubble" style="background: transparent; box-shadow: none; padding: 0;">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Adicionar Nova FAQ</h3>
-        <form method="POST" action="{{ url_for('admin_faq') }}" class="space-y-4 mb-6">
-            <div>
-                <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pergunta</label>
-                <input type="text" id="question" name="question" required class="chat-input w-full" placeholder="Digite a pergunta">
+        </div>
+        <div class="chat-footer">
+            <div class="typing-indicator" id="typing-indicator">
+                <span>Digitando...</span>
             </div>
-            <div>
-                <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
-                <textarea id="answer" name="answer" rows="3" required class="chat-input w-full" placeholder="Digite a resposta"></textarea>
-            </div>
-            <button type="submit" name="add_question" class="chat-button w-full">Adicionar FAQ</button>
-        </form>
-
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Importar FAQs</h3>
-        <form method="POST" action="{{ url_for('admin_faq') }}" enctype="multipart/form-data" class="space-y-4 mb-6">
-            <div>
-                <label for="faq_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selecione um arquivo (JSON ou CSV)</label>
-                <input type="file" id="faq_file" name="faq_file" accept=".json,.csv" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
-            </div>
-            <button type="submit" name="import_faqs" class="chat-button w-full">Importar FAQs</button>
-        </form>
-
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">FAQs Existentes</h3>
-        {% if faqs %}
-            <ul class="space-y-3">
-                {% for faq in faqs %}
-                    <li class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
-                        <strong class="block text-gray-900 dark:text-gray-100">{{ faq.question }}</strong>
-                        <p class="text-gray-700 dark:text-gray-300 mt-1">{{ faq.answer }}</p>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
-        {% endif %}
-        <a href="{{ url_for('index') }}" class="block mt-4 text-center text-blue-600 hover:underline dark:text-blue-400">Voltar para a Home</a>
+            <textarea id="chat-input" class="chat-input" rows="2" placeholder="Digite sua mensagem..."></textarea>
+            <button onclick="enviarMensagem()" class="chat-button">Enviar</button>
+        </div>
     </div>
-</div>
-{% endblock %}
+
+    <script>
+        const chatBody = document.getElementById('chat-body');
+        const chatInput = document.getElementById('chat-input');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        // Alternar tema claro/escuro
+        function toggleTheme() {
+            document.body.classList.toggle('dark');
+            const themeToggle = document.querySelector('.theme-toggle i');
+            themeToggle.classList.toggle('fa-moon');
+            themeToggle.classList.toggle('fa-sun');
+        }
+
+        async function enviarMensagem() {
+            const mensagem = chatInput.value.trim();
+            if (!mensagem) return;
+
+            // Adicionar mensagem do usuário
+            adicionarMensagem(mensagem, 'user');
+            chatInput.value = '';
+            typingIndicator.style.display = 'flex';
+            chatBody.scrollTop = chatBody.scrollHeight;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensagem })
+                });
+                const data = await response.json();
+                adicionarMensagem(data.resposta, 'bot');
+            } catch (error) {
+                adicionarMensagem('Erro ao processar a solicitação.', 'bot');
+            } finally {
+                typingIndicator.style.display = 'none';
+                chatBody.scrollTop = chatBody.scrollHeight;
+            }
+        }
+
+        function adicionarMensagem(texto, tipo) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${tipo}`;
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'avatar';
+            avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            bubbleDiv.textContent = texto;
+            messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
+            messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
+            chatBody.appendChild(messageDiv);
+        }
+
+        // Enviar mensagem com Enter (sem Shift)
+        chatInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                enviarMensagem();
+            }
+        });
+
+        // Carregar mensagens iniciais (se houver)
+        window.addEventListener('load', () => {
+            chatBody.scrollTop = chatBody.scrollHeight;
+        });
+    </script>
+</body>
+</html>
