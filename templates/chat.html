@@ -1,47 +1,8 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><div class="chat-container w-full max-w-3xl flex flex-col h-[calc(100vh-8rem)]">
+<div class="chat-container w-full max-w-3xl flex flex-col h-[calc(100vh-8rem)]">
     <div class="chat-body flex-1 overflow-y-auto p-4" id="chat-body">
         <div class="chat-message bot">
             <div class="avatar"><i class="fas fa-robot"></i></div>
-            <div class="message-bubble">Sou seu assistente de Service Desk. Como posso ajudar hoje? Tente "Encerrar chamado <ID>", "Sugerir solução para <problema>", ou perguntas como "Como configurar uma VPN?".</div>
+            <div class="message-bubble">Sou seu assistente de Service Desk. Como posso ajudar hoje? Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!</div>
         </div>
     </div>
     <div class="chat-footer p-4 bg-white dark:bg-gray-800 shadow-inner">
@@ -57,6 +18,38 @@
 </div>
 
 <script>
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+
+    function filledCell(cell) {
+        return cell !== '' && cell != null;
+    }
+
+    function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                    row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                    headerRowIndex = 0;
+                }
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                return XLSX.utils.sheet_to_csv(csv, { header: 1 });
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+    }
+
     const chatBody = document.getElementById('chat-body');
     const chatInput = document.getElementById('chat-input');
     const typingIndicator = document.getElementById('typing-indicator');
@@ -70,7 +63,7 @@
                 gk_fileData[file.name] = base64Data;
                 gk_xlsxFileLookup[file.name] = true;
                 gk_isXlsx = file.name.toLowerCase().endsWith('.xlsx');
-                adicionarMensagem(`Arquivo "${file.name}" carregado. Envie uma mensagem para processar os dados.`, 'bot');
+                adicionarMensagem(`Arquivo "${file.name}" carregado. Envie uma mensagem para processar os dados.`, 'bot', []);
             };
             reader.readAsDataURL(file);
         }
@@ -90,7 +83,7 @@
             }
         }
 
-        adicionarMensagem(userMessage, 'user');
+        adicionarMensagem(userMessage, 'user', []);
         chatInput.value = '';
         document.getElementById('file-upload').value = '';
         typingIndicator.style.display = 'flex';
@@ -103,26 +96,55 @@
                 body: JSON.stringify({ mensagem: userMessage })
             });
             const data = await response.json();
-            adicionarMensagem(data.resposta, 'bot');
+            adicionarMensagem(data.text, 'bot', data.options, data.html);
         } catch (error) {
-            adicionarMensagem('Erro ao processar a solicitação.', 'bot');
+            adicionarMensagem('Erro ao processar a solicitação.', 'bot', []);
         } finally {
             typingIndicator.style.display = 'none';
             chatBody.scrollTop = chatBody.scrollHeight;
         }
     }
 
-    function adicionarMensagem(texto, tipo) {
+    function adicionarMensagem(texto, tipo, options = [], isHtml = false) {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message ${tipo}`;
+        messageDiv.className = `chat-message ${tipo} mb-4`;
         const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
+        avatarDiv.className = 'avatar mr-2';
         avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
         const bubbleDiv = document.createElement('div');
-        bubbleDiv.className = 'message-bubble';
-        bubbleDiv.innerHTML = texto;
+        bubbleDiv.className = 'message-bubble bg-gray-100 dark:bg-gray-700 p-3 rounded-lg';
+        if (isHtml) {
+            bubbleDiv.innerHTML = texto;
+        } else {
+            bubbleDiv.textContent = texto;
+        }
         messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
         messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
+
+        if (options.length > 0) {
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'mt-2 flex flex-wrap gap-2';
+            options.forEach(opt => {
+                if (opt.action === 'prompt') {
+                    const button = document.createElement('button');
+                    button.className = 'px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm';
+                    button.textContent = opt.text;
+                    button.onclick = () => {
+                        chatInput.value = opt.value;
+                        chatInput.focus();
+                    };
+                    optionsDiv.appendChild(button);
+                } else if (opt.action === 'link') {
+                    const link = document.createElement('a');
+                    link.href = opt.value;
+                    link.className = 'px-3 py-1 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition text-sm';
+                    link.textContent = opt.text;
+                    optionsDiv.appendChild(link);
+                }
+            });
+            messageDiv.appendChild(optionsDiv);
+        }
+
         chatBody.appendChild(messageDiv);
     }
 
