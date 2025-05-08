@@ -4,15 +4,16 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
+import json
+import csv
+from io import StringIO
 from sqlalchemy.exc import OperationalError
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flo
-
-ask(__name__)
+app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql+psycopg2://sdeskdb_user:urrIL42GcKewOyEQDey6KKNcas8NLH2x@dpg-d0dsicndiees73a8op40-a/sdeskdb')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -129,6 +130,32 @@ def admin_faq():
                     flash('Erro ao acessar o banco de dados. Tente novamente mais tarde.', 'error')
             else:
                 flash('Preencha todos os campos.', 'error')
+        elif 'import_faqs' in request.form and 'faq_file' in request.files:
+            file = request.files['faq_file']
+            if file.filename == '':
+                flash('Nenhum arquivo selecionado.', 'error')
+            elif file and (file.filename.endswith('.json') or file.filename.endswith('.csv')):
+                try:
+                    if file.filename.endswith('.json'):
+                        faqs = json.load(file)
+                        for faq in faqs:
+                            if 'question' in faq and 'answer' in faq:
+                                new_faq = FAQ(question=faq['question'], answer=faq['answer'])
+                                db.session.add(new_faq)
+                    elif file.filename.endswith('.csv'):
+                        csv_data = file.read().decode('utf-8')
+                        csv_reader = csv.DictReader(StringIO(csv_data))
+                        for row in csv_reader:
+                            if 'question' in row and 'answer' in row:
+                                new_faq = FAQ(question=row['question'], answer=row['answer'])
+                                db.session.add(new_faq)
+                    db.session.commit()
+                    flash('FAQs importadas com sucesso!', 'success')
+                except Exception as e:
+                    logger.error(f"Erro ao importar FAQs: {e}")
+                    flash('Erro ao importar FAQs. Verifique o formato do arquivo.', 'error')
+            else:
+                flash('Formato de arquivo não suportado. Use JSON ou CSV.', 'error')
     try:
         faqs = FAQ.query.all()
     except OperationalError as e:
@@ -142,15 +169,36 @@ def admin_faq():
 def chat():
     data = request.get_json()
     mensagem = data.get('mensagem', '').lower()
-    if 'encerrar chamado' in mensagem:
-        numero_chamado = mensagem.split('encerrar chamado ')[1]
-        return jsonify({'resposta': f'Chamado {numero_chamado} encerrado com sucesso!'})
-    elif 'sugerir solução para' in mensagem:
-        problema = mensagem.split('sugerir solução para ')[1]
-        return jsonify({'resposta': f'Sugestão para {problema}: Verifique os cabos e a energia.'})
-    elif 'como configurar uma vpn' in mensagem:
-        return jsonify({'resposta': 'Para configurar uma VPN, acesse as configurações de rede e insira as credenciais fornecidas pelo TI.'})
-    return jsonify({'resposta': 'Desculpe, não entendi. Tente "Encerrar chamado <ID>" ou "Sugerir solução para <problema>".'})
+    # Simulação de comportamento de IA
+    try:
+        # Procurar resposta em FAQs
+        faqs = FAQ.query.all()
+        for faq in faqs:
+            if faq.question.lower() in mensagem:
+                return jsonify({'resposta': faq.answer})
+        
+        # Comandos específicos
+        if 'encerrar chamado' in mensagem:
+            try:
+                numero_chamado = mensagem.split('encerrar chamado ')[1].strip()
+                return jsonify({'resposta': f'Chamado {numero_chamado} encerrado com sucesso!'})
+            except IndexError:
+                return jsonify({'resposta': 'Por favor, forneça o número do chamado. Exemplo: "Encerrar chamado 12345"'})
+        elif 'sugerir solução para' in mensagem:
+            try:
+                problema = mensagem.split('sugerir solução para ')[1].strip()
+                faq_match = FAQ.query.filter(FAQ.question.ilike(f'%{problema}%')).first()
+                if faq_match:
+                    return jsonify({'resposta': faq_match.answer})
+                return jsonify({'resposta': f'Sugestão para "{problema}": Verifique os cabos e a energia ou consulte o administrador.'})
+            except IndexError:
+                return jsonify({'resposta': 'Por favor, especifique o problema. Exemplo: "Sugerir solução para computador não liga"'})
+        elif 'como configurar uma vpn' in mensagem:
+            return jsonify({'resposta': 'Para configurar uma VPN, acesse as configurações de rede, selecione "Adicionar VPN", e insira as credenciais fornecidas pelo seu departamento de TI.'})
+        return jsonify({'resposta': 'Desculpe, não entendi. Tente "Encerrar chamado <ID>", "Sugerir solução para <problema>", ou consulte as FAQs disponíveis.'})
+    except Exception as e:
+        logger.error(f"Erro ao processar mensagem de chat: {e}")
+        return jsonify({'resposta': 'Erro ao processar sua solicitação. Tente novamente.'})
 
 def init_db():
     """Inicializa o banco de dados com dados padrão."""
@@ -158,8 +206,8 @@ def init_db():
         try:
             if not FAQ.query.first():
                 faq_data = [
-                    FAQ(question="computador não liga", answer="Verifique a energia e a fonte."),
-                    FAQ(question="erro ao acessar sistema", answer="Reinicie e verifique as credenciais.")
+                    FAQ(question="computador não liga", answer="Verifique a energia e a fonte. Certifique-se de que o cabo de energia está conectado e tente reiniciar."),
+                    FAQ(question="erro ao acessar sistema", answer="Reinicie o sistema e verifique suas credenciais. Se o problema persistir, contate o suporte de TI.")
                 ]
                 db.session.bulk_save_objects(faq_data)
                 db.session.commit()
