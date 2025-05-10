@@ -9,6 +9,11 @@ import re
 from PyPDF2 import PdfReader
 from datetime import datetime
 from google.cloud import dialogflow
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
@@ -180,12 +185,16 @@ def find_faq_by_keywords(message):
     return [match[0] for match in matches] if matches else []
 
 def detect_intent(project_id, session_id, text, language_code="pt-BR"):
-    session_client = dialogflow.SessionsClient()
-    session = session_client.session_path(project_id, session_id)
-    text_input = dialogflow.TextInput(text=text, language_code=language_code)
-    query_input = dialogflow.QueryInput(text=text_input)
-    response = session_client.detect_intent(request={"session": session, "query_input": query_input})
-    return response.query_result.intent.display_name, dict(response.query_result.parameters)
+    try:
+        session_client = dialogflow.SessionsClient()
+        session = session_client.session_path(project_id, session_id)
+        text_input = dialogflow.TextInput(text=text, language_code=language_code)
+        query_input = dialogflow.QueryInput(text=text_input)
+        response = session_client.detect_intent(request={"session": session, "query_input": query_input})
+        return response.query_result.intent.display_name, dict(response.query_result.parameters)
+    except Exception as e:
+        logger.error(f"Erro ao chamar Dialogflow: {str(e)}")
+        return None, {}
 
 # Rotas
 @app.route('/')
@@ -259,8 +268,12 @@ def chat():
     project_id = os.getenv('DIALOGFLOW_PROJECT_ID', 'servicedeskbot-anki')
     session_id = str(current_user.id)
 
-    intent, params = detect_intent(project_id, session_id, user_message)
-    
+    try:
+        intent, params = detect_intent(project_id, session_id, user_message)
+    except Exception as e:
+        logger.error(f"Erro ao detectar intent: {str(e)}")
+        intent, params = None, {}
+
     response = {
         'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!",
         'html': False,
@@ -268,18 +281,19 @@ def chat():
         'options': []
     }
 
-    if intent == "consult_faq":
-        keyword = params.get("keyword", user_message.lower())
-        faq = FAQ.query.filter(FAQ.question.ilike(f"%{keyword}%")).first()
-        if faq:
-            response['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
-            response['html'] = True
-        else:
-            response['text'] = "Desculpe, não encontrei uma FAQ para isso. Tente reformular sua pergunta!"
-    elif intent == "saudacao":
-        response['text'] = "Olá! Como posso ajudar você hoje?"
-    elif intent == "ajuda":
-        response['text'] = "Eu posso ajudar com perguntas sobre hardware, software, rede e mais! Por exemplo, você pode perguntar: 'Como configurar uma impressora?' ou 'O que fazer se o computador não liga?'."
+    if intent:
+        if intent == "consult_faq":
+            keyword = params.get("keyword", user_message.lower())
+            faq = FAQ.query.filter(FAQ.question.ilike(f"%{keyword}%")).first()
+            if faq:
+                response['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
+                response['html'] = True
+            else:
+                response['text'] = "Desculpe, não encontrei uma FAQ para isso. Tente reformular sua pergunta!"
+        elif intent == "saudacao":
+            response['text'] = "Olá! Como posso ajudar você hoje?"
+        elif intent == "ajuda":
+            response['text'] = "Eu posso ajudar com perguntas sobre hardware, software, rede e mais! Por exemplo, você pode perguntar: 'Como configurar uma impressora?' ou 'O que fazer se o computador não liga?'."
     else:
         ticket_response = process_ticket_command(user_message)
         if ticket_response:
