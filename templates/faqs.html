@@ -37,50 +37,6 @@
 
             <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">FAQs</h2>
 
-            <!-- Formulário para Adicionar FAQ Manualmente -->
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Adicionar FAQ Manualmente</h3>
-            <form method="POST" action="/faqs" class="space-y-4 mb-6">
-                <div>
-                    <label for="category" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
-                    <select name="category" id="category" required class="chat-input w-full">
-                        {% for category in categories %}
-                            <option value="{{ category.id }}">{{ category.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pergunta</label>
-                    <input type="text" id="question" name="question" required class="chat-input w-full" placeholder="Digite a pergunta (ex.: Como configurar uma zebra?)">
-                </div>
-                <div>
-                    <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
-                    <textarea id="answer" name="answer" rows="3" required class="chat-input w-full" placeholder="Digite a resposta (ex.: Siga os passos 1, 2, 3...)"></textarea>
-                </div>
-                <div>
-                    <label for="image_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL da Imagem (opcional)</label>
-                    <input type="text" id="image_url" name="image_url" class="chat-input w-full" placeholder="Digite a URL da imagem (ex.: https://example.com/zebra.jpg)">
-                </div>
-                <button type="submit" name="add_faq" class="chat-button w-full">Adicionar FAQ</button>
-            </form>
-
-            <!-- Formulário para Importar FAQ via JSON -->
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Importar FAQs via JSON</h3>
-            <form method="POST" action="/faqs" enctype="multipart/form-data" class="space-y-4 mb-6">
-                <div>
-                    <label for="faq_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selecione um arquivo JSON</label>
-                    <input type="file" id="faq_file" name="faq_file" accept=".json" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
-                </div>
-                <div>
-                    <label for="category_import" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
-                    <select name="category_import" id="category_import" required class="chat-input w-full">
-                        {% for category in categories %}
-                            <option value="{{ category.id }}">{{ category.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button type="submit" name="import_faq" class="chat-button w-full">Importar FAQs</button>
-            </form>
-
             <!-- Tabela de FAQs com Opção de Exclusão -->
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -108,7 +64,7 @@
                                         {% endif %}
                                     </td>
                                     <td class="p-3 border-b dark:border-gray-600">
-                                        <form method="POST" action="/faqs/delete/{{ faq.id }}" class="ml-4" onsubmit="return confirm('Tem certeza que deseja excluir esta FAQ?');">
+                                        <form method="POST" action="/faqs/delete/{{ faq.id }}" class="inline-block" onsubmit="return confirm('Tem certeza que deseja excluir esta FAQ?');">
                                             <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-600">
                                                 <i class="fas fa-trash"></i> Excluir
                                             </button>
