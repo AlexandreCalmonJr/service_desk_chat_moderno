@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -28,7 +28,6 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_timeout': 30,
 }
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'bat', 'exe'}
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
@@ -58,13 +57,8 @@ class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
-    file_path = db.Column(db.String(500), nullable=True)  # Campo para o caminho do arquivo
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
-
-    @property
-    def formatted_answer(self):
-        return format_faq_response(self.question, self.answer, self.file_path)
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -89,10 +83,6 @@ try:
         logger.info("Banco de dados inicializado com sucesso.")
 except Exception as e:
     logger.error(f"Erro ao inicializar o banco de dados: {str(e)}")
-
-# Funções de utilidade
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 def process_ticket_command(message):
     match = re.match(r"Encerrar chamado (\d+)", message)
@@ -133,17 +123,11 @@ def extract_faqs_from_pdf(file_path):
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
             answer = lines[i + 1]
-            faqs.append({"question": question, "answer": answer, "file_path": None})
+            faqs.append({"question": question, "answer": answer})
         return faqs
     except Exception as e:
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
-
-def format_faq_response(question, answer, file_path=None):
-    formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>{answer}<br>"
-    if file_path and os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], file_path)):
-        formatted_response += f'<a href="/download/{file_path}" download>Baixar Arquivo: {os.path.basename(file_path)}</a><br>'
-    return formatted_response
 
 def search_faq(message):
     words = re.findall(r'\w+', message.lower())
@@ -166,14 +150,8 @@ def search_faq(message):
     matches.sort(key=lambda x: x[1], reverse=True)
     if matches:
         faq = matches[0][0]  # Pega a FAQ com maior pontuação
-        return faq.formatted_answer
+        return f"<strong>Pergunta:</strong> {faq.question}<br><br>{faq.answer}"
     return None
-
-# Rota para baixar arquivos
-@app.route('/download/<path:filename>')
-@login_required
-def download_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
 
 # Rotas
 @app.route('/')
@@ -191,6 +169,13 @@ def profile():
         flash('Perfil atualizado com sucesso!', 'success')
         return redirect(url_for('profile'))
     return render_template('profile.html')
+
+@app.route('/faqs')
+@login_required
+def faqs():
+    faqs = FAQ.query.all()
+    categories = Category.query.all()
+    return render_template('faqs.html', faqs=faqs, categories=categories)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -248,17 +233,19 @@ def chat():
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
         resposta['text'] = ticket_response
+        resposta['html'] = False
     else:
         solution_response = suggest_solution(mensagem)
         if solution_response:
             resposta['text'] = solution_response
+            resposta['html'] = False
         else:
             faq_response = search_faq(mensagem)
             if faq_response:
                 resposta['text'] = faq_response
 
     chat_messages.append({"texto": resposta['text'], "tipo": "bot"})
-    return jsonify({'resposta': resposta['text'], 'mensagens': chat_messages})
+    return jsonify({'resposta': resposta['text'], 'mensagens': chat_messages, 'html': resposta['html']})
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
@@ -268,19 +255,14 @@ def admin_faq():
         return redirect(url_for('index'))
     
     categories = Category.query.all()
+    faqs = FAQ.query.all()  # Para exibir as FAQs existentes
     if request.method == 'POST':
         if 'add_question' in request.form:
             category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
-            file = request.files.get('file')
-            file_path = None
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
             if category_id and question and answer:
-                faq = FAQ(category_id=category_id, question=question, answer=answer, file_path=file_path)
+                faq = FAQ(category_id=category_id, question=question, answer=answer)
                 db.session.add(faq)
                 try:
                     db.session.commit()
@@ -291,12 +273,8 @@ def admin_faq():
                     db.session.rollback()
                     logger.error(f"Erro ao adicionar FAQ: {str(e)}")
                     flash('Erro ao adicionar FAQ.', 'error')
-                    if file_path and os.path.exists(file_path):
-                        os.remove(file_path)
             else:
                 flash('Preencha todos os campos obrigatórios.', 'error')
-                if file_path and os.path.exists(file_path):
-                    os.remove(file_path)
         elif 'import_faqs' in request.form:
             file = request.files['faq_file']
             if file and file.filename.endswith(('.json', '.csv', '.pdf')):
@@ -352,7 +330,7 @@ def admin_faq():
                     os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
-    return render_template('admin_faq.html', categories=categories)
+    return render_template('admin_faq.html', categories=categories, faqs=faqs)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
