@@ -16,12 +16,7 @@
             <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
         </div>
         <div class="flex items-center space-x-3">
-            <a href="/" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Voltar ao Chat</a>
-            {% if current_user.is_admin %}
-                <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
-            {% endif %}
-            <a href="/faqs" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ver FAQs</a>
-            <a href="/profile" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Perfil</a>
+            <a href="/" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Voltar para o Chat</a>
             <a href="/logout" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
             <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
                 <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
@@ -29,40 +24,45 @@
         </div>
     </header>
     <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
-        <div class="w-full max-w-2xl p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">FAQs Registradas</h2>
-
-            <!-- Filtros -->
-            <div class="mb-6 space-y-4">
-                <div>
-                    <label for="category_filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filtrar por Categoria</label>
-                    <select id="category_filter" onchange="filterFAQs()" class="chat-input w-full">
-                        <option value="">Todas as Categorias</option>
-                        {% for category in categories %}
-                            <option value="{{ category.name }}">{{ category.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="search_filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar por Palavra-Chave</label>
-                    <input type="text" id="search_filter" onkeyup="filterFAQs()" class="chat-input w-full" placeholder="Digite uma palavra-chave...">
-                </div>
-            </div>
-
-            <!-- Lista de FAQs -->
-            <div class="space-y-6" id="faq-list">
-                {% for faq in faqs %}
-                    <div class="faq-item" data-category="{{ faq.category.name }}">
-                        <div class="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg shadow-sm">
-                            {{ faq.formatted_answer | safe }}
+        <div class="w-full max-w-4xl p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
+                            {{ message }}
                         </div>
-                    </div>
-                {% endfor %}
-            </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
-            {% if not faqs %}
-                <p class="text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</p>
-            {% endif %}
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">FAQs</h2>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200 dark:bg-gray-700">
+                            <th class="p-3 border-b dark:border-gray-600">Pergunta</th>
+                            <th class="p-3 border-b dark:border-gray-600">Resposta</th>
+                            <th class="p-3 border-b dark:border-gray-600">Categoria</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if faqs %}
+                            {% for faq in faqs %}
+                                <tr class="hover:bg-gray-100 dark:hover:bg-gray-800">
+                                    <td class="p-3 border-b dark:border-gray-600">{{ faq.question }}</td>
+                                    <td class="p-3 border-b dark:border-gray-600">{{ faq.answer }}</td>
+                                    <td class="p-3 border-b dark:border-gray-600">{{ faq.category.name }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="p-3 text-center text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </main>
 
@@ -72,26 +72,6 @@
             const themeToggle = document.querySelector('.theme-toggle i');
             themeToggle.classList.toggle('fa-moon');
             themeToggle.classList.toggle('fa-sun');
-        }
-
-        function filterFAQs() {
-            const categoryFilter = document.getElementById('category_filter').value.toLowerCase();
-            const searchFilter = document.getElementById('search_filter').value.toLowerCase();
-            const faqItems = document.querySelectorAll('.faq-item');
-
-            faqItems.forEach(item => {
-                const category = item.getAttribute('data-category').toLowerCase();
-                const content = item.textContent.toLowerCase();
-
-                const matchesCategory = categoryFilter === '' || category === categoryFilter;
-                const matchesSearch = searchFilter === '' || content.includes(searchFilter);
-
-                if (matchesCategory && matchesSearch) {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
         }
     </script>
 </body>
