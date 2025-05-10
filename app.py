@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8,6 +8,7 @@ import csv
 import json
 import re
 from PyPDF2 import PdfReader
+from datetime import datetime
 import logging
 
 # Configurar logging
@@ -27,15 +28,16 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_timeout': 30,
 }
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['PDF_FOLDER'] = os.path.join('uploads', 'pdfs')
+app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'bat', 'exe'}
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
-if not os.path.exists(app.config['PDF_FOLDER']):
-    os.makedirs(app.config['PDF_FOLDER'])
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# Lista para armazenar mensagens do chat
+chat_messages = []
 
 # Modelos
 class User(UserMixin, db.Model):
@@ -56,7 +58,13 @@ class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
-    pdf_path = db.Column(db.String(200))
+    file_path = db.Column(db.String(500), nullable=True)  # Campo para o caminho do arquivo
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
+
+    @property
+    def formatted_answer(self):
+        return format_faq_response(self.question, self.answer, self.file_path)
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,12 +76,23 @@ class Ticket(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Inicialização do banco de dados e categorias padrão
 try:
     with app.app_context():
         db.create_all()
+        categories = ['Hardware', 'Software', 'Rede', 'Outros']
+        for category_name in categories:
+            if not Category.query.filter_by(name=category_name).first():
+                category = Category(name=category_name)
+                db.session.add(category)
+        db.session.commit()
         logger.info("Banco de dados inicializado com sucesso.")
 except Exception as e:
     logger.error(f"Erro ao inicializar o banco de dados: {str(e)}")
+
+# Funções de utilidade
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 def process_ticket_command(message):
     match = re.match(r"Encerrar chamado (\d+)", message)
@@ -114,17 +133,64 @@ def extract_faqs_from_pdf(file_path):
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
             answer = lines[i + 1]
-            faqs.append({"question": question, "answer": answer})
+            faqs.append({"question": question, "answer": answer, "file_path": None})
         return faqs
     except Exception as e:
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
+def format_faq_response(question, answer, file_path=None):
+    formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>{answer}<br>"
+    if file_path and os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], file_path)):
+        formatted_response += f'<a href="/download/{file_path}" download>Baixar Arquivo: {os.path.basename(file_path)}</a><br>'
+    return formatted_response
+
+def search_faq(message):
+    words = re.findall(r'\w+', message.lower())
+    faqs = FAQ.query.all()
+    matches = []
+
+    for faq in faqs:
+        score = 0
+        question_text = faq.question.lower()
+        answer_text = faq.answer.lower()
+        combined_text = question_text + " " + answer_text
+
+        for word in words:
+            if word in combined_text:
+                score += 1
+
+        if score > 0:
+            matches.append((faq, score))
+
+    matches.sort(key=lambda x: x[1], reverse=True)
+    if matches:
+        faq = matches[0][0]  # Pega a FAQ com maior pontuação
+        return faq.formatted_answer
+    return None
+
+# Rota para baixar arquivos
+@app.route('/download/<path:filename>')
+@login_required
+def download_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+
+# Rotas
 @app.route('/')
 @login_required
 def index():
     session.pop('faq_selection', None)
     return render_template('index.html')
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        current_user.phone = request.form.get('phone')
+        db.session.commit()
+        flash('Perfil atualizado com sucesso!', 'success')
+        return redirect(url_for('profile'))
+    return render_template('profile.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -172,7 +238,10 @@ def logout():
 def chat():
     data = request.get_json()
     mensagem = data.get('mensagem', '').strip()
-    resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta qualquer para buscar uma FAQ, como 'Manual do Totem'."
+    resposta = {
+        'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Manual do Totem'.",
+        'html': True
+    }
 
     chat_messages.append({"texto": mensagem, "tipo": "user"})
 
@@ -186,11 +255,10 @@ def chat():
         else:
             faq_response = search_faq(mensagem)
             if faq_response:
-                resposta = faq_response
+                resposta['text'] = faq_response
 
-    chat_messages.append({"texto": resposta, "tipo": "bot"})
-
-    return jsonify({'resposta': resposta, 'mensagens': chat_messages})
+    chat_messages.append({"texto": resposta['text'], "tipo": "bot"})
+    return jsonify({'resposta': resposta['text'], 'mensagens': chat_messages})
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
@@ -205,8 +273,14 @@ def admin_faq():
             category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
-            if question and answer:
-                faq = FAQ(question=question, answer=answer)
+            file = request.files.get('file')
+            file_path = None
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+            if category_id and question and answer:
+                faq = FAQ(category_id=category_id, question=question, answer=answer, file_path=file_path)
                 db.session.add(faq)
                 try:
                     db.session.commit()
@@ -217,8 +291,12 @@ def admin_faq():
                     db.session.rollback()
                     logger.error(f"Erro ao adicionar FAQ: {str(e)}")
                     flash('Erro ao adicionar FAQ.', 'error')
+                    if file_path and os.path.exists(file_path):
+                        os.remove(file_path)
             else:
-                flash('Preencha todos os campos.', 'error')
+                flash('Preencha todos os campos obrigatórios.', 'error')
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
         elif 'import_faqs' in request.form:
             file = request.files['faq_file']
             if file and file.filename.endswith(('.json', '.csv', '.pdf')):
@@ -237,7 +315,6 @@ def admin_faq():
                                 category_name = item.get('category')
                                 question = item.get('question')
                                 answer = item.get('answer', '')
-                                image_url = item.get('image_url')
                                 if not category_name or not question:
                                     flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
                                     continue
@@ -246,7 +323,7 @@ def admin_faq():
                                     category = Category(name=category_name)
                                     db.session.add(category)
                                     db.session.commit()
-                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url)
+                                faq = FAQ(category_id=category.id, question=question, answer=answer)
                                 db.session.add(faq)
                     elif file.filename.endswith('.csv'):
                         category_id = request.form['category_import']
@@ -256,8 +333,7 @@ def admin_faq():
                                 faq = FAQ(
                                     category_id=category_id,
                                     question=row.get('question'),
-                                    answer=row.get('answer', ''),
-                                    image_url=row.get('image_url')
+                                    answer=row.get('answer', '')
                                 )
                                 db.session.add(faq)
                     elif file.filename.endswith('.pdf'):
@@ -265,7 +341,7 @@ def admin_faq():
                         faqs_extracted = extract_faqs_from_pdf(file_path)
                         for faq in faqs_extracted:
                             if faq['question'] and faq['answer']:
-                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
+                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'])
                                 db.session.add(new_faq)
                     db.session.commit()
                     logger.info(f"FAQs importadas do arquivo {filename}")
