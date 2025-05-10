@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8,15 +8,18 @@ import csv
 import json
 import re
 from PyPDF2 import PdfReader
-from datetime import datetime
-import redis
-import pickle
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-
-# Configuração do PostgreSQL no Render
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://<user>:<password>@<host>:<port>/service_desk')
+if os.getenv('DATABASE_URL'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL').replace("postgres://", "postgresql://")
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///service_desk.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 10,
@@ -24,13 +27,11 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_timeout': 30,
 }
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['ALLOWED_EXTENSIONS'] = {'pdf', 'bat', 'exe'}
+app.config['PDF_FOLDER'] = os.path.join('uploads', 'pdfs')
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
-
-# Configuração do Redis no Render
-redis_url = os.getenv('REDIS_URL', 'redis://<user>:<password>@<host>:<port>')
-redis_client = redis.Redis.from_url(redis_url, decode_responses=True)
+if not os.path.exists(app.config['PDF_FOLDER']):
+    os.makedirs(app.config['PDF_FOLDER'])
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
@@ -55,14 +56,7 @@ class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
-    image_url = db.Column(db.String(500), nullable=True)
-    file_path = db.Column(db.String(500), nullable=True)  # Novo campo para armazenar o caminho do arquivo
-    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
-    category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
-
-    @property
-    def formatted_answer(self):
-        return format_faq_response(self.question, self.answer, self.image_url, self.file_path)
+    pdf_path = db.Column(db.String(200))
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,19 +68,12 @@ class Ticket(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Inicialização do banco de dados e categorias padrão
-with app.app_context():
-    db.create_all()
-    categories = ['Hardware', 'Software', 'Rede', 'Outros']
-    for category_name in categories:
-        if not Category.query.filter_by(name=category_name).first():
-            category = Category(name=category_name)
-            db.session.add(category)
-    db.session.commit()
-
-# Funções de utilidade
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+try:
+    with app.app_context():
+        db.create_all()
+        logger.info("Banco de dados inicializado com sucesso.")
+except Exception as e:
+    logger.error(f"Erro ao inicializar o banco de dados: {str(e)}")
 
 def process_ticket_command(message):
     match = re.match(r"Encerrar chamado (\d+)", message)
@@ -127,123 +114,17 @@ def extract_faqs_from_pdf(file_path):
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
             answer = lines[i + 1]
-            faqs.append({"question": question, "answer": answer, "image_url": None, "file_path": None})
+            faqs.append({"question": question, "answer": answer})
         return faqs
     except Exception as e:
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
-def format_faq_response(question, answer, image_url=None, file_path=None):
-    formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
-
-    sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
-    current_section = None
-    for part in sections:
-        part = part.strip()
-        if not part:
-            continue
-        if part.startswith("Pré-requisitos:"):
-            current_section = "Pré-requisitos"
-            formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
-        elif part.startswith("Etapa"):
-            current_section = "Etapa"
-            formatted_response += f"<strong>🔧 {part}</strong><br>"
-        elif part.startswith("Atenção:"):
-            current_section = "Atenção"
-            formatted_response += "<strong>⚠️ Atenção</strong><br>"
-        elif part.startswith("Finalizar:"):
-            current_section = "Finalizar"
-            formatted_response += "<strong>⏳ Finalizar</strong><br>"
-        elif part.startswith("Pós-instalação:"):
-            current_section = "Pós-instalação"
-            formatted_response += "<strong>✅ Pós-instalação</strong><br>"
-        else:
-            if current_section:
-                items = re.split(r'[,.]\s*(?=[A-Z])', part)
-                for item in items:
-                    item = item.strip()
-                    if item:
-                        formatted_response += f"{item}<br>"
-            formatted_response += "<br>"
-
-    if image_url:
-        formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
-    if file_path:
-        formatted_response += f'<a href="/download/{file_path}" download>Baixar Arquivo</a><br>'
-
-    return formatted_response
-
-def find_faq_by_keywords(message):
-    cache_key = f"faq_search:{message.lower()}"
-    cached_result = redis_client.get(cache_key)
-    if cached_result:
-        return pickle.loads(cached_result.encode('latin1'))
-
-    words = re.findall(r'\w+', message.lower())
-    faqs = FAQ.query.all()
-    matches = []
-
-    for faq in faqs:
-        score = 0
-        question_text = faq.question.lower()
-        answer_text = faq.answer.lower()
-        combined_text = question_text + " " + answer_text
-
-        for word in words:
-            if word in combined_text:
-                score += 1
-
-        if score > 0:
-            matches.append((faq, score))
-
-    matches.sort(key=lambda x: x[1], reverse=True)
-    result = [match[0] for match in matches] if matches else []
-    redis_client.setex(cache_key, 3600, pickle.dumps(result).decode('latin1'))
-    return result
-
-# Rota para baixar arquivos
-@app.route('/download/<path:filename>')
-@login_required
-def download_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
-
-# Rotas
 @app.route('/')
 @login_required
 def index():
     session.pop('faq_selection', None)
     return render_template('index.html')
-
-@app.route('/profile', methods=['GET', 'POST'])
-@login_required
-def profile():
-    if request.method == 'POST':
-        current_user.phone = request.form.get('phone')
-        db.session.commit()
-        flash('Perfil atualizado com sucesso!', 'success')
-        return redirect(url_for('profile'))
-    return render_template('profile.html')
-
-@app.route('/faqs')
-@login_required
-def faqs():
-    cache_key_faqs = "faqs_all"
-    cached_faqs = redis_client.get(cache_key_faqs)
-    if cached_faqs:
-        faqs = pickle.loads(cached_faqs.encode('latin1'))
-    else:
-        faqs = FAQ.query.all()
-        redis_client.setex(cache_key_faqs, 3600, pickle.dumps(faqs).decode('latin1'))
-
-    cache_key_categories = "categories_all"
-    cached_categories = redis_client.get(cache_key_categories)
-    if cached_categories:
-        categories = pickle.loads(cached_categories.encode('latin1'))
-    else:
-        categories = Category.query.all()
-        redis_client.setex(cache_key_categories, 3600, pickle.dumps(categories).decode('latin1'))
-
-    return render_template('faqs.html', faqs=faqs, categories=categories)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -291,27 +172,9 @@ def logout():
 def chat():
     data = request.get_json()
     mensagem = data.get('mensagem', '').strip()
-    resposta = {
-        'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!",
-        'html': False,
-        'state': 'normal',
-        'options': []
-    }
+    resposta = "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta qualquer para buscar uma FAQ, como 'Manual do Totem'."
 
-    if 'faq_selection' in session and mensagem.startswith('faq_'):
-        faq_id = mensagem.replace('faq_', '')
-        faq_ids = session.get('faq_selection', [])
-        if int(faq_id) in faq_ids:
-            selected_faq = FAQ.query.get(int(faq_id))
-            if selected_faq:
-                resposta['text'] = selected_faq.formatted_answer
-                resposta['html'] = True
-                faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
-                resposta['state'] = 'faq_selection'
-                resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
-                return jsonify(resposta)
-        resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
-        return jsonify(resposta)
+    chat_messages.append({"texto": mensagem, "tipo": "user"})
 
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
@@ -321,24 +184,13 @@ def chat():
         if solution_response:
             resposta['text'] = solution_response
         else:
-            faq_matches = find_faq_by_keywords(mensagem)
-            if faq_matches:
-                if len(faq_matches) == 1:
-                    faq = faq_matches[0]
-                    resposta['text'] = faq.formatted_answer
-                    resposta['html'] = True
-                else:
-                    faq_ids = [faq.id for faq in faq_matches]
-                    session['faq_selection'] = faq_ids
-                    resposta['state'] = 'faq_selection'
-                    resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
-                    resposta['html'] = True
-                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
-            else:
-                resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
-                resposta['html'] = False
+            faq_response = search_faq(mensagem)
+            if faq_response:
+                resposta = faq_response
 
-    return jsonify(resposta)
+    chat_messages.append({"texto": resposta, "tipo": "bot"})
+
+    return jsonify({'resposta': resposta, 'mensagens': chat_messages})
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
@@ -353,23 +205,20 @@ def admin_faq():
             category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
-            image_url = request.form.get('image_url')
-            file = request.files.get('file')
-            file_path = None
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-            if category_id and question and answer:
-                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url, file_path=file_path)
+            if question and answer:
+                faq = FAQ(question=question, answer=answer)
                 db.session.add(faq)
-                db.session.commit()
-                redis_client.delete("faqs_all")
-                flash('FAQ adicionada com sucesso!', 'success')
+                try:
+                    db.session.commit()
+                    logger.info(f"FAQ adicionada: {question}")
+                    flash('FAQ adicionada com sucesso!', 'success')
+                    chat_messages.append({"texto": f"Nova FAQ adicionada: **{question}**\n{answer}", "tipo": "bot"})
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Erro ao adicionar FAQ: {str(e)}")
+                    flash('Erro ao adicionar FAQ.', 'error')
             else:
-                flash('Preencha todos os campos obrigatórios.', 'error')
-                if file_path and os.path.exists(file_path):
-                    os.remove(file_path)
+                flash('Preencha todos os campos.', 'error')
         elif 'import_faqs' in request.form:
             file = request.files['faq_file']
             if file and file.filename.endswith(('.json', '.csv', '.pdf')):
@@ -419,7 +268,7 @@ def admin_faq():
                                 new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
                                 db.session.add(new_faq)
                     db.session.commit()
-                    redis_client.delete("faqs_all")
+                    logger.info(f"FAQs importadas do arquivo {filename}")
                     flash('FAQs importadas com sucesso!', 'success')
                 except Exception as e:
                     flash(f'Erro ao importar FAQs: {str(e)}', 'error')
