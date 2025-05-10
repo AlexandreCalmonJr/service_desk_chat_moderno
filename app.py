@@ -9,37 +9,25 @@ import json
 import re
 from PyPDF2 import PdfReader
 from datetime import datetime
-import logging
-
-# Configurar logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
 
 # Configuração do banco de dados
+# Usar DATABASE_URL do ambiente (para Render/PostgreSQL) ou SQLite como fallback (para testes locais sem PostgreSQL)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
-    'max_overflow': 5,
-    'pool_timeout': 30,
-}
 app.config['UPLOAD_FOLDER'] = 'uploads'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-# Ajustar a URI se estiver usando PostgreSQL
+# Ajustar a URI se estiver usando PostgreSQL (Render substitui 'postgres://' por 'postgresql://')
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
-# Lista para armazenar mensagens do chat
-chat_messages = []
 
 # Modelos
 class User(UserMixin, db.Model):
@@ -79,18 +67,14 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # Inicialização do banco de dados e categorias padrão
-try:
-    with app.app_context():
-        db.create_all()
-        categories = ['Hardware', 'Software', 'Rede', 'Outros']
-        for category_name in categories:
-            if not Category.query.filter_by(name=category_name).first():
-                category = Category(name=category_name)
-                db.session.add(category)
-        db.session.commit()
-        logger.info("Banco de dados inicializado com sucesso.")
-except Exception as e:
-    logger.error(f"Erro ao inicializar o banco de dados: {str(e)}")
+with app.app_context():
+    db.create_all()
+    categories = ['Hardware', 'Software', 'Rede', 'Outros']
+    for category_name in categories:
+        if not Category.query.filter_by(name=category_name).first():
+            category = Category(name=category_name)
+            db.session.add(category)
+    db.session.commit()
 
 # Funções de utilidade
 def process_ticket_command(message):
@@ -274,9 +258,6 @@ def chat():
         'options': []
     }
 
-    # Adicionar mensagem do usuário ao histórico
-    chat_messages.append({"texto": mensagem, "tipo": "user"})
-
     if 'faq_selection' in session and mensagem.startswith('faq_'):
         faq_id = mensagem.replace('faq_', '')
         faq_ids = session.get('faq_selection', [])
@@ -288,11 +269,9 @@ def chat():
                 faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
                 resposta['state'] = 'faq_selection'
                 resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
-                chat_messages.append({"texto": resposta['text'], "tipo": "bot"})
-                return jsonify({'resposta': resposta['text'], 'mensagens': chat_messages, 'html': resposta['html'], 'state': resposta['state'], 'options': resposta['options']})
+                return jsonify(resposta)
         resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
-        chat_messages.append({"texto": resposta['text'], "tipo": "bot"})
-        return jsonify({'resposta': resposta['text'], 'mensagens': chat_messages, 'html': resposta['html'], 'state': resposta['state'], 'options': resposta['options']})
+        return jsonify(resposta)
 
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
@@ -319,8 +298,7 @@ def chat():
                 resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
                 resposta['html'] = False
 
-    chat_messages.append({"texto": resposta['text'], "tipo": "bot"})
-    return jsonify({'resposta': resposta['text'], 'mensagens': chat_messages, 'html': resposta['html'], 'state': resposta['state'], 'options': resposta['options']})
+    return jsonify(resposta)
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
@@ -330,7 +308,6 @@ def admin_faq():
         return redirect(url_for('index'))
     
     categories = Category.query.all()
-    faqs = FAQ.query.all()  # Para exibir as FAQs existentes
     if request.method == 'POST':
         if 'add_question' in request.form:
             category_id = request.form['category']
@@ -340,15 +317,8 @@ def admin_faq():
             if category_id and question and answer:
                 faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url)
                 db.session.add(faq)
-                try:
-                    db.session.commit()
-                    logger.info(f"FAQ adicionada: {question}")
-                    flash('FAQ adicionada com sucesso!', 'success')
-                    chat_messages.append({"texto": f"Nova FAQ adicionada: **{question}**\n{answer}", "tipo": "bot"})
-                except Exception as e:
-                    db.session.rollback()
-                    logger.error(f"Erro ao adicionar FAQ: {str(e)}")
-                    flash('Erro ao adicionar FAQ.', 'error')
+                db.session.commit()
+                flash('FAQ adicionada com sucesso!', 'success')
             else:
                 flash('Preencha todos os campos obrigatórios.', 'error')
         elif 'import_faqs' in request.form:
@@ -371,7 +341,7 @@ def admin_faq():
                                 answer = item.get('answer', '')
                                 image_url = item.get('image_url')
                                 if not category_name or not question:
-                                    flash('Cada FAQ no JSON deve ter 'category' e 'question'.", 'error')
+                                    flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
                                     continue
                                 category = Category.query.filter_by(name=category_name).first()
                                 if not category:
@@ -400,7 +370,6 @@ def admin_faq():
                                 new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
                                 db.session.add(new_faq)
                     db.session.commit()
-                    logger.info(f"FAQs importadas do arquivo {filename}")
                     flash('FAQs importadas com sucesso!', 'success')
                 except Exception as e:
                     flash(f'Erro ao importar FAQs: {str(e)}', 'error')
@@ -408,7 +377,7 @@ def admin_faq():
                     os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
-    return render_template('admin_faq.html', categories=categories, faqs=faqs)
+    return render_template('admin_faq.html', categories=categories)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    app.run(debug=True)
