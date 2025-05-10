@@ -9,77 +9,77 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
-<body class="bg-gray-100 flex flex-col min-h-screen">
-    <header class="bg-gray-800 text-white p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
+<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
         <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold">Assistente de Service Desk</h1>
-            <span class="text-sm">Olá, {{ current_user.name }}!</span>
+            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
+            <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
         </div>
         <div class="flex items-center space-x-3">
-            <a href="/" class="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Voltar para o Chat</a>
-            <a href="/logout" class="text-sm px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600 transition">Sair</a>
+            <a href="/" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Voltar para o Chat</a>
+            <a href="/logout" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
             <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon"></i>
+                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
             </button>
         </div>
     </header>
     <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
-        <div class="w-full max-w-2xl p-6 bg-white rounded-lg shadow-lg">
+        <div class="w-full max-w-2xl p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
                             {{ message }}
                         </div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
 
-            <h2 class="text-xl font-semibold text-gray-900 mb-6">Gerenciar FAQs</h2>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Gerenciar FAQs</h2>
 
-            <h3 class="text-lg font-semibold text-gray-800 mb-3">Adicionar Nova FAQ</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Adicionar Nova FAQ</h3>
             <form method="POST" action="/admin/faq" class="space-y-4 mb-6">
                 <div>
-                    <label for="category" class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                    <select name="category" id="category" required class="w-full p-2 border rounded">
+                    <label for="category" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+                    <select name="category" id="category" required class="chat-input w-full">
                         {% for category in categories %}
                             <option value="{{ category.id }}">{{ category.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div>
-                    <label for="question" class="block text-sm font-medium text-gray-700 mb-1">Pergunta</label>
-                    <input type="text" id="question" name="question" required class="w-full p-2 border rounded" placeholder="Digite a pergunta">
+                    <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pergunta</label>
+                    <input type="text" id="question" name="question" required class="chat-input w-full" placeholder="Digite a pergunta">
                 </div>
                 <div>
-                    <label for="answer" class="block text-sm font-medium text-gray-700 mb-1">Resposta</label>
-                    <textarea id="answer" name="answer" rows="3" required class="w-full p-2 border rounded" placeholder="Digite a resposta"></textarea>
+                    <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
+                    <textarea id="answer" name="answer" rows="3" required class="chat-input w-full" placeholder="Digite a resposta"></textarea>
                 </div>
                 <div>
-                    <label for="image_url" class="block text-sm font-medium text-gray-700 mb-1">URL da Imagem (opcional)</label>
-                    <input type="text" id="image_url" name="image_url" class="w-full p-2 border rounded" placeholder="Digite a URL da imagem">
+                    <label for="image_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL da Imagem (opcional)</label>
+                    <input type="text" id="image_url" name="image_url" class="chat-input w-full" placeholder="Digite a URL da imagem">
                 </div>
-                <button type="submit" name="add_question" class="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Adicionar FAQ</button>
+                <button type="submit" name="add_question" class="chat-button w-full">Adicionar FAQ</button>
             </form>
 
-            <h3 class="text-lg font-semibold text-gray-800 mb-3">Importar FAQs</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Importar FAQs</h3>
             <form method="POST" action="/admin/faq" enctype="multipart/form-data" class="space-y-4 mb-6">
                 <div>
-                    <label for="faq_file" class="block text-sm font-medium text-gray-700 mb-1">Selecione um arquivo (JSON, CSV ou PDF)</label>
-                    <input type="file" id="faq_file" name="faq_file" accept=".json,.csv,.pdf" required class="w-full p-2 border rounded">
+                    <label for="faq_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selecione um arquivo (JSON, CSV ou PDF)</label>
+                    <input type="file" id="faq_file" name="faq_file" accept=".json,.csv,.pdf" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
                 </div>
                 <div>
-                    <label for="category_import" class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                    <select name="category_import" id="category_import" required class="w-full p-2 border rounded">
+                    <label for="category_import" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+                    <select name="category_import" id="category_import" required class="chat-input w-full">
                         {% for category in categories %}
                             <option value="{{ category.id }}">{{ category.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <button type="submit" name="import_faqs" class="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Importar FAQs</button>
+                <button type="submit" name="import_faqs" class="chat-button w-full">Importar FAQs</button>
             </form>
 
-            <a href="/faqs" class="w-full py-2 bg-green-600 text-white text-center rounded hover:bg-green-700 transition">Ver FAQs</a>
+            <a href="/faqs" class="block text-center text-sm px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Ver FAQs</a>
         </div>
     </main>
 
