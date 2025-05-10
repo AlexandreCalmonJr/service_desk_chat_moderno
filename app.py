@@ -9,34 +9,25 @@ import json
 import re
 from PyPDF2 import PdfReader
 from datetime import datetime
-import logging
-
-# Configurar logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-if os.getenv('DATABASE_URL'):
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL').replace("postgres://", "postgresql://")
-else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///service_desk.db'
+
+# Configuração do banco de dados
+# Usar DATABASE_URL do ambiente (para Render/PostgreSQL) ou SQLite como fallback (para testes locais sem PostgreSQL)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
-    'max_overflow': 5,
-    'pool_timeout': 30,
-}
 app.config['UPLOAD_FOLDER'] = 'uploads'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
+# Ajustar a URI se estiver usando PostgreSQL (Render substitui 'postgres://' por 'postgresql://')
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
+
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
-# Lista para armazenar mensagens do chat
-chat_messages = []
 
 # Modelos
 class User(UserMixin, db.Model):
@@ -57,8 +48,13 @@ class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
+    image_url = db.Column(db.String(500), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
+
+    @property
+    def formatted_answer(self):
+        return format_faq_response(self.question, self.answer, self.image_url)
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -71,19 +67,16 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # Inicialização do banco de dados e categorias padrão
-try:
-    with app.app_context():
-        db.create_all()
-        categories = ['Hardware', 'Software', 'Rede', 'Outros']
-        for category_name in categories:
-            if not Category.query.filter_by(name=category_name).first():
-                category = Category(name=category_name)
-                db.session.add(category)
-        db.session.commit()
-        logger.info("Banco de dados inicializado com sucesso.")
-except Exception as e:
-    logger.error(f"Erro ao inicializar o banco de dados: {str(e)}")
+with app.app_context():
+    db.create_all()
+    categories = ['Hardware', 'Software', 'Rede', 'Outros']
+    for category_name in categories:
+        if not Category.query.filter_by(name=category_name).first():
+            category = Category(name=category_name)
+            db.session.add(category)
+    db.session.commit()
 
+# Funções de utilidade
 def process_ticket_command(message):
     match = re.match(r"Encerrar chamado (\d+)", message)
     if match:
@@ -123,13 +116,51 @@ def extract_faqs_from_pdf(file_path):
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
             answer = lines[i + 1]
-            faqs.append({"question": question, "answer": answer})
+            faqs.append({"question": question, "answer": answer, "image_url": None})
         return faqs
     except Exception as e:
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
-def search_faq(message):
+def format_faq_response(question, answer, image_url=None):
+    sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
+    formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
+
+    current_section = None
+    for part in sections:
+        part = part.strip()
+        if not part:
+            continue
+        if part.startswith("Pré-requisitos:"):
+            current_section = "Pré-requisitos"
+            formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
+        elif part.startswith("Etapa"):
+            current_section = "Etapa"
+            formatted_response += f"<strong>🔧 {part}</strong><br>"
+        elif part.startswith("Atenção:"):
+            current_section = "Atenção"
+            formatted_response += "<strong>⚠️ Atenção</strong><br>"
+        elif part.startswith("Finalizar:"):
+            current_section = "Finalizar"
+            formatted_response += "<strong>⏳ Finalizar</strong><br>"
+        elif part.startswith("Pós-instalação:"):
+            current_section = "Pós-instalação"
+            formatted_response += "<strong>✅ Pós-instalação</strong><br>"
+        else:
+            if current_section:
+                items = re.split(r'[,.]\s*(?=[A-Z])', part)
+                for item in items:
+                    item = item.strip()
+                    if item:
+                        formatted_response += f"{item}<br>"
+            formatted_response += "<br>"
+
+    if image_url:
+        formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
+
+    return formatted_response
+
+def find_faq_by_keywords(message):
     words = re.findall(r'\w+', message.lower())
     faqs = FAQ.query.all()
     matches = []
@@ -148,10 +179,7 @@ def search_faq(message):
             matches.append((faq, score))
 
     matches.sort(key=lambda x: x[1], reverse=True)
-    if matches:
-        faq = matches[0][0]  # Pega a FAQ com maior pontuação
-        return f"<strong>Pergunta:</strong> {faq.question}<br><br>{faq.answer}"
-    return None
+    return [match[0] for match in matches] if matches else []
 
 # Rotas
 @app.route('/')
@@ -224,28 +252,53 @@ def chat():
     data = request.get_json()
     mensagem = data.get('mensagem', '').strip()
     resposta = {
-        'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta como 'Manual do Totem'.",
-        'html': True
+        'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!",
+        'html': False,
+        'state': 'normal',
+        'options': []
     }
 
-    chat_messages.append({"texto": mensagem, "tipo": "user"})
+    if 'faq_selection' in session and mensagem.startswith('faq_'):
+        faq_id = mensagem.replace('faq_', '')
+        faq_ids = session.get('faq_selection', [])
+        if int(faq_id) in faq_ids:
+            selected_faq = FAQ.query.get(int(faq_id))
+            if selected_faq:
+                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer, selected_faq.image_url)
+                resposta['html'] = True
+                faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
+                resposta['state'] = 'faq_selection'
+                resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
+                return jsonify(resposta)
+        resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
+        return jsonify(resposta)
 
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
         resposta['text'] = ticket_response
-        resposta['html'] = False
     else:
         solution_response = suggest_solution(mensagem)
         if solution_response:
             resposta['text'] = solution_response
-            resposta['html'] = False
         else:
-            faq_response = search_faq(mensagem)
-            if faq_response:
-                resposta['text'] = faq_response
+            faq_matches = find_faq_by_keywords(mensagem)
+            if faq_matches:
+                if len(faq_matches) == 1:
+                    faq = faq_matches[0]
+                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
+                    resposta['html'] = True
+                else:
+                    faq_ids = [faq.id for faq in faq_matches]
+                    session['faq_selection'] = faq_ids
+                    resposta['state'] = 'faq_selection'
+                    resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
+                    resposta['html'] = True
+                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
+            else:
+                resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
+                resposta['html'] = False
 
-    chat_messages.append({"texto": resposta['text'], "tipo": "bot"})
-    return jsonify({'resposta': resposta['text'], 'mensagens': chat_messages, 'html': resposta['html']})
+    return jsonify(resposta)
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
@@ -255,24 +308,17 @@ def admin_faq():
         return redirect(url_for('index'))
     
     categories = Category.query.all()
-    faqs = FAQ.query.all()  # Para exibir as FAQs existentes
     if request.method == 'POST':
         if 'add_question' in request.form:
             category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
+            image_url = request.form.get('image_url')
             if category_id and question and answer:
-                faq = FAQ(category_id=category_id, question=question, answer=answer)
+                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url)
                 db.session.add(faq)
-                try:
-                    db.session.commit()
-                    logger.info(f"FAQ adicionada: {question}")
-                    flash('FAQ adicionada com sucesso!', 'success')
-                    chat_messages.append({"texto": f"Nova FAQ adicionada: **{question}**\n{answer}", "tipo": "bot"})
-                except Exception as e:
-                    db.session.rollback()
-                    logger.error(f"Erro ao adicionar FAQ: {str(e)}")
-                    flash('Erro ao adicionar FAQ.', 'error')
+                db.session.commit()
+                flash('FAQ adicionada com sucesso!', 'success')
             else:
                 flash('Preencha todos os campos obrigatórios.', 'error')
         elif 'import_faqs' in request.form:
@@ -293,6 +339,7 @@ def admin_faq():
                                 category_name = item.get('category')
                                 question = item.get('question')
                                 answer = item.get('answer', '')
+                                image_url = item.get('image_url')
                                 if not category_name or not question:
                                     flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
                                     continue
@@ -301,7 +348,7 @@ def admin_faq():
                                     category = Category(name=category_name)
                                     db.session.add(category)
                                     db.session.commit()
-                                faq = FAQ(category_id=category.id, question=question, answer=answer)
+                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url)
                                 db.session.add(faq)
                     elif file.filename.endswith('.csv'):
                         category_id = request.form['category_import']
@@ -311,7 +358,8 @@ def admin_faq():
                                 faq = FAQ(
                                     category_id=category_id,
                                     question=row.get('question'),
-                                    answer=row.get('answer', '')
+                                    answer=row.get('answer', ''),
+                                    image_url=row.get('image_url')
                                 )
                                 db.session.add(faq)
                     elif file.filename.endswith('.pdf'):
@@ -319,10 +367,9 @@ def admin_faq():
                         faqs_extracted = extract_faqs_from_pdf(file_path)
                         for faq in faqs_extracted:
                             if faq['question'] and faq['answer']:
-                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'])
+                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
                                 db.session.add(new_faq)
                     db.session.commit()
-                    logger.info(f"FAQs importadas do arquivo {filename}")
                     flash('FAQs importadas com sucesso!', 'success')
                 except Exception as e:
                     flash(f'Erro ao importar FAQs: {str(e)}', 'error')
@@ -330,7 +377,7 @@ def admin_faq():
                     os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
-    return render_template('admin_faq.html', categories=categories, faqs=faqs)
+    return render_template('admin_faq.html', categories=categories)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
+    app.run(debug=True)
