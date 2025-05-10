@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Chat Avançado</title>
+    <title>Assistente de Service Desk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/styles.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,21 +16,24 @@
             <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
         </div>
         <div class="flex items-center space-x-3">
-            {% if current_user.is_admin %}
-                <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
-            {% endif %}
             <a href="/faqs" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ver FAQs</a>
-            <a href="/profile" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Perfil</a>
+            <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
             <a href="/logout" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
             <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
                 <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
             </button>
         </div>
     </header>
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
-        {% include 'chat.html' %}
+    <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
+        <div class="w-full max-w-2xl p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Chat</h2>
+            <div id="chat-output" class="chat-output mb-4 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg h-64 overflow-y-auto"></div>
+            <form id="chat-form" method="POST" action="/chat" class="flex space-x-3">
+                <input type="text" id="chat-input" name="message" required class="chat-input flex-1" placeholder="Digite sua pergunta...">
+                <button type="submit" class="chat-button">Enviar</button>
+            </form>
+        </div>
     </main>
-
     <script>
         function toggleTheme() {
             document.body.classList.toggle('dark');
@@ -38,6 +41,31 @@
             themeToggle.classList.toggle('fa-moon');
             themeToggle.classList.toggle('fa-sun');
         }
+
+        document.getElementById('chat-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const chatOutput = document.getElementById('chat-output');
+            const userMessage = document.getElementById('chat-input').value;
+
+            // Exibir mensagem do usuário
+            chatOutput.innerHTML += `<div class="text-right"><strong>Você:</strong> ${userMessage}</div><br>`;
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+
+            // Enviar mensagem para o backend
+            const response = await fetch('/chat', {
+                method: 'POST',
+                body: new FormData(form)
+            });
+            const data = await response.json();
+
+            // Exibir resposta do assistente
+            chatOutput.innerHTML += `<div><strong>Assistente:</strong> ${data.response}</div><br>`;
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+
+            // Limpar o campo de entrada
+            document.getElementById('chat-input').value = '';
+        });
     </script>
 </body>
 </html>
