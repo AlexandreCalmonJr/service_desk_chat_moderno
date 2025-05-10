@@ -44,6 +44,7 @@
                             <th class="p-3 border-b dark:border-gray-600">Pergunta</th>
                             <th class="p-3 border-b dark:border-gray-600">Resposta</th>
                             <th class="p-3 border-b dark:border-gray-600">Categoria</th>
+                            <th class="p-3 border-b dark:border-gray-600">Imagem</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -53,11 +54,18 @@
                                     <td class="p-3 border-b dark:border-gray-600">{{ faq.question }}</td>
                                     <td class="p-3 border-b dark:border-gray-600">{{ faq.answer }}</td>
                                     <td class="p-3 border-b dark:border-gray-600">{{ faq.category.name }}</td>
+                                    <td class="p-3 border-b dark:border-gray-600">
+                                        {% if faq.image_url %}
+                                            <a href="{{ faq.image_url }}" target="_blank">Ver Imagem</a>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
                                 </tr>
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="3" class="p-3 text-center text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</td>
+                                <td colspan="4" class="p-3 text-center text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</td>
                             </tr>
                         {% endif %}
                     </tbody>

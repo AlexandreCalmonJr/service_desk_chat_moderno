@@ -55,6 +55,10 @@
                     <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
                     <textarea id="answer" name="answer" rows="3" required class="chat-input w-full" placeholder="Digite a resposta"></textarea>
                 </div>
+                <div>
+                    <label for="image_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL da Imagem (opcional)</label>
+                    <input type="text" id="image_url" name="image_url" class="chat-input w-full" placeholder="Digite a URL da imagem">
+                </div>
                 <button type="submit" name="add_question" class="chat-button w-full">Adicionar FAQ</button>
             </form>
 
@@ -83,6 +87,9 @@
                             <div>
                                 <strong class="block text-gray-900 dark:text-gray-100">{{ faq.question }}</strong>
                                 <p class="text-gray-700 dark:text-gray-300 mt-1">{{ faq.answer }}</p>
+                                {% if faq.image_url %}
+                                    <p class="text-gray-700 dark:text-gray-300 mt-1">Imagem: <a href="{{ faq.image_url }}" target="_blank">{{ faq.image_url }}</a></p>
+                                {% endif %}
                             </div>
                             <form method="POST" action="/admin/faq/delete/{{ faq.id }}" class="ml-4" onsubmit="return confirm('Tem certeza que deseja excluir esta FAQ?');">
                                 <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-600">
