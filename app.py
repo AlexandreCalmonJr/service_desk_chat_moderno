@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, flash, redirect, url_for
+from flask import Flask, request, jsonify, render_template, flash, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -6,14 +6,17 @@ from werkzeug.utils import secure_filename
 import os
 import json
 import re
+from PyPDF2 import PdfReader
+from datetime import datetime
 from google.cloud import dialogflow
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'sua-chave-secreta-aqui')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
@@ -30,7 +33,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     phone = db.Column(db.String(20))
-    registered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    registered_at = db.Column(db.DateTime, default=lambda: datetime.utcnow())
     last_login = db.Column(db.DateTime)
 
 class Category(db.Model):
@@ -45,11 +48,75 @@ class FAQ(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
 
+    @property
+    def formatted_answer(self):
+        return format_faq_response(self.question, self.answer, self.image_url)
+
+class Ticket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String(10), unique=True, nullable=False)
+    status = db.Column(db.String(20), default='Aberto')
+    description = db.Column(db.Text)
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Função para formatar a resposta da FAQ
+# Inicialização do banco de dados e categorias padrão
+with app.app_context():
+    db.create_all()
+    categories = ['Hardware', 'Software', 'Rede', 'Outros']
+    for category_name in categories:
+        if not Category.query.filter_by(name=category_name).first():
+            category = Category(name=category_name)
+            db.session.add(category)
+    db.session.commit()
+
+# Funções de utilidade
+def process_ticket_command(message):
+    match = re.match(r"Encerrar chamado (\d+)", message)
+    if match:
+        ticket_id = match.group(1)
+        ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
+        if ticket:
+            if ticket.status == 'Aberto':
+                ticket.status = 'Fechado'
+                db.session.commit()
+                return f"Chamado {ticket_id} encerrado com sucesso."
+            else:
+                return f"Chamado {ticket_id} já está fechado."
+        return f"Chamado {ticket_id} não encontrado."
+    return None
+
+def suggest_solution(message):
+    match = re.match(r"Sugerir solução para (.+)", message)
+    if match:
+        problem = match.group(1).lower()
+        solutions = {
+            "computador não liga": "Verifique a fonte de energia e reinicie o dispositivo.",
+            "internet lenta": "Reinicie o roteador e verifique a conexão.",
+            "configurar uma vpn": "Acesse as configurações de rede e insira as credenciais da VPN fornecidas pelo TI."
+        }
+        return solutions.get(problem, "Desculpe, não tenho uma solução para esse problema no momento.")
+    return None
+
+def extract_faqs_from_pdf(file_path):
+    try:
+        faqs = []
+        pdf_reader = PdfReader(file_path)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        for i in range(0, len(lines) - 1, 2):
+            question = lines[i]
+            answer = lines[i + 1]
+            faqs.append({"question": question, "answer": answer, "image_url": None})
+        return faqs
+    except Exception as e:
+        flash(f"Erro ao processar o PDF: {str(e)}", 'error')
+        return []
+
 def format_faq_response(question, answer, image_url=None):
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
     has_sections = any(section in answer for section in ["Pré-requisitos:", "Etapa", "Atenção:", "Finalizar:", "Pós-instalação:"])
@@ -95,7 +162,23 @@ def format_faq_response(question, answer, image_url=None):
     
     return formatted_response
 
-# Função para interagir com o Dialogflow
+def find_faq_by_keywords(message):
+    words = re.findall(r'\w+', message.lower())
+    faqs = FAQ.query.all()
+    matches = []
+    for faq in faqs:
+        score = 0
+        question_text = faq.question.lower()
+        answer_text = faq.answer.lower()
+        combined_text = question_text + " " + answer_text
+        for word in words:
+            if word in combined_text:
+                score += 1
+        if score > 0:
+            matches.append((faq, score))
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return [match[0] for match in matches] if matches else []
+
 def detect_intent(project_id, session_id, text, language_code="pt-BR"):
     session_client = dialogflow.SessionsClient()
     session = session_client.session_path(project_id, session_id)
@@ -108,7 +191,25 @@ def detect_intent(project_id, session_id, text, language_code="pt-BR"):
 @app.route('/')
 @login_required
 def index():
+    session.pop('faq_selection', None)
     return render_template('index.html')
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        current_user.phone = request.form.get('phone')
+        db.session.commit()
+        flash('Perfil atualizado com sucesso!', 'success')
+        return redirect(url_for('profile'))
+    return render_template('profile.html')
+
+@app.route('/faqs')
+@login_required
+def faqs():
+    faqs = FAQ.query.all()
+    categories = Category.query.all()
+    return render_template('faqs.html', faqs=faqs, categories=categories)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -126,12 +227,37 @@ def login():
         flash('Email ou senha inválidos.', 'error')
     return render_template('login.html')
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        password = generate_password_hash(request.form['password'])
+        phone = request.form.get('phone')
+        is_admin = 'is_admin' in request.form
+        if User.query.filter_by(email=email).first():
+            flash('Email já registrado.', 'error')
+        else:
+            user = User(name=name, email=email, password=password, phone=phone, is_admin=is_admin)
+            db.session.add(user)
+            db.session.commit()
+            flash('Registro concluído! Faça login.', 'success')
+            return redirect(url_for('login'))
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Você saiu com sucesso.', 'success')
+    return redirect(url_for('login'))
+
 @app.route('/chat', methods=['POST'])
 @login_required
 def chat():
     user_message = request.form['message']
-    project_id = "servicedeskbot-anki"  # Substitua pelo seu Project ID do Dialogflow
-    session_id = str(current_user.id)  # Use o ID do usuário como session_id
+    project_id = os.getenv('DIALOGFLOW_PROJECT_ID', 'servicedeskbot-anki')
+    session_id = str(current_user.id)
 
     intent, params = detect_intent(project_id, session_id, user_message)
     
@@ -181,48 +307,33 @@ def chat():
 
     return jsonify(response)
 
-# Outras rotas (mantidas como no código original)
-@app.route('/profile', methods=['GET', 'POST'])
-@login_required
-def profile():
-    if request.method == 'POST':
-        current_user.phone = request.form.get('phone')
-        db.session.commit()
-        flash('Perfil atualizado com sucesso!', 'success')
-        return redirect(url_for('profile'))
-    return render_template('profile.html')
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'fulfillmentText': 'Erro: Dados inválidos'}), 400
 
-@app.route('/faqs')
-@login_required
-def faqs():
-    faqs = FAQ.query.all()
-    categories = Category.query.all()
-    return render_template('faqs.html', faqs=faqs, categories=categories)
+    intent = data['queryResult']['intent']['displayName']
+    params = data['queryResult']['parameters']
+    query_text = data['queryResult']['queryText']
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        name = request.form['name']
-        email = request.form['email']
-        password = generate_password_hash(request.form['password'])
-        phone = request.form.get('phone')
-        is_admin = 'is_admin' in request.form
-        if User.query.filter_by(email=email).first():
-            flash('Email já registrado.', 'error')
+    response_text = "Desculpe, não entendi. Tente novamente."
+
+    if intent == "consult_faq":
+        keyword = params.get("keyword", query_text.lower())
+        faq = FAQ.query.filter(FAQ.question.ilike(f"%{keyword}%")).first()
+        if faq:
+            response_text = format_faq_response(faq.question, faq.answer, faq.image_url)
         else:
-            user = User(name=name, email=email, password=password, phone=phone, is_admin=is_admin)
-            db.session.add(user)
-            db.session.commit()
-            flash('Registro concluído! Faça login.', 'success')
-            return redirect(url_for('login'))
-    return render_template('register.html')
+            response_text = "Desculpe, não encontrei uma FAQ para isso. Tente reformular sua pergunta!"
+    elif intent == "saudacao":
+        response_text = "Olá! Como posso ajudar você hoje?"
+    elif intent == "ajuda":
+        response_text = "Eu posso ajudar com perguntas sobre hardware, software, rede e mais! Por exemplo, você pode perguntar: 'Como configurar uma impressora?' ou 'O que fazer se o computador não liga?'."
 
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    flash('Você saiu com sucesso.', 'success')
-    return redirect(url_for('login'))
+    return jsonify({
+        'fulfillmentText': response_text
+    })
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
@@ -314,15 +425,6 @@ def delete_faq(faq_id):
     else:
         flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
     return redirect(url_for('faqs'))
-
-with app.app_context():
-    db.create_all()
-    categories = ['Hardware', 'Software', 'Rede', 'Outros']
-    for category_name in categories:
-        if not Category.query.filter_by(name=category_name).first():
-            category = Category(name=category_name)
-            db.session.add(category)
-    db.session.commit()
 
 if __name__ == '__main__':
     app.run(debug=True)
