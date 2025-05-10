@@ -8,12 +8,6 @@ import json
 import re
 from PyPDF2 import PdfReader
 from datetime import datetime
-from google.cloud import dialogflow
-import logging
-
-# Configurar logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
@@ -184,18 +178,6 @@ def find_faq_by_keywords(message):
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches] if matches else []
 
-def detect_intent(project_id, session_id, text, language_code="pt-BR"):
-    try:
-        session_client = dialogflow.SessionsClient()
-        session = session_client.session_path(project_id, session_id)
-        text_input = dialogflow.TextInput(text=text, language_code=language_code)
-        query_input = dialogflow.QueryInput(text=text_input)
-        response = session_client.detect_intent(request={"session": session, "query_input": query_input})
-        return response.query_result.intent.display_name, dict(response.query_result.parameters)
-    except Exception as e:
-        logger.error(f"Erro ao chamar Dialogflow: {str(e)}")
-        return None, {}
-
 # Rotas
 @app.route('/')
 @login_required
@@ -264,62 +246,55 @@ def logout():
 @app.route('/chat', methods=['POST'])
 @login_required
 def chat():
-    user_message = request.form['message']
-    project_id = os.getenv('DIALOGFLOW_PROJECT_ID', 'servicedeskbot-anki')
-    session_id = str(current_user.id)
-
-    try:
-        intent, params = detect_intent(project_id, session_id, user_message)
-    except Exception as e:
-        logger.error(f"Erro ao detectar intent: {str(e)}")
-        intent, params = None, {}
-
-    response = {
+    data = request.get_json()
+    mensagem = data.get('mensagem', '').strip()
+    resposta = {
         'text': "Desculpe, não entendi o comando. Tente 'Encerrar chamado <ID>', 'Sugerir solução para <problema>', ou faça uma pergunta!",
         'html': False,
         'state': 'normal',
         'options': []
     }
 
-    if intent:
-        if intent == "consult_faq":
-            keyword = params.get("keyword", user_message.lower())
-            faq = FAQ.query.filter(FAQ.question.ilike(f"%{keyword}%")).first()
-            if faq:
-                response['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
-                response['html'] = True
-            else:
-                response['text'] = "Desculpe, não encontrei uma FAQ para isso. Tente reformular sua pergunta!"
-        elif intent == "saudacao":
-            response['text'] = "Olá! Como posso ajudar você hoje?"
-        elif intent == "ajuda":
-            response['text'] = "Eu posso ajudar com perguntas sobre hardware, software, rede e mais! Por exemplo, você pode perguntar: 'Como configurar uma impressora?' ou 'O que fazer se o computador não liga?'."
-    else:
-        ticket_response = process_ticket_command(user_message)
-        if ticket_response:
-            response['text'] = ticket_response
-        else:
-            solution_response = suggest_solution(user_message)
-            if solution_response:
-                response['text'] = solution_response
-            else:
-                faq_matches = find_faq_by_keywords(user_message)
-                if faq_matches:
-                    if len(faq_matches) == 1:
-                        faq = faq_matches[0]
-                        response['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
-                        response['html'] = True
-                    else:
-                        faq_ids = [faq.id for faq in faq_matches]
-                        session['faq_selection'] = faq_ids
-                        response['state'] = 'faq_selection'
-                        response['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
-                        response['html'] = True
-                        response['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
-                else:
-                    response['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
+    if 'faq_selection' in session and mensagem.startswith('faq_'):
+        faq_id = mensagem.replace('faq_', '')
+        faq_ids = session.get('faq_selection', [])
+        if int(faq_id) in faq_ids:
+            selected_faq = FAQ.query.get(int(faq_id))
+            if selected_faq:
+                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer, selected_faq.image_url)
+                resposta['html'] = True
+                faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
+                resposta['state'] = 'faq_selection'
+                resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
+                return jsonify(resposta)
+        resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
+        return jsonify(resposta)
 
-    return jsonify(response)
+    ticket_response = process_ticket_command(mensagem)
+    if ticket_response:
+        resposta['text'] = ticket_response
+    else:
+        solution_response = suggest_solution(mensagem)
+        if solution_response:
+            resposta['text'] = solution_response
+        else:
+            faq_matches = find_faq_by_keywords(mensagem)
+            if faq_matches:
+                if len(faq_matches) == 1:
+                    faq = faq_matches[0]
+                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
+                    resposta['html'] = True
+                else:
+                    faq_ids = [faq.id for faq in faq_matches]
+                    session['faq_selection'] = faq_ids
+                    resposta['state'] = 'faq_selection'
+                    resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
+                    resposta['html'] = True
+                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
+            else:
+                resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
+
+    return jsonify(resposta)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
