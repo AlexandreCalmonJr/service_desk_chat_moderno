@@ -1,19 +1,45 @@
 from flask import Flask, request, jsonify, render_template, flash, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_caching import Cache
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import json
 import re
+import unicodedata
 from PyPDF2 import PdfReader
 from datetime import datetime
+import difflib
+import nltk
+from nltk.corpus import stopwords
+import logging
+
+# Configurar logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Baixar stop words do NLTK
+try:
+    nltk.download('stopwords', quiet=True)
+    stop_words = set(stopwords.words('portuguese'))
+except Exception as e:
+    logger.warning(f"Erro ao baixar stop words do NLTK: {str(e)}. Usando conjunto vazio.")
+    stop_words = set()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_timeout': 30,
+    'pool_recycle': 1800,
+    'pool_pre_ping': True
+}
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['CACHE_TYPE'] = 'SimpleCache'  # Cache em memória
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutos
+
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
@@ -21,6 +47,7 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
 
 db = SQLAlchemy(app)
+cache = Cache(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
@@ -41,8 +68,8 @@ class Category(db.Model):
 
 class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    question = db.Column(db.String(200), nullable=False)
-    answer = db.Column(db.Text, nullable=False)
+    question = db.Column(db.String(200), nullable=False, index=True)
+    answer = db.Column(db.Text, nullable=False, index=True)
     image_url = db.Column(db.String(500), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
@@ -161,22 +188,67 @@ def format_faq_response(question, answer, image_url=None):
     
     return formatted_response
 
+def normalize_text(text):
+    # Normalizar texto: remover acentos, converter para minúsculas
+    text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+    return text.lower()
+
+@cache.memoize(timeout=300)
 def find_faq_by_keywords(message):
-    words = re.findall(r'\w+', message.lower())
-    faqs = FAQ.query.all()
-    matches = []
-    for faq in faqs:
-        score = 0
-        question_text = faq.question.lower()
-        answer_text = faq.answer.lower()
-        combined_text = question_text + " " + answer_text
-        for word in words:
-            if word in combined_text:
-                score += 1
-        if score > 0:
+    try:
+        # Normalizar a mensagem do usuário
+        normalized_message = normalize_text(message)
+        # Pré-processar a mensagem: remover stop words e converter para minúsculas
+        words = re.findall(r'\w+', normalized_message)
+        filtered_words = [word for word in words if word not in stop_words and len(word) > 2]  # Ignorar palavras muito curtas
+
+        if not filtered_words:
+            return []
+
+        # Construir uma consulta SQL para buscar FAQs que contenham pelo menos uma palavra-chave
+        query = db.session.query(FAQ)
+        for word in filtered_words:
+            like_pattern = f"%{word}%"
+            query = query.filter(db.or_(
+                FAQ.question.ilike(like_pattern),
+                FAQ.answer.ilike(like_pattern)
+            ))
+
+        # Executar a consulta com retry em caso de falha
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                faqs = query.all()
+                break
+            except Exception as e:
+                logger.error(f"Tentativa {attempt + 1} falhou: {str(e)}")
+                if attempt == max_retries - 1:
+                    raise Exception("Falha ao acessar o banco de dados após várias tentativas.")
+                continue
+
+        if not faqs:
+            return []
+
+        # Calcular similaridade entre a mensagem e as perguntas das FAQs
+        matches = []
+        for faq in faqs:
+            normalized_question = normalize_text(faq.question)
+            normalized_answer = normalize_text(faq.answer)
+            question_similarity = difflib.SequenceMatcher(None, normalized_message, normalized_question).ratio()
+            answer_similarity = difflib.SequenceMatcher(None, normalized_message, normalized_answer).ratio()
+            # Ponderar mais a similaridade da pergunta
+            score = (question_similarity * 0.7) + (answer_similarity * 0.3)
             matches.append((faq, score))
-    matches.sort(key=lambda x: x[1], reverse=True)
-    return [match[0] for match in matches] if matches else []
+
+        # Ordenar por pontuação de similaridade
+        matches.sort(key=lambda x: x[1], reverse=True)
+
+        # Retornar as FAQs (limitando a 10 resultados para evitar sobrecarga)
+        return [match[0] for match in matches[:10]]
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar FAQs: {str(e)}")
+        return []
 
 # Rotas
 @app.route('/')
@@ -278,21 +350,25 @@ def chat():
         if solution_response:
             resposta['text'] = solution_response
         else:
-            faq_matches = find_faq_by_keywords(mensagem)
-            if faq_matches:
-                if len(faq_matches) == 1:
-                    faq = faq_matches[0]
-                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
-                    resposta['html'] = True
+            try:
+                faq_matches = find_faq_by_keywords(mensagem)
+                if faq_matches:
+                    if len(faq_matches) == 1:
+                        faq = faq_matches[0]
+                        resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
+                        resposta['html'] = True
+                    else:
+                        faq_ids = [faq.id for faq in faq_matches]
+                        session['faq_selection'] = faq_ids
+                        resposta['state'] = 'faq_selection'
+                        resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
+                        resposta['html'] = True
+                        resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
                 else:
-                    faq_ids = [faq.id for faq in faq_matches]
-                    session['faq_selection'] = faq_ids
-                    resposta['state'] = 'faq_selection'
-                    resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
-                    resposta['html'] = True
-                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
-            else:
-                resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
+                    resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs!"
+            except Exception as e:
+                logger.error(f"Erro ao processar busca de FAQs: {str(e)}")
+                resposta['text'] = "Desculpe, ocorreu um erro ao buscar FAQs. Tente novamente em alguns instantes."
 
     return jsonify(resposta)
 
@@ -302,23 +378,19 @@ def webhook():
     if not data:
         return jsonify({'fulfillmentText': 'Erro: Dados inválidos'}), 400
 
-    intent = data['queryResult']['intent']['displayName']
-    params = data['queryResult']['parameters']
     query_text = data['queryResult']['queryText']
-
     response_text = "Desculpe, não entendi. Tente novamente."
 
-    if intent == "consult_faq":
-        keyword = params.get("keyword", query_text.lower())
-        faq = FAQ.query.filter(FAQ.question.ilike(f"%{keyword}%")).first()
-        if faq:
+    try:
+        faq_matches = find_faq_by_keywords(query_text)
+        if faq_matches:
+            faq = faq_matches[0]  # Pega o FAQ mais relevante
             response_text = format_faq_response(faq.question, faq.answer, faq.image_url)
         else:
             response_text = "Desculpe, não encontrei uma FAQ para isso. Tente reformular sua pergunta!"
-    elif intent == "saudacao":
-        response_text = "Olá! Como posso ajudar você hoje?"
-    elif intent == "ajuda":
-        response_text = "Eu posso ajudar com perguntas sobre hardware, software, rede e mais! Por exemplo, você pode perguntar: 'Como configurar uma impressora?' ou 'O que fazer se o computador não liga?'."
+    except Exception as e:
+        logger.error(f"Erro no webhook: {str(e)}")
+        response_text = "Desculpe, ocorreu um erro ao processar sua solicitação."
 
     return jsonify({
         'fulfillmentText': response_text
@@ -342,6 +414,7 @@ def admin_faq():
                 faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url)
                 db.session.add(faq)
                 db.session.commit()
+                cache.clear()
                 flash('FAQ adicionada com sucesso!', 'success')
             else:
                 flash('Preencha todos os campos obrigatórios.', 'error')
@@ -394,6 +467,7 @@ def admin_faq():
                                 new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
                                 db.session.add(new_faq)
                     db.session.commit()
+                    cache.clear()
                     flash('FAQs importadas com sucesso!', 'success')
                 except Exception as e:
                     flash(f'Erro ao importar FAQs: {str(e)}', 'error')
@@ -410,6 +484,7 @@ def delete_faq(faq_id):
     if current_user.is_admin:
         db.session.delete(faq)
         db.session.commit()
+        cache.clear()
         flash('FAQ excluída com sucesso!', 'success')
     else:
         flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
