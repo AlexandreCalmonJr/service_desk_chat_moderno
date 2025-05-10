@@ -379,5 +379,17 @@ def admin_faq():
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
     return render_template('admin_faq.html', categories=categories)
 
+@app.route('/faqs/delete/<int:faq_id>', methods=['POST'])
+@login_required
+def delete_faq(faq_id):
+    faq = FAQ.query.get_or_404(faq_id)
+    if current_user.is_admin or (hasattr(current_user, 'id') and faq.category_id in [cat.id for cat in Category.query.all()]):  # Ajuste de permissão se necessário
+        db.session.delete(faq)
+        db.session.commit()
+        flash('FAQ excluída com sucesso!', 'success')
+    else:
+        flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
+    return redirect(url_for('faqs'))
+
 if __name__ == '__main__':
     app.run(debug=True)
