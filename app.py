@@ -123,41 +123,56 @@ def extract_faqs_from_pdf(file_path):
         return []
 
 def format_faq_response(question, answer, image_url=None):
-    sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
 
-    current_section = None
-    for part in sections:
-        part = part.strip()
-        if not part:
-            continue
-        if part.startswith("Pré-requisitos:"):
-            current_section = "Pré-requisitos"
-            formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
-        elif part.startswith("Etapa"):
-            current_section = "Etapa"
-            formatted_response += f"<strong>🔧 {part}</strong><br>"
-        elif part.startswith("Atenção:"):
-            current_section = "Atenção"
-            formatted_response += "<strong>⚠️ Atenção</strong><br>"
-        elif part.startswith("Finalizar:"):
-            current_section = "Finalizar"
-            formatted_response += "<strong>⏳ Finalizar</strong><br>"
-        elif part.startswith("Pós-instalação:"):
-            current_section = "Pós-instalação"
-            formatted_response += "<strong>✅ Pós-instalação</strong><br>"
-        else:
-            if current_section:
-                items = re.split(r'[,.]\s*(?=[A-Z])', part)
+    # Verificar se o texto contém seções específicas
+    has_sections = any(section in answer for section in ["Pré-requisitos:", "Etapa", "Atenção:", "Finalizar:", "Pós-instalação:"])
+    
+    if has_sections:
+        sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
+        current_section = None
+        for i in range(0, len(sections), 2):
+            header = sections[i].strip() if i + 1 < len(sections) else ""
+            content = sections[i + 1].strip() if i + 1 < len(sections) else ""
+
+            if header:
+                if header.startswith("Pré-requisitos:"):
+                    current_section = "Pré-requisitos"
+                    formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
+                elif header.startswith("Etapa"):
+                    current_section = "Etapa"
+                    formatted_response += f"<strong>🔧 {header}</strong><br>"
+                elif header.startswith("Atenção:"):
+                    current_section = "Atenção"
+                    formatted_response += "<strong>⚠️ Atenção</strong><br>"
+                elif header.startswith("Finalizar:"):
+                    current_section = "Finalizar"
+                    formatted_response += "<strong>⏳ Finalizar</strong><br>"
+                elif header.startswith("Pós-instalação:"):
+                    current_section = "Pós-instalação"
+                    formatted_response += "<strong>✅ Pós-instalação</strong><br>"
+            
+            if content and current_section:
+                items = re.split(r'(?<=[.!?])\s+(?=[A-Z])', content)
                 for item in items:
                     item = item.strip()
                     if item:
                         formatted_response += f"{item}<br>"
-            formatted_response += "<br>"
-
+                formatted_response += "<br>" if i + 2 < len(sections) else ""
+    else:
+        # Tratamento como texto livre
+        lines = [line.strip() for line in answer.split('\n') if line.strip()]
+        for line in lines:
+            formatted_response += f"{line}<br>"
+    
+    # Adicionar imagem, se disponível
     if image_url:
         formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
-
+    
+    # Remover o último <br> se houver imagem
+    if formatted_response.endswith("<br>") and image_url:
+        formatted_response = formatted_response[:-4]
+    
     return formatted_response
 
 def find_faq_by_keywords(message):
