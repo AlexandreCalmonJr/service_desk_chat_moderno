@@ -1,46 +1,22 @@
-from flask import Flask, request, jsonify, render_template, flash, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_caching import Cache
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
+import csv
 import json
 import re
-import unicodedata
 from PyPDF2 import PdfReader
 from datetime import datetime
-import difflib
-import nltk
-from nltk.corpus import stopwords
-import logging
-
-# Configurar logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
-# Baixar stop words do NLTK
-try:
-    nltk.download('stopwords', quiet=True)
-    stop_words = set(stopwords.words('portuguese'))
-except Exception as e:
-    logger.warning(f"Erro ao baixar stop words do NLTK: {str(e)}. Usando conjunto vazio.")
-    stop_words = set()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
+
+# Configuração do banco de dados
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_timeout': 10,
-    'pool_recycle': 1800,
-    'pool_pre_ping': True
-}
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['CACHE_TYPE'] = os.getenv('CACHE_TYPE', 'SimpleCache')  # Suporte a Redis se configurado
-app.config['CACHE_REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379')
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300
-
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
@@ -48,7 +24,6 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
 
 db = SQLAlchemy(app)
-cache = Cache(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
@@ -60,7 +35,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     phone = db.Column(db.String(20))
-    registered_at = db.Column(db.DateTime, default=lambda: datetime.utcnow())
+    registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
 
 class Category(db.Model):
@@ -69,8 +44,8 @@ class Category(db.Model):
 
 class FAQ(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    question = db.Column(db.String(200), nullable=False, index=True)
-    answer = db.Column(db.Text, nullable=False, index=True)
+    question = db.Column(db.String(200), nullable=False)
+    answer = db.Column(db.Text, nullable=False)
     image_url = db.Column(db.String(500), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
@@ -101,12 +76,12 @@ with app.app_context():
 
 # Funções de utilidade
 def process_ticket_command(message):
-    match = re.match(r"Encerrar chamado (\d+)", message, re.IGNORECASE)
+    match = re.match(r"Encerrar chamado (\d+)", message)
     if match:
         ticket_id = match.group(1)
         ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
         if ticket:
-            if ticket.status.lower() == 'aberto':
+            if ticket.status == 'Aberto':
                 ticket.status = 'Fechado'
                 db.session.commit()
                 return f"Chamado {ticket_id} encerrado com sucesso."
@@ -116,7 +91,7 @@ def process_ticket_command(message):
     return None
 
 def suggest_solution(message):
-    match = re.match(r"Sugerir solução para (.+)", message, re.IGNORECASE)
+    match = re.match(r"Sugerir solução para (.+)", message)
     if match:
         problem = match.group(1).lower()
         solutions = {
@@ -134,6 +109,7 @@ def extract_faqs_from_pdf(file_path):
         text = ""
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
+
         lines = [line.strip() for line in text.split("\n") if line.strip()]
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
@@ -145,108 +121,75 @@ def extract_faqs_from_pdf(file_path):
         return []
 
 def format_faq_response(question, answer, image_url=None):
+    sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
-    has_sections = any(section in answer for section in ["Pré-requisitos:", "Etapa", "Atenção:", "Finalizar:", "Pós-instalação:"])
-    
-    if has_sections:
-        sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
-        current_section = None
-        for i in range(0, len(sections), 2):
-            header = sections[i].strip() if i + 1 < len(sections) else ""
-            content = sections[i + 1].strip() if i + 1 < len(sections) else ""
-            if header:
-                if header.startswith("Pré-requisitos:"):
-                    current_section = "Pré-requisitos"
-                    formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
-                elif header.startswith("Etapa"):
-                    current_section = "Etapa"
-                    formatted_response += f"<strong>🔧 {header}</strong><br>"
-                elif header.startswith("Atenção:"):
-                    current_section = "Atenção"
-                    formatted_response += "<strong>⚠️ Atenção</strong><br>"
-                elif header.startswith("Finalizar:"):
-                    current_section = "Finalizar"
-                    formatted_response += "<strong>⏳ Finalizar</strong><br>"
-                elif header.startswith("Pós-instalação:"):
-                    current_section = "Pós-instalação"
-                    formatted_response += "<strong>✅ Pós-instalação</strong><br>"
-            if content and current_section:
-                items = re.split(r'(?<=[.!?])\s+(?=[A-Z])', content)
+
+    current_section = None
+    for part in sections:
+        part = part.strip()
+        if not part:
+            continue
+        if part.startswith("Pré-requisitos:"):
+            current_section = "Pré-requisitos"
+            formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
+        elif part.startswith("Etapa"):
+            current_section = "Etapa"
+            formatted_response += f"<strong>🔧 {part}</strong><br>"
+        elif part.startswith("Atenção:"):
+            current_section = "Atenção"
+            formatted_response += "<strong>⚠️ Atenção</strong><br>"
+        elif part.startswith("Finalizar:"):
+            current_section = "Finalizar"
+            formatted_response += "<strong>⏳ Finalizar</strong><br>"
+        elif part.startswith("Pós-instalação:"):
+            current_section = "Pós-instalação"
+            formatted_response += "<strong>✅ Pós-instalação</strong><br>"
+        else:
+            if current_section:
+                items = re.split(r'[,.]\s*(?=[A-Z])', part)
                 for item in items:
                     item = item.strip()
                     if item:
                         formatted_response += f"{item}<br>"
-                formatted_response += "<br>" if i + 2 < len(sections) else ""
-    else:
-        lines = [line.strip() for line in answer.split('\n') if line.strip()]
-        for line in lines:
-            formatted_response += f"{line}<br>"
-    
+            formatted_response += "<br>"
+
     if image_url:
         formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
-    if formatted_response.endswith("<br>") and image_url:
-        formatted_response = formatted_response[:-4]
-    
+
     return formatted_response
 
-def normalize_text(text):
-    text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
-    return text.lower()
-
-@cache.memoize(timeout=300)
 def find_faq_by_keywords(message):
-    try:
-        normalized_message = normalize_text(message)
-        words = re.findall(r'\w+', normalized_message)
-        filtered_words = [word for word in words if word not in stop_words and len(word) > 2]
+    words = re.findall(r'\w+', message.lower())
+    faqs = FAQ.query.all()
+    matches = []
 
-        if not filtered_words:
-            return []
+    for faq in faqs:
+        score = 0
+        question_text = faq.question.lower()
+        answer_text = faq.answer.lower()
+        combined_text = question_text + " " + answer_text
 
-        query = db.session.query(FAQ)
-        for word in filtered_words[:3]:
-            like_pattern = f"%{word}%"
-            query = query.filter(db.or_(
-                FAQ.question.ilike(like_pattern),
-                FAQ.answer.ilike(like_pattern)
-            ))
+        for word in words:
+            if word in combined_text:
+                score += 1
 
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                faqs = query.limit(50).all()
-                break
-            except Exception as e:
-                logger.error(f"Tentativa {attempt + 1} falhou: {str(e)}")
-                if attempt == max_retries - 1:
-                    raise Exception("Falha ao acessar o banco de dados após várias tentativas.")
-                continue
-
-        if not faqs:
-            return []
-
-        matches = []
-        for faq in faqs:
-            normalized_question = normalize_text(faq.question)
-            normalized_answer = normalize_text(faq.answer)
-            question_similarity = difflib.SequenceMatcher(None, normalized_message, normalized_question).ratio()
-            answer_similarity = difflib.SequenceMatcher(None, normalized_message, normalized_answer).ratio()
-            score = (question_similarity * 0.7) + (answer_similarity * 0.3)
+        if score > 0:
             matches.append((faq, score))
 
-        matches.sort(key=lambda x: x[1], reverse=True)
-        return [match[0] for match in matches[:10]]
-
-    except Exception as e:
-        logger.error(f"Erro ao buscar FAQs: {str(e)}")
-        return []
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return [match[0] for match in matches] if matches else []
 
 # Rotas
 @app.route('/')
 @login_required
 def index():
-    session.pop('faq_selection', None)
     return render_template('index.html')
+
+@app.route('/chat-page')
+@login_required
+def chat_page():
+    session.pop('faq_selection', None)
+    return render_template('chat.html')
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -341,51 +284,32 @@ def chat():
         if solution_response:
             resposta['text'] = solution_response
         else:
-            try:
-                faq_matches = find_faq_by_keywords(mensagem)
-                if faq_matches:
-                    if len(faq_matches) == 1:
-                        faq = faq_matches[0]
-                        resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
-                        resposta['html'] = True
-                    else:
-                        faq_ids = [faq.id for faq in faq_matches]
-                        session['faq_selection'] = faq_ids
-                        resposta['state'] = 'faq_selection'
-                        resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
-                        resposta['html'] = True
-                        resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
+            faq_matches = find_faq_by_keywords(mensagem)
+            if faq_matches:
+                if len(faq_matches) == 1:
+                    faq = faq_matches[0]
+                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
+                    resposta['html'] = True
                 else:
-                    resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs!"
-            except Exception as e:
-                logger.error(f"Erro ao processar busca de FAQs: {str(e)}")
-                resposta['text'] = "Desculpe, ocorreu um erro ao buscar FAQs. Tente novamente em alguns instantes."
+                    faq_ids = [faq.id for faq in faq_matches]
+                    session['faq_selection'] = faq_ids
+                    resposta['state'] = 'faq_selection'
+                    resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
+                    resposta['html'] = True
+                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
+            else:
+                if "windows" in mensagem.lower():
+                    resposta['text'] = format_faq_response(
+                        "O que é o modo de segurança no Windows?",
+                        "O Modo de Segurança no Windows é uma opção de inicialização que carrega apenas os drivers e serviços essenciais, útil para solucionar problemas. Para acessá-lo, reinicie o computador e pressione F8 antes do carregamento do sistema, ou configure nas Configurações de Inicialização Avançadas.",
+                        None
+                    )
+                    resposta['html'] = True
+                else:
+                    resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
+                    resposta['html'] = False
 
     return jsonify(resposta)
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({'fulfillmentText': 'Erro: Dados inválidos'}), 400
-
-    query_text = data['queryResult']['queryText']
-    response_text = "Desculpe, não entendi. Tente novamente."
-
-    try:
-        faq_matches = find_faq_by_keywords(query_text)
-        if faq_matches:
-            faq = faq_matches[0]
-            response_text = format_faq_response(faq.question, faq.answer, faq.image_url)
-        else:
-            response_text = "Desculpe, não encontrei uma FAQ para isso. Tente reformular sua pergunta!"
-    except Exception as e:
-        logger.error(f"Erro no webhook: {str(e)}")
-        response_text = "Desculpe, ocorreu um erro ao processar sua solicitação."
-
-    return jsonify({
-        'fulfillmentText': response_text
-    })
 
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
@@ -405,7 +329,6 @@ def admin_faq():
                 faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url)
                 db.session.add(faq)
                 db.session.commit()
-                cache.clear()
                 flash('FAQ adicionada com sucesso!', 'success')
             else:
                 flash('Preencha todos os campos obrigatórios.', 'error')
@@ -458,7 +381,6 @@ def admin_faq():
                                 new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
                                 db.session.add(new_faq)
                     db.session.commit()
-                    cache.clear()
                     flash('FAQs importadas com sucesso!', 'success')
                 except Exception as e:
                     flash(f'Erro ao importar FAQs: {str(e)}', 'error')
@@ -475,7 +397,6 @@ def delete_faq(faq_id):
     if current_user.is_admin:
         db.session.delete(faq)
         db.session.commit()
-        cache.clear()
         flash('FAQ excluída com sucesso!', 'success')
     else:
         flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
