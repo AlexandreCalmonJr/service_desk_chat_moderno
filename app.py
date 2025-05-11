@@ -9,6 +9,8 @@ import json
 import re
 from PyPDF2 import PdfReader
 from datetime import datetime
+import spacy
+import spacy.cli
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
@@ -26,6 +28,14 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
+
+# Configuração do spacy
+try:
+    nlp = spacy.load('pt_core_news_sm')
+except OSError:
+    print("Modelo pt_core_news_sm não encontrado. Baixando...")
+    spacy.cli.download('pt_core_news_sm')
+    nlp = spacy.load('pt_core_news_sm')
 
 # Modelos
 class User(UserMixin, db.Model):
@@ -159,18 +169,25 @@ def format_faq_response(question, answer, image_url=None):
     return formatted_response
 
 def find_faq_by_keywords(message):
-    words = re.findall(r'\w+', message.lower())
+    # Processar a mensagem com spaCy
+    doc = nlp(message.lower())
+    # Extrair palavras-chave (ignorando stop words e pontuação)
+    keywords = [token.text for token in doc if token.is_alpha and not token.is_stop]
+
     faqs = FAQ.query.all()
     matches = []
 
     for faq in faqs:
         score = 0
-        question_text = faq.question.lower()
-        answer_text = faq.answer.lower()
-        combined_text = question_text + " " + answer_text
+        # Processar a pergunta e resposta da FAQ com spaCy
+        question_doc = nlp(faq.question.lower())
+        answer_doc = nlp(faq.answer.lower())
+        question_keywords = [token.text for token in question_doc if token.is_alpha and not token.is_stop]
+        answer_keywords = [token.text for token in answer_doc if token.is_alpha and not token.is_stop]
+        combined_keywords = question_keywords + answer_keywords
 
-        for word in words:
-            if word in combined_text:
+        for keyword in keywords:
+            if keyword in combined_keywords:
                 score += 1
 
         if score > 0:
