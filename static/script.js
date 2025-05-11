@@ -4,29 +4,40 @@ document.addEventListener('DOMContentLoaded', function () {
     const sendButton = document.getElementById('sendButton');
     const loadingSpinner = document.getElementById('loadingSpinner');
 
-    // Função para adicionar mensagem ao chat
+    // Função para adicionar mensagem ao chat com avatar
     function addMessage(message, isUser = false, isHtml = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'chat-message';
         messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
+        
+        const avatarSrc = isUser ? 'https://via.placeholder.com/40?text=U' : 'https://via.placeholder.com/40?text=Bot';
+        const avatar = `<img src="${avatarSrc}" alt="${isUser ? 'Usuário' : 'Bot'}" class="avatar">`;
+        
+        const messageBubble = document.createElement('div');
+        messageBubble.className = 'message-bubble';
         if (isHtml) {
-            messageDiv.innerHTML = message;
+            messageBubble.innerHTML = message;
         } else {
-            messageDiv.textContent = message;
+            messageBubble.textContent = message;
         }
+        
+        messageDiv.innerHTML = avatar + messageBubble.outerHTML;
         chatBox.appendChild(messageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // Função para exibir opções de FAQ
+    // Função para exibir opções de FAQ em uma grade
     function displayOptions(options) {
+        const optionsDiv = document.createElement('div');
+        optionsDiv.className = 'options-container';
         options.forEach(option => {
             const optionButton = document.createElement('button');
-            optionButton.className = 'btn btn-outline-primary btn-sm m-1';
+            optionButton.className = 'btn btn-outline-primary btn-sm';
             optionButton.textContent = option.question;
             optionButton.onclick = () => sendMessage(`faq_${option.id}`);
-            chatBox.appendChild(optionButton);
+            optionsDiv.appendChild(optionButton);
         });
+        chatBox.appendChild(optionsDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 

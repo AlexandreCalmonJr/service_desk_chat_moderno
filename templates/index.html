@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -45,13 +6,20 @@
     <title>Service Desk - Chatbot</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; }
+        body { background-color: #f8f9fa; font-family: Arial, sans-serif; }
         .chat-container { max-width: 800px; margin: 0 auto; padding: 20px; }
         .chat-box { border: 1px solid #ddd; border-radius: 10px; padding: 15px; background-color: #fff; height: 400px; overflow-y: auto; }
-        .chat-message { margin-bottom: 10px; }
-        .user-message { text-align: right; color: #007bff; }
-        .bot-message { text-align: left; color: #333; }
+        .chat-message { display: flex; align-items: flex-start; margin-bottom: 15px; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; }
+        .user-message { justify-content: flex-end; }
+        .user-message .message-bubble { background-color: #007bff; color: #fff; border-radius: 10px; padding: 8px 12px; }
+        .bot-message .message-bubble { background-color: #e9ecef; color: #333; border-radius: 10px; padding: 8px 12px; }
         .loading-spinner { display: none; text-align: center; margin-top: 10px; }
+        .options-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .options-container button { flex: 1 1 calc(50% - 5px); }
+        @media (max-width: 576px) {
+            .options-container button { flex: 1 1 100%; }
+        }
     </style>
 </head>
 <body>
