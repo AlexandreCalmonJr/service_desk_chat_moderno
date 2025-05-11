@@ -83,9 +83,20 @@
         avatarDiv.className = 'avatar mr-2';
         avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
         const bubbleDiv = document.createElement('div');
-        bubbleDiv.className = 'message-bubble bg-gray-100 dark:bg-gray-700 p-3 rounded-lg';
+        bubbleDiv.className = 'message-bubble bg-gray-100 dark:bg-gray-700 p-3 rounded-lg w-full';
         if (isHtml) {
             bubbleDiv.innerHTML = texto;
+            // Ajustar a responsividade de vídeos e imagens
+            const videos = bubbleDiv.querySelectorAll('video, iframe');
+            videos.forEach(video => {
+                video.style.maxWidth = '100%';
+                video.style.height = 'auto';
+            });
+            const images = bubbleDiv.querySelectorAll('img');
+            images.forEach(image => {
+                image.style.maxWidth = '100%';
+                image.style.height = 'auto';
+            });
         } else {
             bubbleDiv.textContent = texto;
         }

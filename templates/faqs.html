@@ -46,6 +46,7 @@
                             <th class="p-3 border-b dark:border-gray-600">Resposta</th>
                             <th class="p-3 border-b dark:border-gray-600">Categoria</th>
                             <th class="p-3 border-b dark:border-gray-600">Imagem</th>
+                            <th class="p-3 border-b dark:border-gray-600">Vídeo</th>
                             <th class="p-3 border-b dark:border-gray-600">Ação</th>
                         </tr>
                     </thead>
@@ -54,11 +55,18 @@
                             {% for faq in faqs %}
                                 <tr class="hover:bg-gray-100 dark:hover:bg-gray-800">
                                     <td class="p-3 border-b dark:border-gray-600 text-gray-900 dark:text-gray-100">{{ faq.question }}</td>
-                                    <td class="p-3 border-b dark:border-gray-600 text-gray-700 dark:text-gray-300">{{ faq.answer }}</td>
+                                    <td class="p-3 border-b dark:border-gray-600 text-gray-700 dark:text-gray-300">{{ faq.formatted_answer | safe }}</td>
                                     <td class="p-3 border-b dark:border-gray-600 text-gray-700 dark:text-gray-300">{{ faq.category.name }}</td>
                                     <td class="p-3 border-b dark:border-gray-600">
                                         {% if faq.image_url %}
                                             <a href="{{ faq.image_url }}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">Ver Imagem</a>
+                                        {% else %}
+                                            <span class="text-gray-500 dark:text-gray-400">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="p-3 border-b dark:border-gray-600">
+                                        {% if faq.video_url %}
+                                            <a href="{{ faq.video_url }}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">Ver Vídeo</a>
                                         {% else %}
                                             <span class="text-gray-500 dark:text-gray-400">-</span>
                                         {% endif %}
@@ -74,7 +82,7 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="5" class="p-3 text-center text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</td>
+                                <td colspan="6" class="p-3 text-center text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</td>
                             </tr>
                         {% endif %}
                     </tbody>
