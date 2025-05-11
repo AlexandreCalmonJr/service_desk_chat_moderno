@@ -1,43 +1,100 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Chat Avançado</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="/static/styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <title>Service Desk - Chatbot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .chat-container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .chat-box { border: 1px solid #ddd; border-radius: 10px; padding: 15px; background-color: #fff; height: 400px; overflow-y: auto; }
+        .chat-message { margin-bottom: 10px; }
+        .user-message { text-align: right; color: #007bff; }
+        .bot-message { text-align: left; color: #333; }
+        .loading-spinner { display: none; text-align: center; margin-top: 10px; }
+    </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-            <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
-        </div>
-        <div class="flex items-center space-x-3">
-            {% if current_user.is_admin %}
-                <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
-            {% endif %}
-            <a href="/faqs" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ver FAQs</a>
-            <a href="/profile" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Perfil</a>
-            <a href="/logout" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-            </button>
-        </div>
-    </header>
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
-        {% include 'chat.html' %}
-    </main>
+<body>
+    <div class="chat-container">
+        <h1 class="text-center mb-4">Service Desk Chatbot</h1>
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="{{ url_for('index') }}">Home</a>
+                <div class="navbar-nav">
+                    <a class="nav-link" href="{{ url_for('profile') }}">Perfil</a>
+                    <a class="nav-link" href="{{ url_for('faqs') }}">FAQs</a>
+                    {% if current_user.is_admin %}
+                    <a class="nav-link" href="{{ url_for('admin_faq') }}">Gerenciar FAQs</a>
+                    {% endif %}
+                    <a class="nav-link" href="{{ url_for('logout') }}">Sair</a>
+                </div>
+            </div>
+        </nav>
 
-    <script>
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            const themeToggle = document.querySelector('.theme-toggle i');
-            themeToggle.classList.toggle('fa-moon');
-            themeToggle.classList.toggle('fa-sun');
-        }
-    </script>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="chat-box" id="chatBox"></div>
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+        <div class="input-group mt-3">
+            <input type="text" class="form-control" id="chatInput" placeholder="Digite sua mensagem..." aria-label="Mensagem">
+            <button class="btn btn-primary" type="button" id="sendButton">Enviar</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

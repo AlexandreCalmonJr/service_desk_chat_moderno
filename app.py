@@ -32,13 +32,14 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_timeout': 30,
+    'pool_timeout': 10,
     'pool_recycle': 1800,
     'pool_pre_ping': True
 }
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['CACHE_TYPE'] = 'SimpleCache'  # Cache em memória
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutos
+app.config['CACHE_TYPE'] = os.getenv('CACHE_TYPE', 'SimpleCache')  # Suporte a Redis se configurado
+app.config['CACHE_REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379')
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
@@ -100,12 +101,12 @@ with app.app_context():
 
 # Funções de utilidade
 def process_ticket_command(message):
-    match = re.match(r"Encerrar chamado (\d+)", message)
+    match = re.match(r"Encerrar chamado (\d+)", message, re.IGNORECASE)
     if match:
         ticket_id = match.group(1)
         ticket = Ticket.query.filter_by(ticket_id=ticket_id).first()
         if ticket:
-            if ticket.status == 'Aberto':
+            if ticket.status.lower() == 'aberto':
                 ticket.status = 'Fechado'
                 db.session.commit()
                 return f"Chamado {ticket_id} encerrado com sucesso."
@@ -115,7 +116,7 @@ def process_ticket_command(message):
     return None
 
 def suggest_solution(message):
-    match = re.match(r"Sugerir solução para (.+)", message)
+    match = re.match(r"Sugerir solução para (.+)", message, re.IGNORECASE)
     if match:
         problem = match.group(1).lower()
         solutions = {
@@ -189,36 +190,31 @@ def format_faq_response(question, answer, image_url=None):
     return formatted_response
 
 def normalize_text(text):
-    # Normalizar texto: remover acentos, converter para minúsculas
     text = ''.join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
     return text.lower()
 
 @cache.memoize(timeout=300)
 def find_faq_by_keywords(message):
     try:
-        # Normalizar a mensagem do usuário
         normalized_message = normalize_text(message)
-        # Pré-processar a mensagem: remover stop words e converter para minúsculas
         words = re.findall(r'\w+', normalized_message)
-        filtered_words = [word for word in words if word not in stop_words and len(word) > 2]  # Ignorar palavras muito curtas
+        filtered_words = [word for word in words if word not in stop_words and len(word) > 2]
 
         if not filtered_words:
             return []
 
-        # Construir uma consulta SQL para buscar FAQs que contenham pelo menos uma palavra-chave
         query = db.session.query(FAQ)
-        for word in filtered_words:
+        for word in filtered_words[:3]:
             like_pattern = f"%{word}%"
             query = query.filter(db.or_(
                 FAQ.question.ilike(like_pattern),
                 FAQ.answer.ilike(like_pattern)
             ))
 
-        # Executar a consulta com retry em caso de falha
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                faqs = query.all()
+                faqs = query.limit(50).all()
                 break
             except Exception as e:
                 logger.error(f"Tentativa {attempt + 1} falhou: {str(e)}")
@@ -229,21 +225,16 @@ def find_faq_by_keywords(message):
         if not faqs:
             return []
 
-        # Calcular similaridade entre a mensagem e as perguntas das FAQs
         matches = []
         for faq in faqs:
             normalized_question = normalize_text(faq.question)
             normalized_answer = normalize_text(faq.answer)
             question_similarity = difflib.SequenceMatcher(None, normalized_message, normalized_question).ratio()
             answer_similarity = difflib.SequenceMatcher(None, normalized_message, normalized_answer).ratio()
-            # Ponderar mais a similaridade da pergunta
             score = (question_similarity * 0.7) + (answer_similarity * 0.3)
             matches.append((faq, score))
 
-        # Ordenar por pontuação de similaridade
         matches.sort(key=lambda x: x[1], reverse=True)
-
-        # Retornar as FAQs (limitando a 10 resultados para evitar sobrecarga)
         return [match[0] for match in matches[:10]]
 
     except Exception as e:
@@ -384,7 +375,7 @@ def webhook():
     try:
         faq_matches = find_faq_by_keywords(query_text)
         if faq_matches:
-            faq = faq_matches[0]  # Pega o FAQ mais relevante
+            faq = faq_matches[0]
             response_text = format_faq_response(faq.question, faq.answer, faq.image_url)
         else:
             response_text = "Desculpe, não encontrei uma FAQ para isso. Tente reformular sua pergunta!"
