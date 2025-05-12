@@ -66,7 +66,7 @@ class FAQ(db.Model):
 
     @property
     def formatted_answer(self):
-        return format_faq_response(self.question, self.answer, self.image_url, self.video_url)
+        return format_faq_response(self.id, self.question, self.answer, self.image_url, self.video_url, self.file_name)
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -134,7 +134,7 @@ def extract_faqs_from_pdf(file_path):
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
-def format_faq_response(question, answer, image_url=None, video_url=None):
+def format_faq_response(faq_id, question, answer, image_url=None, video_url=None, file_name=None):
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
 
     has_sections = any(section in answer for section in ["Pré-requisitos:", "Etapa", "Atenção:", "Finalizar:", "Pós-instalação:"])
@@ -189,7 +189,11 @@ def format_faq_response(question, answer, image_url=None, video_url=None):
         else:
             formatted_response += f'<video width="560" height="315" controls style="margin-top: 10px;"><source src="{video_url}" type="video/mp4">Seu navegador não suporta o vídeo.</video><br>'
     
-    if formatted_response.endswith("<br>") and (image_url or video_url):
+    # Adicionar link de download do arquivo, se disponível
+    if file_name:
+        formatted_response += f'<br><a href="/download/{faq_id}" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank">📎 Baixar arquivo: {file_name}</a>'
+
+    if formatted_response.endswith("<br>") and (image_url or video_url or file_name):
         formatted_response = formatted_response[:-4]
     
     return formatted_response
@@ -379,13 +383,13 @@ def chat():
         if int(faq_id) in faq_ids:
             selected_faq = FAQ.query.get(int(faq_id))
             if selected_faq:
-                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer, selected_faq.image_url, selected_faq.video_url)
+                resposta['text'] = format_faq_response(selected_faq.id, selected_faq.question, selected_faq.answer, selected_faq.image_url, selected_faq.video_url, selected_faq.file_name)
                 resposta['html'] = True
                 faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
                 resposta['state'] = 'faq_selection'
                 resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
                 return jsonify(resposta)
-        resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova pergunta."
+        resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova mensagem."
         return jsonify(resposta)
 
     ticket_response = process_ticket_command(mensagem)
@@ -400,7 +404,7 @@ def chat():
             if faq_matches:
                 if len(faq_matches) == 1:
                     faq = faq_matches[0]
-                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url, faq.video_url)
+                    resposta['text'] = format_faq_response(faq.id, faq.question, faq.answer, faq.image_url, faq.video_url, faq.file_name)
                     resposta['html'] = True
                 else:
                     faq_ids = [faq.id for faq in faq_matches]
@@ -412,10 +416,12 @@ def chat():
             else:
                 if "windows" in mensagem.lower():
                     resposta['text'] = format_faq_response(
+                        None,  # FAQ sem ID, pois é estática
                         "O que é o modo de segurança no Windows?",
                         "O Modo de Segurança no Windows é uma opção de inicialização que carrega apenas os drivers e serviços essenciais, útil para solucionar problemas. Para acessá-lo, reinicie o computador e pressione F8 antes do carregamento do sistema, ou configure nas Configurações de Inicialização Avançadas.",
                         None,
-                        None
+                        None,
+                        None  # Sem arquivo associado
                     )
                     resposta['html'] = True
                 else:

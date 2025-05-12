@@ -31,7 +31,6 @@
         chatInput.value = '';
         chatBody.scrollTop = chatBody.scrollHeight;
 
-        // Adicionar mensagem de status com ícone animado
         const statusMessage = adicionarMensagem('Buscando no banco de dados...', 'bot', true, null, true);
         chatBody.scrollTop = chatBody.scrollHeight;
 
@@ -42,7 +41,6 @@
                 body: JSON.stringify({ mensagem: mensagem })
             });
             const data = await response.json();
-            // Remover a mensagem de status antes de adicionar a resposta
             chatBody.removeChild(statusMessage);
             adicionarMensagem(data.text, 'bot', data.html, data.options);
             chatState = data.state || 'normal';
@@ -115,6 +113,10 @@
                     image.style.maxWidth = '100%';
                     image.style.height = 'auto';
                 });
+                const links = bubbleDiv.querySelectorAll('a');
+                links.forEach(link => {
+                    link.className = 'text-blue-600 dark:text-blue-400 hover:underline flex items-center space-x-1';
+                });
             }
         } else {
             bubbleDiv.textContent = texto;
@@ -140,7 +142,7 @@
         messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
         messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
         chatBody.appendChild(messageDiv);
-        return messageDiv; // Retorna o elemento para remoção posterior
+        return messageDiv;
     }
 
     chatInput.addEventListener('keydown', (event) => {
