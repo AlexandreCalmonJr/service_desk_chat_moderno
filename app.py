@@ -500,7 +500,7 @@ def edit_faq(faq_id):
             faq.file_data = file.read()
         db.session.commit()
         flash('FAQ atualizada com sucesso!', 'success')
-        return redirect(url_for('admin_faq'))
+        return redirect(url_for('faqs'))
     return redirect(url_for('admin_faq', edit=faq_id))
 
 @app.route('/faqs/delete/<int:faq_id>', methods=['POST'])
@@ -513,6 +513,24 @@ def delete_faq(faq_id):
         flash('FAQ excluída com sucesso!', 'success')
     else:
         flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
+    return redirect(url_for('faqs'))
+
+@app.route('/faqs/delete-multiple', methods=['POST'])
+@login_required
+def delete_multiple_faqs():
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('faqs'))
+    
+    faq_ids = request.form.getlist('faq_ids')
+    if faq_ids:
+        FAQs_to_delete = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
+        for faq in FAQs_to_delete:
+            db.session.delete(faq)
+        db.session.commit()
+        flash(f'{len(faq_ids)} FAQs excluídas com sucesso!', 'success')
+    else:
+        flash('Nenhuma FAQ selecionada para exclusão.', 'error')
     return redirect(url_for('faqs'))
 
 @app.route('/download/<int:faq_id>')
