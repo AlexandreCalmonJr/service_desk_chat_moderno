@@ -481,12 +481,113 @@ def admin_faq():
     return render_template('admin_faq.html', categories=categories, faqs=faqs, faq_to_edit=faq_to_edit)
 
 # Nova rota para edição
-@app.route('/admin/faq/edit/<int:faq_id>', methods=['GET', 'POST'])
+@app.route('/admin/faq', methods=['GET', 'POST'])
+@login_required
+def admin_faq():
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('index'))
+    
+    categories = Category.query.all()
+    
+    if request.method == 'POST':
+        if 'add_question' in request.form:
+            category_id = request.form['category']
+            question = request.form['question']
+            answer = request.form['answer']
+            image_url = request.form.get('image_url')
+            video_url = request.form.get('video_url')
+            file = request.files.get('file')
+            file_name = file.filename if file else None
+            file_data = file.read() if file else None
+            if category_id and question and answer:
+                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url, video_url=video_url, file_name=file_name, file_data=file_data)
+                db.session.add(faq)
+                db.session.commit()
+                flash('FAQ adicionada com sucesso!', 'success')
+            else:
+                flash('Preencha todos os campos obrigatórios.', 'error')
+        elif 'import_faqs' in request.form:
+            file = request.files['faq_file']
+            if file and file.filename.endswith(('.json', '.csv', '.pdf')):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                try:
+                    if file.filename.endswith('.json'):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            if not isinstance(data, list):
+                                flash('Arquivo JSON deve conter uma lista de FAQs.', 'error')
+                                os.remove(file_path)
+                                return redirect(url_for('admin_faq'))
+                            for item in data:
+                                category_name = item.get('category')
+                                question = item.get('question')
+                                answer = item.get('answer', '')
+                                image_url = item.get('image_url')
+                                video_url = item.get('video_url')
+                                file_name = item.get('file_name')
+                                file_data = item.get('file_data', None)
+                                if not category_name or not question:
+                                    flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
+                                    continue
+                                category = Category.query.filter_by(name=category_name).first()
+                                if not category:
+                                    category = Category(name=category_name)
+                                    db.session.add(category)
+                                    db.session.commit()
+                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url, video_url=video_url, file_name=file_name, file_data=file_data)
+                                db.session.add(faq)
+                    elif file.filename.endswith('.csv'):
+                        category_id = request.form['category_import']
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            for row in reader:
+                                faq = FAQ(
+                                    category_id=category_id,
+                                    question=row.get('question'),
+                                    answer=row.get('answer', ''),
+                                    image_url=row.get('image_url'),
+                                    video_url=row.get('video_url'),
+                                    file_name=row.get('file_name'),
+                                    file_data=row.get('file_data')
+                                )
+                                db.session.add(faq)
+                    elif file.filename.endswith('.pdf'):
+                        category_id = request.form['category_import']
+                        faqs_extracted = extract_faqs_from_pdf(file_path)
+                        for faq in faqs_extracted:
+                            new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None, video_url=None, file_name=None, file_data=None)
+                            db.session.add(new_faq)
+                    db.session.commit()
+                    flash('FAQs importadas com sucesso!', 'success')
+                except Exception as e:
+                    flash(f'Erro ao importar FAQs: {str(e)}', 'error')
+                finally:
+                    os.remove(file_path)
+            else:
+                flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
+
+    return render_template('admin_faq.html', categories=categories)
+
+@app.route('/faqs', methods=['GET'])
+@login_required
+def faqs():
+    categories = Category.query.all()
+    faqs = FAQ.query.all()
+    faq_to_edit = None
+    if request.args.get('edit'):
+        faq_id = request.args.get('edit')
+        faq_to_edit = FAQ.query.get_or_404(faq_id)
+    return render_template('faqs.html', faqs=faqs, categories=categories, faq_to_edit=faq_to_edit)
+
+@app.route('/faqs/edit/<int:faq_id>', methods=['GET', 'POST'])
 @login_required
 def edit_faq(faq_id):
     if not current_user.is_admin:
         flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
-        return redirect(url_for('index'))
+        return redirect(url_for('faqs'))
     faq = FAQ.query.get_or_404(faq_id)
     if request.method == 'POST':
         faq.category_id = request.form['edit_category']
@@ -501,18 +602,18 @@ def edit_faq(faq_id):
         db.session.commit()
         flash('FAQ atualizada com sucesso!', 'success')
         return redirect(url_for('faqs'))
-    return redirect(url_for('admin_faq', edit=faq_id))
+    return redirect(url_for('faqs', edit=faq_id))
 
 @app.route('/faqs/delete/<int:faq_id>', methods=['POST'])
 @login_required
 def delete_faq(faq_id):
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('faqs'))
     faq = FAQ.query.get_or_404(faq_id)
-    if current_user.is_admin:
-        db.session.delete(faq)
-        db.session.commit()
-        flash('FAQ excluída com sucesso!', 'success')
-    else:
-        flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
+    db.session.delete(faq)
+    db.session.commit()
+    flash('FAQ excluída com sucesso!', 'success')
     return redirect(url_for('faqs'))
 
 @app.route('/faqs/delete-multiple', methods=['POST'])
@@ -521,7 +622,6 @@ def delete_multiple_faqs():
     if not current_user.is_admin:
         flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
         return redirect(url_for('faqs'))
-    
     faq_ids = request.form.getlist('faq_ids')
     if faq_ids:
         FAQs_to_delete = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
