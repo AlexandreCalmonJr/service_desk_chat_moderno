@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_file
+import io
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -60,12 +61,13 @@ class FAQ(db.Model):
     video_url = db.Column(db.String(500), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
-    file_name = db.Column(db.String(255), nullable=True)  # Novo campo
-    file_data = db.Column(db.LargeBinary, nullable=True)  # Novo campo para binário
+    file_name = db.Column(db.String(255), nullable=True)
+    file_data = db.Column(db.LargeBinary, nullable=True)
 
     @property
     def formatted_answer(self):
         return format_faq_response(self.question, self.answer, self.image_url, self.video_url)
+
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(db.String(10), unique=True, nullable=False)
@@ -135,7 +137,6 @@ def extract_faqs_from_pdf(file_path):
 def format_faq_response(question, answer, image_url=None, video_url=None):
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
 
-    # Verificar se o texto contém seções específicas
     has_sections = any(section in answer for section in ["Pré-requisitos:", "Etapa", "Atenção:", "Finalizar:", "Pós-instalação:"])
     
     if has_sections:
@@ -170,19 +171,15 @@ def format_faq_response(question, answer, image_url=None, video_url=None):
                         formatted_response += f"{item}<br>"
                 formatted_response += "<br>" if i + 2 < len(sections) else ""
     else:
-        # Tratamento como texto livre
         lines = [line.strip() for line in answer.split('\n') if line.strip()]
         for line in lines:
             formatted_response += f"{line}<br>"
     
-    # Adicionar imagem, se disponível
     if image_url and is_image_url(image_url):
         formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
     
-    # Adicionar vídeo, se disponível
     if video_url and is_video_url(video_url):
         if 'youtube.com' in video_url or 'youtu.be' in video_url:
-            # Extrair ID do vídeo do YouTube
             video_id = re.search(r'(?:v=|\/)([a-zA-Z0-9_-]{11})', video_url)
             if video_id:
                 video_id = video_id.group(1)
@@ -192,26 +189,21 @@ def format_faq_response(question, answer, image_url=None, video_url=None):
         else:
             formatted_response += f'<video width="560" height="315" controls style="margin-top: 10px;"><source src="{video_url}" type="video/mp4">Seu navegador não suporta o vídeo.</video><br>'
     
-    # Remover o último <br> se houver mídia
     if formatted_response.endswith("<br>") and (image_url or video_url):
         formatted_response = formatted_response[:-4]
     
     return formatted_response
 
 def is_image_url(url):
-    # Verifica se a URL termina com uma extensão de imagem comum
     image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
     return url and url.lower().endswith(image_extensions)
 
 def is_video_url(url):
-    # Verifica se a URL é de vídeo (YouTube ou extensão de vídeo)
     video_extensions = ('.mp4', '.webm', '.ogg')
     return url and (any(url.lower().endswith(ext) for ext in video_extensions) or 'youtube.com' in url.lower() or 'youtu.be' in url.lower())
 
 def find_faq_by_keywords(message):
-    # Processar a mensagem com spaCy
     doc = nlp(message.lower())
-    # Extrair palavras-chave (ignorando stop words e pontuação)
     keywords = [token.text for token in doc if token.is_alpha and not token.is_stop]
 
     faqs = FAQ.query.all()
@@ -219,7 +211,6 @@ def find_faq_by_keywords(message):
 
     for faq in faqs:
         score = 0
-        # Processar a pergunta e resposta da FAQ com spaCy
         question_doc = nlp(faq.question.lower())
         answer_doc = nlp(faq.answer.lower())
         question_keywords = [token.text for token in question_doc if token.is_alpha and not token.is_stop]
@@ -258,12 +249,76 @@ def profile():
         return redirect(url_for('profile'))
     return render_template('profile.html')
 
-@app.route('/faqs')
+@app.route('/faqs', methods=['GET'])
 @login_required
 def faqs():
-    faqs = FAQ.query.all()
     categories = Category.query.all()
-    return render_template('faqs.html', faqs=faqs, categories=categories)
+    faqs = FAQ.query.all()
+    faq_to_edit = None
+    if request.args.get('edit'):
+        faq_id = request.args.get('edit')
+        faq_to_edit = FAQ.query.get_or_404(faq_id)
+    return render_template('faqs.html', faqs=faqs, categories=categories, faq_to_edit=faq_to_edit)
+
+@app.route('/faqs/edit/<int:faq_id>', methods=['GET', 'POST'])
+@login_required
+def edit_faq(faq_id):
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('faqs'))
+    faq = FAQ.query.get_or_404(faq_id)
+    if request.method == 'POST':
+        faq.category_id = request.form['edit_category']
+        faq.question = request.form['edit_question']
+        faq.answer = request.form['edit_answer']
+        faq.image_url = request.form.get('edit_image_url') or None
+        faq.video_url = request.form.get('edit_video_url') or None
+        file = request.files.get('edit_file')
+        if file and file.filename:
+            faq.file_name = file.filename
+            faq.file_data = file.read()
+        db.session.commit()
+        flash('FAQ atualizada com sucesso!', 'success')
+        return redirect(url_for('faqs'))
+    return redirect(url_for('faqs', edit=faq_id))
+
+@app.route('/faqs/delete/<int:faq_id>', methods=['POST'])
+@login_required
+def delete_faq(faq_id):
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('faqs'))
+    faq = FAQ.query.get_or_404(faq_id)
+    db.session.delete(faq)
+    db.session.commit()
+    flash('FAQ excluída com sucesso!', 'success')
+    return redirect(url_for('faqs'))
+
+@app.route('/faqs/delete-multiple', methods=['POST'])
+@login_required
+def delete_multiple_faqs():
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('faqs'))
+    faq_ids = request.form.getlist('faq_ids')
+    if faq_ids:
+        FAQs_to_delete = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
+        for faq in FAQs_to_delete:
+            db.session.delete(faq)
+        db.session.commit()
+        flash(f'{len(faq_ids)} FAQs excluídas com sucesso!', 'success')
+    else:
+        flash('Nenhuma FAQ selecionada para exclusão.', 'error')
+    return redirect(url_for('faqs'))
+
+@app.route('/download/<int:faq_id>')
+@login_required
+def download(faq_id):
+    faq = FAQ.query.get_or_404(faq_id)
+    if faq.file_data:
+        return send_file(io.BytesIO(faq.file_data), download_name=faq.file_name, as_attachment=True)
+    flash('Nenhum arquivo encontrado.', 'error')
+    return redirect(url_for('faqs'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -369,7 +424,6 @@ def chat():
 
     return jsonify(resposta)
 
-# Nova rota para edição
 @app.route('/admin/faq', methods=['GET', 'POST'])
 @login_required
 def admin_faq():
@@ -459,77 +513,6 @@ def admin_faq():
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
 
     return render_template('admin_faq.html', categories=categories)
-
-@app.route('/faqs', methods=['GET'])
-@login_required
-def faqs():
-    categories = Category.query.all()
-    faqs = FAQ.query.all()
-    faq_to_edit = None
-    if request.args.get('edit'):
-        faq_id = request.args.get('edit')
-        faq_to_edit = FAQ.query.get_or_404(faq_id)
-    return render_template('faqs.html', faqs=faqs, categories=categories, faq_to_edit=faq_to_edit)
-
-@app.route('/faqs/edit/<int:faq_id>', methods=['GET', 'POST'])
-@login_required
-def edit_faq(faq_id):
-    if not current_user.is_admin:
-        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
-        return redirect(url_for('faqs'))
-    faq = FAQ.query.get_or_404(faq_id)
-    if request.method == 'POST':
-        faq.category_id = request.form['edit_category']
-        faq.question = request.form['edit_question']
-        faq.answer = request.form['edit_answer']
-        faq.image_url = request.form.get('edit_image_url') or None
-        faq.video_url = request.form.get('edit_video_url') or None
-        file = request.files.get('edit_file')
-        if file and file.filename:
-            faq.file_name = file.filename
-            faq.file_data = file.read()
-        db.session.commit()
-        flash('FAQ atualizada com sucesso!', 'success')
-        return redirect(url_for('faqs'))
-    return redirect(url_for('faqs', edit=faq_id))
-
-@app.route('/faqs/delete/<int:faq_id>', methods=['POST'])
-@login_required
-def delete_faq(faq_id):
-    if not current_user.is_admin:
-        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
-        return redirect(url_for('faqs'))
-    faq = FAQ.query.get_or_404(faq_id)
-    db.session.delete(faq)
-    db.session.commit()
-    flash('FAQ excluída com sucesso!', 'success')
-    return redirect(url_for('faqs'))
-
-@app.route('/faqs/delete-multiple', methods=['POST'])
-@login_required
-def delete_multiple_faqs():
-    if not current_user.is_admin:
-        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
-        return redirect(url_for('faqs'))
-    faq_ids = request.form.getlist('faq_ids')
-    if faq_ids:
-        FAQs_to_delete = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
-        for faq in FAQs_to_delete:
-            db.session.delete(faq)
-        db.session.commit()
-        flash(f'{len(faq_ids)} FAQs excluídas com sucesso!', 'success')
-    else:
-        flash('Nenhuma FAQ selecionada para exclusão.', 'error')
-    return redirect(url_for('faqs'))
-
-@app.route('/download/<int:faq_id>')
-@login_required
-def download(faq_id):
-    faq = FAQ.query.get_or_404(faq_id)
-    if faq.file_data:
-        return send_file(io.BytesIO(faq.file_data), download_name=faq.file_name, as_attachment=True)
-    flash('Nenhum arquivo encontrado.', 'error')
-    return redirect(url_for('faqs'))
 
 if __name__ == '__main__':
     app.run(debug=True)
