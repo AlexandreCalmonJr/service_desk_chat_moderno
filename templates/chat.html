@@ -6,7 +6,7 @@
         </div>
     </div>
     <div class="chat-footer p-4 bg-white dark:bg-gray-800 shadow-inner">
-        <div class="typing-indicator" id="typing-indicator">
+        <div class="typing-indicator" id="typing-indicator" style="display: none;">
             <span>Digitando...</span>
         </div>
         <div class="flex items-center space-x-2">
@@ -29,7 +29,10 @@
 
         adicionarMensagem(mensagem, 'user');
         chatInput.value = '';
-        typingIndicator.style.display = 'flex';
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        // Adicionar mensagem de status com ícone animado
+        const statusMessage = adicionarMensagem('Buscando no banco de dados...', 'bot', true, null, true);
         chatBody.scrollTop = chatBody.scrollHeight;
 
         try {
@@ -39,6 +42,8 @@
                 body: JSON.stringify({ mensagem: mensagem })
             });
             const data = await response.json();
+            // Remover a mensagem de status antes de adicionar a resposta
+            chatBody.removeChild(statusMessage);
             adicionarMensagem(data.text, 'bot', data.html, data.options);
             chatState = data.state || 'normal';
             if (chatState === 'faq_selection') {
@@ -47,6 +52,7 @@
                 chatInput.placeholder = 'Digite sua mensagem...';
             }
         } catch (error) {
+            chatBody.removeChild(statusMessage);
             adicionarMensagem('Erro ao processar a solicitação.', 'bot');
         } finally {
             typingIndicator.style.display = 'none';
@@ -55,7 +61,7 @@
     }
 
     async function selecionarFAQ(faqId) {
-        typingIndicator.style.display = 'flex';
+        const statusMessage = adicionarMensagem('Buscando no banco de dados...', 'bot', true, null, true);
         chatBody.scrollTop = chatBody.scrollHeight;
 
         try {
@@ -65,18 +71,19 @@
                 body: JSON.stringify({ mensagem: `faq_${faqId}` })
             });
             const data = await response.json();
+            chatBody.removeChild(statusMessage);
             adicionarMensagem(data.text, 'bot', data.html, data.options);
             chatState = data.state || 'normal';
             chatInput.placeholder = chatState === 'faq_selection' ? 'Clique em uma FAQ acima ou digite uma nova mensagem...' : 'Digite sua mensagem...';
         } catch (error) {
+            chatBody.removeChild(statusMessage);
             adicionarMensagem('Erro ao processar a solicitação.', 'bot');
         } finally {
-            typingIndicator.style.display = 'none';
             chatBody.scrollTop = chatBody.scrollHeight;
         }
     }
 
-    function adicionarMensagem(texto, tipo, isHtml = false, options = []) {
+    function adicionarMensagem(texto, tipo, isHtml = false, options = [], isSearching = false) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${tipo} mb-4 flex items-start`;
         const avatarDiv = document.createElement('div');
@@ -85,24 +92,35 @@
         const bubbleDiv = document.createElement('div');
         bubbleDiv.className = 'message-bubble bg-gray-100 dark:bg-gray-700 p-3 rounded-lg w-full';
         if (isHtml) {
-            bubbleDiv.innerHTML = texto;
-            // Ajustar a responsividade de vídeos e imagens
-            const videos = bubbleDiv.querySelectorAll('video, iframe');
-            videos.forEach(video => {
-                video.style.maxWidth = '100%';
-                video.style.height = 'auto';
-            });
-            const images = bubbleDiv.querySelectorAll('img');
-            images.forEach(image => {
-                image.style.maxWidth = '100%';
-                image.style.height = 'auto';
-            });
+            if (isSearching) {
+                bubbleDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <svg class="animate-tech mr-2" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" fill="currentColor"/>
+                            <path d="M12 6V9L15 12L12 15V18C15.31 18 18 15.31 18 12C18 8.69 15.31 6 12 6Z" fill="currentColor"/>
+                            <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/>
+                        </svg>
+                        <span>Buscando no banco de dados...</span>
+                    </div>
+                `;
+            } else {
+                bubbleDiv.innerHTML = texto;
+                const videos = bubbleDiv.querySelectorAll('video, iframe');
+                videos.forEach(video => {
+                    video.style.maxWidth = '100%';
+                    video.style.height = 'auto';
+                });
+                const images = bubbleDiv.querySelectorAll('img');
+                images.forEach(image => {
+                    image.style.maxWidth = '100%';
+                    image.style.height = 'auto';
+                });
+            }
         } else {
             bubbleDiv.textContent = texto;
         }
 
-        // Adicionar botões de opções, se existirem e não forem duplicatas
-        if (options.length > 0) {
+        if (options && options.length > 0) {
             const optionsString = JSON.stringify(options);
             if (optionsString !== JSON.stringify(lastOptions)) {
                 const optionsDiv = document.createElement('div');
@@ -121,8 +139,8 @@
 
         messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
         messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
-
         chatBody.appendChild(messageDiv);
+        return messageDiv; // Retorna o elemento para remoção posterior
     }
 
     chatInput.addEventListener('keydown', (event) => {
@@ -136,3 +154,40 @@
         chatBody.scrollTop = chatBody.scrollHeight;
     });
 </script>
+
+<style>
+    .chat-input:focus {
+        outline: none;
+    }
+    .typing-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .animate-tech {
+        animation: techSpin 1.5s linear infinite;
+    }
+    @keyframes techSpin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    @media (max-width: 768px) {
+        .chat-container {
+            max-width: 100%;
+            height: calc(100vh - 4rem);
+        }
+        .chat-body {
+            padding: 1rem;
+        }
+        .chat-footer {
+            padding: 1rem;
+        }
+        .message-bubble {
+            max-width: 90% !important;
+        }
+        .chat-button {
+            width: 70px;
+            padding: 0.5rem;
+        }
+    }
+</style>
