@@ -29,7 +29,7 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# Configuração do spacy
+# Configuração do spaCy
 try:
     nlp = spacy.load('pt_core_news_sm')
 except OSError:
@@ -57,12 +57,13 @@ class FAQ(db.Model):
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
     image_url = db.Column(db.String(500), nullable=True)
+    video_url = db.Column(db.String(500), nullable=True)  # Novo campo para vídeos
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
 
     @property
     def formatted_answer(self):
-        return format_faq_response(self.question, self.answer, self.image_url)
+        return format_faq_response(self.question, self.answer, self.image_url, self.video_url)
 
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -77,7 +78,7 @@ def load_user(user_id):
 # Inicialização do banco de dados e categorias padrão
 with app.app_context():
     db.create_all()
-    categories = ['Hardware', 'Software', 'Rede', 'Outros']
+    categories = ['Hardware', 'Software', 'Rede', 'Outros', 'Mobile', 'Automation']
     for category_name in categories:
         if not Category.query.filter_by(name=category_name).first():
             category = Category(name=category_name)
@@ -124,14 +125,13 @@ def extract_faqs_from_pdf(file_path):
         for i in range(0, len(lines) - 1, 2):
             question = lines[i]
             answer = lines[i + 1]
-            faqs.append({"question": question, "answer": answer, "image_url": None})
+            faqs.append({"question": question, "answer": answer, "image_url": None, "video_url": None})
         return faqs
     except Exception as e:
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
-def format_faq_response(question, answer, image_url=None):
-
+def format_faq_response(question, answer, image_url=None, video_url=None):
     formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
 
     # Verificar se o texto contém seções específicas
@@ -175,14 +175,37 @@ def format_faq_response(question, answer, image_url=None):
             formatted_response += f"{line}<br>"
     
     # Adicionar imagem, se disponível
-    if image_url:
+    if image_url and is_image_url(image_url):
         formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
     
-    # Remover o último <br> se houver imagem
-    if formatted_response.endswith("<br>") and image_url:
+    # Adicionar vídeo, se disponível
+    if video_url and is_video_url(video_url):
+        if 'youtube.com' in video_url or 'youtu.be' in video_url:
+            # Extrair ID do vídeo do YouTube
+            video_id = re.search(r'(?:v=|\/)([a-zA-Z0-9_-]{11})', video_url)
+            if video_id:
+                video_id = video_id.group(1)
+                formatted_response += f'<iframe width="560" height="315" src="https://www.youtube.com/embed/{video_id}" frameborder="0" allowfullscreen style="margin-top: 10px;"></iframe><br>'
+            else:
+                formatted_response += f'<p>URL do YouTube inválida: {video_url}</p><br>'
+        else:
+            formatted_response += f'<video width="560" height="315" controls style="margin-top: 10px;"><source src="{video_url}" type="video/mp4">Seu navegador não suporta o vídeo.</video><br>'
+    
+    # Remover o último <br> se houver mídia
+    if formatted_response.endswith("<br>") and (image_url or video_url):
         formatted_response = formatted_response[:-4]
     
     return formatted_response
+
+def is_image_url(url):
+    # Verifica se a URL termina com uma extensão de imagem comum
+    image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
+    return url and url.lower().endswith(image_extensions)
+
+def is_video_url(url):
+    # Verifica se a URL é de vídeo (YouTube ou extensão de vídeo)
+    video_extensions = ('.mp4', '.webm', '.ogg')
+    return url and (any(url.lower().endswith(ext) for ext in video_extensions) or 'youtube.com' in url.lower() or 'youtu.be' in url.lower())
 
 def find_faq_by_keywords(message):
     # Processar a mensagem com spaCy
@@ -300,7 +323,7 @@ def chat():
         if int(faq_id) in faq_ids:
             selected_faq = FAQ.query.get(int(faq_id))
             if selected_faq:
-                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer, selected_faq.image_url)
+                resposta['text'] = format_faq_response(selected_faq.question, selected_faq.answer, selected_faq.image_url, selected_faq.video_url)
                 resposta['html'] = True
                 faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
                 resposta['state'] = 'faq_selection'
@@ -321,7 +344,7 @@ def chat():
             if faq_matches:
                 if len(faq_matches) == 1:
                     faq = faq_matches[0]
-                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url)
+                    resposta['text'] = format_faq_response(faq.question, faq.answer, faq.image_url, faq.video_url)
                     resposta['html'] = True
                 else:
                     faq_ids = [faq.id for faq in faq_matches]
@@ -335,6 +358,7 @@ def chat():
                     resposta['text'] = format_faq_response(
                         "O que é o modo de segurança no Windows?",
                         "O Modo de Segurança no Windows é uma opção de inicialização que carrega apenas os drivers e serviços essenciais, útil para solucionar problemas. Para acessá-lo, reinicie o computador e pressione F8 antes do carregamento do sistema, ou configure nas Configurações de Inicialização Avançadas.",
+                        None,
                         None
                     )
                     resposta['html'] = True
@@ -358,8 +382,9 @@ def admin_faq():
             question = request.form['question']
             answer = request.form['answer']
             image_url = request.form.get('image_url')
+            video_url = request.form.get('video_url')  # Novo campo no formulário
             if category_id and question and answer:
-                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url)
+                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url, video_url=video_url)
                 db.session.add(faq)
                 db.session.commit()
                 flash('FAQ adicionada com sucesso!', 'success')
@@ -384,6 +409,7 @@ def admin_faq():
                                 question = item.get('question')
                                 answer = item.get('answer', '')
                                 image_url = item.get('image_url')
+                                video_url = item.get('video_url')  # Novo campo no JSON
                                 if not category_name or not question:
                                     flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
                                     continue
@@ -392,7 +418,7 @@ def admin_faq():
                                     category = Category(name=category_name)
                                     db.session.add(category)
                                     db.session.commit()
-                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url)
+                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url, video_url=video_url)
                                 db.session.add(faq)
                     elif file.filename.endswith('.csv'):
                         category_id = request.form['category_import']
@@ -403,7 +429,8 @@ def admin_faq():
                                     category_id=category_id,
                                     question=row.get('question'),
                                     answer=row.get('answer', ''),
-                                    image_url=row.get('image_url')
+                                    image_url=row.get('image_url'),
+                                    video_url=row.get('video_url')  # Novo campo no CSV
                                 )
                                 db.session.add(faq)
                     elif file.filename.endswith('.pdf'):
@@ -411,7 +438,7 @@ def admin_faq():
                         faqs_extracted = extract_faqs_from_pdf(file_path)
                         for faq in faqs_extracted:
                             if faq['question'] and faq['answer']:
-                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None)
+                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None, video_url=None)
                                 db.session.add(new_faq)
                     db.session.commit()
                     flash('FAQs importadas com sucesso!', 'success')
