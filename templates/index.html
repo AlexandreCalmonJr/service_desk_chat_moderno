@@ -10,24 +10,24 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-            <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
+    <header class="bg-white dark:bg-gray-800 shadow-sm p-2 md:p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
+        <div class="flex items-center space-x-2 md:space-x-3">
+            <h1 class="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
+            <span class="text-xs md:text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
         </div>
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-1 md:space-x-2">
             {% if current_user.is_admin %}
-                <a href="/admin/faq" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
+                <a href="/admin/faq" class="text-xs md:text-sm px-2 md:px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Gerenciar FAQs</a>
             {% endif %}
-            <a href="/faqs" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ver FAQs</a>
-            <a href="/profile" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Perfil</a>
-            <a href="/logout" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
+            <a href="/faqs" class="text-xs md:text-sm px-2 md:px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ver FAQs</a>
+            <a href="/profile" class="text-xs md:text-sm px-2 md:px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Perfil</a>
+            <a href="/logout" class="text-xs md:text-sm px-2 md:px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
             <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
+                <i class="fas fa-moon text-gray-600 dark:text-gray-300 text-sm md:text-base"></i>
             </button>
         </div>
     </header>
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
+    <main class="flex-1 flex flex-col items-center justify-center pt-16 md:pt-20 pb-4 px-2 md:px-4">
         {% include 'chat.html' %}
     </main>
 
@@ -39,5 +39,6 @@
             themeToggle.classList.toggle('fa-sun');
         }
     </script>
+</style>
 </body>
 </html>

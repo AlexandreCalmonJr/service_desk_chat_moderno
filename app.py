@@ -57,14 +57,15 @@ class FAQ(db.Model):
     question = db.Column(db.String(200), nullable=False)
     answer = db.Column(db.Text, nullable=False)
     image_url = db.Column(db.String(500), nullable=True)
-    video_url = db.Column(db.String(500), nullable=True)  # Novo campo para vídeos
+    video_url = db.Column(db.String(500), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
+    file_name = db.Column(db.String(255), nullable=True)  # Novo campo
+    file_data = db.Column(db.LargeBinary, nullable=True)  # Novo campo para binário
 
     @property
     def formatted_answer(self):
         return format_faq_response(self.question, self.answer, self.image_url, self.video_url)
-
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ticket_id = db.Column(db.String(10), unique=True, nullable=False)
@@ -376,20 +377,40 @@ def admin_faq():
         return redirect(url_for('index'))
     
     categories = Category.query.all()
+    faq_to_edit = None
+    
     if request.method == 'POST':
         if 'add_question' in request.form:
             category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
             image_url = request.form.get('image_url')
-            video_url = request.form.get('video_url')  # Novo campo no formulário
+            video_url = request.form.get('video_url')
+            file = request.files.get('file')
+            file_name = file.filename if file else None
+            file_data = file.read() if file else None
             if category_id and question and answer:
-                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url, video_url=video_url)
+                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url, video_url=video_url, file_name=file_name, file_data=file_data)
                 db.session.add(faq)
                 db.session.commit()
                 flash('FAQ adicionada com sucesso!', 'success')
             else:
                 flash('Preencha todos os campos obrigatórios.', 'error')
+        elif 'edit_faq' in request.form:
+            faq_id = request.form['faq_id']
+            faq = FAQ.query.get_or_404(faq_id)
+            faq.category_id = request.form['edit_category']
+            faq.question = request.form['edit_question']
+            faq.answer = request.form['edit_answer']
+            faq.image_url = request.form.get('edit_image_url') or None
+            faq.video_url = request.form.get('edit_video_url') or None
+            file = request.files.get('edit_file')
+            if file and file.filename:
+                faq.file_name = file.filename
+                faq.file_data = file.read()
+            db.session.commit()
+            flash('FAQ atualizada com sucesso!', 'success')
+            return redirect(url_for('admin_faq'))
         elif 'import_faqs' in request.form:
             file = request.files['faq_file']
             if file and file.filename.endswith(('.json', '.csv', '.pdf')):
@@ -409,7 +430,9 @@ def admin_faq():
                                 question = item.get('question')
                                 answer = item.get('answer', '')
                                 image_url = item.get('image_url')
-                                video_url = item.get('video_url')  # Novo campo no JSON
+                                video_url = item.get('video_url')
+                                file_name = item.get('file_name')
+                                file_data = item.get('file_data', None)  # Suporte a dados binários base64 (opcional)
                                 if not category_name or not question:
                                     flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
                                     continue
@@ -418,7 +441,7 @@ def admin_faq():
                                     category = Category(name=category_name)
                                     db.session.add(category)
                                     db.session.commit()
-                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url, video_url=video_url)
+                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url, video_url=video_url, file_name=file_name, file_data=file_data)
                                 db.session.add(faq)
                     elif file.filename.endswith('.csv'):
                         category_id = request.form['category_import']
@@ -430,16 +453,17 @@ def admin_faq():
                                     question=row.get('question'),
                                     answer=row.get('answer', ''),
                                     image_url=row.get('image_url'),
-                                    video_url=row.get('video_url')  # Novo campo no CSV
+                                    video_url=row.get('video_url'),
+                                    file_name=row.get('file_name'),
+                                    file_data=row.get('file_data')  # Suporte a dados binários (opcional)
                                 )
                                 db.session.add(faq)
                     elif file.filename.endswith('.pdf'):
                         category_id = request.form['category_import']
                         faqs_extracted = extract_faqs_from_pdf(file_path)
                         for faq in faqs_extracted:
-                            if faq['question'] and faq['answer']:
-                                new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None, video_url=None)
-                                db.session.add(new_faq)
+                            new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None, video_url=None, file_name=None, file_data=None)
+                            db.session.add(new_faq)
                     db.session.commit()
                     flash('FAQs importadas com sucesso!', 'success')
                 except Exception as e:
@@ -448,7 +472,36 @@ def admin_faq():
                     os.remove(file_path)
             else:
                 flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
-    return render_template('admin_faq.html', categories=categories)
+
+    # Passar a lista de FAQs e a FAQ a ser editada (se houver)
+    faqs = FAQ.query.all()
+    if request.args.get('edit'):
+        faq_id = request.args.get('edit')
+        faq_to_edit = FAQ.query.get_or_404(faq_id)
+    return render_template('admin_faq.html', categories=categories, faqs=faqs, faq_to_edit=faq_to_edit)
+
+# Nova rota para edição
+@app.route('/admin/faq/edit/<int:faq_id>', methods=['GET', 'POST'])
+@login_required
+def edit_faq(faq_id):
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        return redirect(url_for('index'))
+    faq = FAQ.query.get_or_404(faq_id)
+    if request.method == 'POST':
+        faq.category_id = request.form['edit_category']
+        faq.question = request.form['edit_question']
+        faq.answer = request.form['edit_answer']
+        faq.image_url = request.form.get('edit_image_url') or None
+        faq.video_url = request.form.get('edit_video_url') or None
+        file = request.files.get('edit_file')
+        if file and file.filename:
+            faq.file_name = file.filename
+            faq.file_data = file.read()
+        db.session.commit()
+        flash('FAQ atualizada com sucesso!', 'success')
+        return redirect(url_for('admin_faq'))
+    return redirect(url_for('admin_faq', edit=faq_id))
 
 @app.route('/faqs/delete/<int:faq_id>', methods=['POST'])
 @login_required
@@ -460,6 +513,15 @@ def delete_faq(faq_id):
         flash('FAQ excluída com sucesso!', 'success')
     else:
         flash('Acesso negado. Apenas administradores podem excluir FAQs.', 'error')
+    return redirect(url_for('faqs'))
+
+@app.route('/download/<int:faq_id>')
+@login_required
+def download(faq_id):
+    faq = FAQ.query.get_or_404(faq_id)
+    if faq.file_data:
+        return send_file(io.BytesIO(faq.file_data), download_name=faq.file_name, as_attachment=True)
+    flash('Nenhum arquivo encontrado.', 'error')
     return redirect(url_for('faqs'))
 
 if __name__ == '__main__':
