@@ -11,8 +11,6 @@ import json
 import re
 from PyPDF2 import PdfReader
 from datetime import datetime
-import spacy
-import spacy.cli
 import torch
 
 
@@ -42,12 +40,7 @@ except Exception as e:
 faq_embeddings = {}
 
 # Configuração do spaCy
-try:
-    nlp = spacy.load('pt_core_news_sm')
-except OSError:
-    print("Modelo pt_core_news_sm não encontrado. Baixando...")
-    spacy.cli.download('pt_core_news_sm')
-    nlp = spacy.load('pt_core_news_sm')
+
 
 # Modelos
 class User(UserMixin, db.Model):
