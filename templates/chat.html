@@ -23,6 +23,22 @@
     let chatState = 'normal';
     let lastOptions = [];
 
+    function sendFeedback(button, messageId, feedbackType) {
+        fetch('/chat/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message_id: messageId, feedback: feedbackType })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Desabilita os botões e dá um feedback visual
+                const feedbackContainer = button.parentElement;
+                feedbackContainer.innerHTML = '<span class="text-sm text-gray-500">Obrigado pelo feedback!</span>';
+            }
+        });
+    }
+
     async function enviarMensagem() {
         const mensagem = chatInput.value.trim();
         if (!mensagem) return;
@@ -135,6 +151,16 @@
                     optionsDiv.appendChild(button);
                 });
                 bubbleDiv.appendChild(optionsDiv);
+                if (tipo === 'bot' && message_id) {
+                    const feedbackDiv = document.createElement('div');
+                    feedbackDiv.className = 'feedback-container mt-3 pt-2 border-t border-gray-200 dark:border-gray-600';
+                    feedbackDiv.innerHTML = `
+                        <span class="text-xs text-gray-500 mr-2">Isso foi útil?</span>
+                        <button class="feedback-button" onclick="sendFeedback(this, ${message_id}, 'helpful')">👍</button>
+                        <button class="feedback-button" onclick="sendFeedback(this, ${message_id}, 'unhelpful')">👎</button>
+                    `;
+                    bubbleDiv.appendChild(feedbackDiv);
+                }
                 lastOptions = options;
             }
         }

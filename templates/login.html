@@ -18,8 +18,12 @@
         </button>
     </header>
     <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
-        <div class="w-full max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 text-center mb-6">Faça Login</h2>
+        <div class="text-center mb-4">
+            <svg class="mx-auto h-16 w-16 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.125 2.994 2.707 3.227 1.068.158 2.148.279 3.238.364.494.03.994.037 1.49.037h.044c.594 0 1.19-.014 1.784-.042 1.092-.086 2.174-.208 3.244-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.344 48.344 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+            </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 text-center mb-6">Faça Login</h2>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
