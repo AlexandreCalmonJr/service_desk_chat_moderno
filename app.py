@@ -32,7 +32,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 try:
-    semantic_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+    semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
 except Exception as e:
     print(f"Erro ao carregar o modelo de sentence-transformer: {e}")
     semantic_model = None
