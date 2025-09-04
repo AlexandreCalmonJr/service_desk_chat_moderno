@@ -1,165 +1,66 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Gerir FAQs</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="/static/styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+{% extends "base_layout.html" %}
 
-    <!-- CABEÇALHO RESPONSIVO COMPLETO -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <!-- Título e Nome do Utilizador -->
-        <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-            <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                {{ user_level_insignia }} Olá, {{ current_user.name }}!
-            </span>
-        </div>
+{% block title %}Gerir FAQs{% endblock %}
 
-        <!-- Menu para Ecrãs Grandes -->
-        <div class="hidden md:flex items-center space-x-3">
-            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
-            {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
-                <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
-                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Gerir Desafios</a>
-            {% endif %}
-            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Ver FAQs</a>
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Sair</a>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-            </button>
-        </div>
+{% block content %}
+<div class="w-full max-w-4xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Gestão de FAQs</h2>
 
-        <!-- Botão de Menu Hambúrguer para Ecrãs Pequenos -->
-        <div class="md:hidden flex items-center">
-            <button id="menu-button" class="text-gray-900 dark:text-gray-100 focus:outline-none">
-                <i class="fas fa-bars fa-lg"></i>
-            </button>
-        </div>
-    </header>
-
-    <!-- Menu Dropdown para Ecrãs Pequenos -->
-    <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48">
-        <div class="flex flex-col space-y-3">
-            <a href="{{ url_for('list_challenges') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ranking</a>
-             {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_users') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir Utilizadores</a>
-                <a href="{{ url_for('admin_faq') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir FAQs</a>
-            {% endif %}
-            <a href="{{ url_for('faqs') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ver FAQs</a>
-            <a href="{{ url_for('profile') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-600">Sair</a>
-            <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
-                <button class="theme-toggle w-full text-left text-gray-800 dark:text-gray-200" onclick="toggleTheme()" title="Alternar tema">
-                    <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i> Alternar Tema
-                </button>
+    <!-- Formulário de Adição de FAQ -->
+    <div class="mb-10 p-6 border rounded-lg border-gray-700 bg-gray-800/50">
+        <h3 class="text-xl font-semibold mb-4 text-yellow-400">Adicionar Nova FAQ</h3>
+        <form method="POST" action="{{ url_for('admin_faq') }}" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label for="category" class="block text-sm font-medium text-gray-300">Categoria</label>
+                <select name="category" id="category" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
+                    {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
-        </div>
+            <div>
+                <label for="question" class="block text-sm font-medium text-gray-300">Pergunta</label>
+                <input type="text" id="question" name="question" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md" placeholder="Digite a pergunta">
+            </div>
+            <div>
+                <label for="answer" class="block text-sm font-medium text-gray-300">Resposta</label>
+                <textarea id="answer" name="answer" rows="4" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md" placeholder="Use ```python ... ``` para blocos de código"></textarea>
+            </div>
+            <div>
+                <label for="image_url" class="block text-sm font-medium text-gray-300">URL da Imagem (opcional)</label>
+                <input type="url" id="image_url" name="image_url" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md" placeholder="https://exemplo.com/imagem.jpg">
+            </div>
+            <div>
+                <label for="video_url" class="block text-sm font-medium text-gray-300">URL do Vídeo (opcional)</label>
+                <input type="url" id="video_url" name="video_url" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md" placeholder="https://youtube.com/watch?v=...">
+            </div>
+             <div>
+                <label for="file" class="block text-sm font-medium text-gray-300">Anexar Ficheiro (opcional)</label>
+                <input type="file" name="file" id="file" class="mt-1 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 cursor-pointer">
+            </div>
+            <button type="submit" name="add_question" class="w-full py-2 px-4 rounded-md font-medium text-white bg-green-600 hover:bg-green-700">Adicionar FAQ</button>
+        </form>
     </div>
 
-    <main class="flex-1 flex flex-col items-center pt-24 px-4 w-full">
-        <div class="w-full max-w-2xl p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
-                            {{ message }}
-                        </div>
+    <!-- Formulário de Importação de FAQs -->
+    <div class="p-6 border rounded-lg border-gray-700 bg-gray-800/50">
+        <h3 class="text-xl font-semibold mb-4 text-yellow-400">Importar FAQs em Lote</h3>
+        <form method="POST" action="{{ url_for('admin_faq') }}" enctype="multipart/form-data" class="space-y-4">
+            <div>
+                <label for="category_import" class="block text-sm font-medium text-gray-300">Categoria para Importação</label>
+                <select id="category_import" name="category_import" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
+                    {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
                     {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">Gerir FAQs</h2>
-
-            <!-- Formulário de Adição de FAQ -->
-            <div class="mb-8 p-4 border rounded-lg dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Adicionar Nova FAQ</h3>
-                <form method="POST" action="{{ url_for('admin_faq') }}" enctype="multipart/form-data" class="space-y-4">
-                    <div>
-                        <label for="category" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
-                        <select name="category" id="category" required class="chat-input w-full">
-                            {% for category in categories %}
-                                <option value="{{ category.id }}">{{ category.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="question" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pergunta</label>
-                        <input type="text" id="question" name="question" required class="chat-input w-full" placeholder="Digite a pergunta">
-                    </div>
-                    <div>
-                        <label for="answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
-                        <textarea id="answer" name="answer" rows="5" required class="chat-input w-full" placeholder="Digite a resposta. Para código, use ```python ... ```"></textarea>
-                    </div>
-                    <div>
-                        <label for="image_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL da Imagem (opcional)</label>
-                        <input type="url" id="image_url" name="image_url" class="chat-input w-full" placeholder="https://exemplo.com/imagem.jpg">
-                    </div>
-                    <div>
-                        <label for="video_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL do Vídeo (opcional)</label>
-                        <input type="url" id="video_url" name="video_url" class="chat-input w-full" placeholder="https://youtube.com/watch?v=...">
-                    </div>
-                    <div>
-                        <label for="file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ficheiro (PDF, etc.) (opcional)</label>
-                        <input type="file" name="file" id="file" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
-                    </div>
-                    <button type="submit" name="add_question" class="chat-button w-full">Adicionar FAQ</button>
-                </form>
+                </select>
             </div>
-
-            <!-- Formulário de Importação de FAQs -->
-            <div class="p-4 border rounded-lg dark:border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Importar FAQs</h3>
-                <form method="POST" action="{{ url_for('admin_faq') }}" enctype="multipart/form-data" class="space-y-4">
-                    <div>
-                        <label for="category_import" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria para Importação</label>
-                        <select id="category_import" name="category_import" required class="chat-input w-full">
-                            {% for category in categories %}
-                                <option value="{{ category.id }}">{{ category.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label for="faq_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Selecione um ficheiro (JSON, CSV ou PDF)</label>
-                        <input type="file" id="faq_file" name="faq_file" accept=".json,.csv,.pdf" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
-                    </div>
-                    <button type="submit" name="import_faqs" class="chat-button w-full">Importar FAQs</button>
-                </form>
+            <div>
+                <label for="faq_file" class="block text-sm font-medium text-gray-300">Selecione um ficheiro (JSON, CSV ou PDF)</label>
+                <input type="file" id="faq_file" name="faq_file" accept=".json,.csv,.pdf" required class="mt-1 block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 cursor-pointer">
             </div>
-        </div>
-    </main>
+            <button type="submit" name="import_faqs" class="w-full py-2 px-4 rounded-md font-medium text-white bg-blue-600 hover:bg-blue-700">Importar FAQs</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
 
-    <!-- SCRIPTS GLOBAIS -->
-    <script>
-        // Função para alternar o tema claro/escuro
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            const themeIcons = document.querySelectorAll('.theme-toggle i');
-            themeIcons.forEach(icon => {
-                icon.classList.toggle('fa-moon');
-                icon.classList.toggle('fa-sun');
-            });
-        }
-
-        // Script para o menu hambúrguer
-        const menuButton = document.getElementById('menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        if (menuButton) {
-            menuButton.onclick = function() {
-                mobileMenu.classList.toggle('hidden');
-            };
-        }
-    </script>
-</body>
-</html>

@@ -1,131 +1,52 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Gerir Utilizadores</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="/static/styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
-    
-    <!-- COPIE O CABEÇALHO E MENU DO FICHEIRO INDEX.HTML PARA AQUI -->
-    <header>...cabeçalho...</header>    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <!-- Título e Nome do Utilizador -->
-        <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-            <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                {{ user_level_insignia }} Olá, {{ current_user.name }}!
-            </span>
-        </div>
+{% extends "base_layout.html" %}
 
-        <!-- Menu para Ecrãs Grandes -->
-        <div class="hidden md:flex items-center space-x-3">
-            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
-            {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
-                <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
-                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Gerir Desafios</a>
-            {% endif %}
-            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Ver FAQs</a>
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Sair</a>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-            </button>
-        </div>
+{% block title %}Gerir Utilizadores{% endblock %}
 
-        <!-- Botão de Menu Hambúrguer para Ecrãs Pequenos -->
-        <div class="md:hidden flex items-center">
-            <button id="menu-button" class="text-gray-900 dark:text-gray-100 focus:outline-none">
-                <i class="fas fa-bars fa-lg"></i>
-            </button>
-        </div>
-    </header>
-    <div>...menu móvel...</div>
-
-    <main class="flex-1 flex flex-col items-center pt-24 px-4 w-full">
-        <div class="w-full max-w-5xl p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">Gestão de Utilizadores</h2>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="bg-gray-200 dark:bg-gray-700">
-                            <th class="p-3">Nome</th>
-                            <th class="p-3">Email</th>
-                            <th class="p-3">Time</th>
-                            <th class="p-3">Pontos</th>
-                            <th class="p-3">Status</th>
-                            <th class="p-3">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                            <tr class="border-b dark:border-gray-700">
-                                <td class="p-3">{{ user.name }}</td>
-                                <td class="p-3">{{ user.email }}</td>
-                                <td class="p-3">{{ user.team.name if user.team else 'Nenhum' }}</td>
-                                <td class="p-3">{{ user.points }}</td>
-                                <td class="p-3">
+{% block content %}
+<div class="w-full max-w-5xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Gestão de Utilizadores</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="bg-gray-800 border-b border-gray-700">
+                    <th class="p-3">Nome</th>
+                    <th class="p-3">Email</th>
+                    <th class="p-3">Time</th>
+                    <th class="p-3">Pontos</th>
+                    <th class="p-3">Status</th>
+                    <th class="p-3">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr class="border-b border-gray-700">
+                        <td class="p-3">{{ user.name }}</td>
+                        <td class="p-3">{{ user.email }}</td>
+                        <td class="p-3">{{ user.team.name if user.team else 'Nenhum' }}</td>
+                        <td class="p-3">{{ user.points }}</td>
+                        <td class="p-3">
+                            {% if user.is_admin %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-200 text-green-800">Admin</span>
+                            {% else %}
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-gray-200">Utilizador</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-3">
+                            {% if user.id != current_user.id %}
+                                <form action="{{ url_for('toggle_admin', user_id=user.id) }}" method="POST">
                                     {% if user.is_admin %}
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-200 text-green-800">Admin</span>
+                                        <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm transition">Remover Admin</button>
                                     {% else %}
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">Utilizador</span>
+                                        <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition">Tornar Admin</button>
                                     {% endif %}
-                                </td>
-                                <td class="p-3">
-                                    {% if user.id != current_user.id %}
-                                        <form action="{{ url_for('toggle_admin', user_id=user.id) }}" method="POST">
-                                            {% if user.is_admin %}
-                                                <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm transition">Remover Admin</button>
-                                            {% else %}
-                                                <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition">Tornar Admin</button>
-                                            {% endif %}
-                                        </form>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
 
-    <script>
-        // Função para alternar o tema claro/escuro
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            const themeIcons = document.querySelectorAll('.theme-toggle i');
-            themeIcons.forEach(icon => {
-                icon.classList.toggle('fa-moon');
-                icon.classList.toggle('fa-sun');
-            });
-        }
-
-        // Script para o menu hambúrguer
-        const menuButton = document.getElementById('menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        if (menuButton) {
-            menuButton.onclick = function() {
-                mobileMenu.classList.toggle('hidden');
-            };
-        }
-    </script>
-</body>
-</html>

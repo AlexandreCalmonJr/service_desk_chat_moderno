@@ -1,0 +1,38 @@
+{% extends "base_layout.html" %}
+
+{% block title %}Gerir Times (Admin){% endblock %}
+
+{% block content %}
+<div class="w-full max-w-4xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Gestão de Todos os Times</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="bg-gray-800 border-b border-gray-700">
+                    <th class="p-3">Nome do Time</th>
+                    <th class="p-3">Dono</th>
+                    <th class="p-3">Membros</th>
+                    <th class="p-3">Pontos</th>
+                    <th class="p-3">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in teams %}
+                <tr class="border-b border-gray-700">
+                    <td class="p-3 font-semibold">{{ team.name }}</td>
+                    <td class="p-3">{{ team.owner.name }}</td>
+                    <td class="p-3">{{ team.members.count() }}</td>
+                    <td class="p-3">{{ team.total_points }}</td>
+                    <td class="p-3">
+                        <form action="{{ url_for('admin_delete_team', team_id=team.id) }}" method="POST" onsubmit="return confirm('Tem a certeza que quer dissolver este time?');">
+                            <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm transition">Dissolver</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

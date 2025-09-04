@@ -1,0 +1,41 @@
+{% extends "base_layout.html" %}
+
+{% block title %}Gerir Meu Time{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-4xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Gerir Time: {{ team.name }}</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead>
+                <tr class="bg-gray-800 border-b border-gray-700">
+                    <th class="p-3">Membro</th>
+                    <th class="p-3">Nível</th>
+                    <th class="p-3">Pontos</th>
+                    <th class="p-3">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for member in team.members %}
+                <tr class="border-b border-gray-700">
+                    <td class="p-3 flex items-center gap-2">
+                        <img src="{{ url_for('uploaded_insignia', filename=member.level.insignia_image_url) if member.level else '' }}" class="w-6 h-6">
+                        <span>{{ member.name }} {% if member.id == team.owner_id %}(Dono){% endif %}</span>
+                    </td>
+                    <td class="p-3">{{ member.level.name if member.level else 'N/A' }}</td>
+                    <td class="p-3">{{ member.points }}</td>
+                    <td class="p-3">
+                        {% if member.id != current_user.id %}
+                        <form action="{{ url_for('kick_from_team', user_id=member.id) }}" method="POST" onsubmit="return confirm('Tem a certeza que quer expulsar este membro?');">
+                            <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm transition">Expulsar</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

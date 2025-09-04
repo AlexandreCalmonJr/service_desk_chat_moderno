@@ -3,62 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Login</title>
+    <title>ServiceDesk RPG - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="/static/styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-            <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-        </button>
-    </header>
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
-        <div class="w-full max-w-md p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <div class="text-center mb-4">
-                <svg class="mx-auto h-16 w-16 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.125 2.994 2.707 3.227 1.068.158 2.148.279 3.238.364.494.03.994.037 1.49.037h.044c.594 0 1.19-.014 1.784-.042 1.092-.086 2.174-.208 3.244-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.344 48.344 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-                </svg>
-            </div>
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 text-center mb-6">Faça Login</h2>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            <form method="POST" action="/login" class="space-y-4">
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input type="email" id="email" name="email" required class="chat-input w-full" placeholder="Digite seu email">
-                </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Senha</label>
-                    <input type="password" id="password" name="password" required class="chat-input w-full" placeholder="Digite sua senha">
-                </div>
-                <button type="submit" class="chat-button w-full">Entrar</button>
-            </form>
-            <p class="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
-                Não tem uma conta? <a href="/register" class="text-blue-600 hover:underline dark:text-blue-400">Registe-se</a>
-            </p>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <div class="text-center">
+            <i class="fas fa-dungeon text-5xl text-green-400"></i>
+            <h2 class="mt-4 text-3xl font-extrabold text-white">Bem-vindo de volta!</h2>
+            <p class="mt-2 text-gray-400">Entre para continuar a sua aventura.</p>
         </div>
-    </main>
 
-    <script>
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            const themeToggle = document.querySelector('.theme-toggle i');
-            themeToggle.classList.toggle('fa-moon');
-            themeToggle.classList.toggle('fa-sun');
-        }
-    </script>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-md text-sm {% if category == 'error' %}bg-red-500/20 text-red-300{% else %}bg-green-500/20 text-green-300{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('login') }}" class="space-y-6">
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-300">Email</label>
+                <input type="email" id="email" name="email" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-300">Senha</label>
+                <input type="password" id="password" name="password" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
+            </div>
+            <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800">Entrar</button>
+        </form>
+        <p class="text-center text-sm text-gray-400">
+            Ainda não tem uma conta? <a href="{{ url_for('register') }}" class="font-medium text-green-400 hover:text-green-300">Crie uma agora</a>
+        </p>
+    </div>
 </body>
 </html>
+

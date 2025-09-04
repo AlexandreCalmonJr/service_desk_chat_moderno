@@ -1,146 +1,82 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <!-- (Copie o <head> de outro template como o index.html) -->
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Assistente de Service Desk - Chat</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="/static/styles.css" rel="stylesheet">
-            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-            <!-- Link para o Syntax Highlighting (se estiver a usar a funcionalidade de código) -->
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-        </head>
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
-    
-    <!-- CABEÇALHO RESPONSIVO COMPLETO -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <!-- Título e Nome do Utilizador -->
-        <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-            <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                {{ user_level_insignia }} Olá, {{ current_user.name }}!
-            </span>
-        </div>
+{% extends "base_layout.html" %}
 
-        <!-- Menu para Ecrãs Grandes -->
-        <div class="hidden md:flex items-center space-x-3">
-            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
-            {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
-                <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
-                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Gerir Desafios</a>
-            {% endif %}
-            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Ver FAQs</a>
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Sair</a>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-            </button>
-        </div>
+{% block title %}Gerir Desafios{% endblock %}
 
-        <!-- Botão de Menu Hambúrguer para Ecrãs Pequenos -->
-        <div class="md:hidden flex items-center">
-            <button id="menu-button" class="text-gray-900 dark:text-gray-100 focus:outline-none">
-                <i class="fas fa-bars fa-lg"></i>
-            </button>
-        </div>
-    </header>
-    <main class="flex-1 flex flex-col items-center pt-24 px-4 w-full">
-        <div class="w-full max-w-4xl p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">Gestão de Desafios</h2>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                <!-- (código para exibir mensagens flash) -->
-            {% endwith %}
+{% block content %}
+<div class="w-full max-w-4xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Gestão de Desafios</h2>
 
-            <!-- Formulário para Adicionar Novo Desafio -->
-            <div class="mb-10 p-4 border rounded-lg dark:border-gray-700">
-                <h3 class="text-xl font-semibold mb-4">Adicionar Novo Desafio</h3>
-                <form action="{{ url_for('admin_challenges') }}" method="POST" class="space-y-4">
-                    <div>
-                        <label for="title" class="block text-sm font-medium">Título</label>
-                        <input type="text" id="title" name="title" required class="chat-input w-full">
-                    </div>
-                    <div>
-                        <label for="description" class="block text-sm font-medium">Descrição (Enunciado)</label>
-                        <textarea id="description" name="description" rows="3" required class="chat-input w-full"></textarea>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label for="level_required" class="block text-sm font-medium">Nível Mínimo</label>
-                            <select id="level_required" name="level_required" class="chat-input w-full">
-                                {% for level_name in levels %}
-                                <option value="{{ level_name }}">{{ level_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div>
-                            <label for="points_reward" class="block text-sm font-medium">Recompensa (Pontos)</label>
-                            <input type="number" id="points_reward" name="points_reward" value="10" required class="chat-input w-full">
-                        </div>
-                    </div>
-                    <div>
-                        <label for="expected_answer" class="block text-sm font-medium">Resposta Esperada</label>
-                        <input type="text" id="expected_answer" name="expected_answer" required class="chat-input w-full" placeholder="A resposta exata que o utilizador deve submeter">
-                    </div>
-                    <div>
-                        <label for="unlocks_faq_id" class="block text-sm font-medium">FAQ que este desafio desbloqueia (Opcional)</label>
-                        <select id="unlocks_faq_id" name="unlocks_faq_id" class="chat-input w-full">
-                            <option value="">Nenhuma</option>
-                            {% for faq in faqs %}
-                            <option value="{{ faq.id }}">{{ faq.question }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <button type="submit" class="chat-button w-full">Adicionar Desafio</button>
-                </form>
+    <!-- Formulário para Adicionar Novo Desafio -->
+    <div class="mb-10 p-6 border rounded-lg border-gray-700 bg-gray-800/50">
+        <h3 class="text-xl font-semibold mb-4 text-yellow-400">Adicionar Novo Desafio</h3>
+        <form action="{{ url_for('admin_challenges') }}" method="POST" class="space-y-4">
+            <div>
+                <label for="title" class="block text-sm font-medium">Título</label>
+                <input type="text" id="title" name="title" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
             </div>
-
-            <!-- Lista de Desafios Existentes -->
-            <h3 class="text-xl font-semibold mb-4">Desafios Existentes</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="bg-gray-200 dark:bg-gray-700">
-                            <th class="p-3">Título</th>
-                            <th class="p-3">Nível</th>
-                            <th class="p-3">Pontos</th>
-                            <th class="p-3">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for challenge in challenges %}
-                        <tr class="border-b dark:border-gray-700">
-                            <td class="p-3">{{ challenge.title }}</td>
-                            <td class="p-3">{{ challenge.level_required }}</td>
-                            <td class="p-3">{{ challenge.points_reward }}</td>
-                            <td class="p-3">
-                                <form action="{{ url_for('delete_challenge', challenge_id=challenge.id) }}" method="POST" onsubmit="return confirm('Tem a certeza que quer apagar este desafio?');">
-                                    <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm transition">Apagar</button>
-                                </form>
-                            </td>
-                        </tr>
+            <div>
+                <label for="description" class="block text-sm font-medium">Descrição (Enunciado)</label>
+                <textarea id="description" name="description" rows="3" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="level_required" class="block text-sm font-medium">Nível Mínimo</label>
+                    <select id="level_required" name="level_required" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
+                        {% for level in levels %}
+                        <option value="{{ level.name }}">{{ level.name }}</option>
                         {% endfor %}
-                    </tbody>
-                </table>
+                    </select>
+                </div>
+                <div>
+                    <label for="points_reward" class="block text-sm font-medium">Recompensa (Pontos)</label>
+                    <input type="number" id="points_reward" name="points_reward" value="10" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
+                </div>
             </div>
-        </div>
-    </main>
-    
-    <script>
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            const themeToggle = document.querySelector('.theme-toggle i');
-            themeToggle.classList.toggle('fa-moon');
-            themeToggle.classList.toggle('fa-sun');
-        }
-    </script>
-</body>
-</html>
+            <div>
+                <label for="expected_answer" class="block text-sm font-medium">Resposta Esperada</label>
+                <input type="text" id="expected_answer" name="expected_answer" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md" placeholder="A resposta exata que o utilizador deve submeter">
+            </div>
+            <div>
+                <label for="unlocks_faq_id" class="block text-sm font-medium">FAQ que este desafio desbloqueia (Opcional)</label>
+                <select id="unlocks_faq_id" name="unlocks_faq_id" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
+                    <option value="">Nenhuma</option>
+                    {% for faq in faqs %}
+                    <option value="{{ faq.id }}">{{ faq.question }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="w-full py-2 px-4 rounded-md font-medium text-white bg-green-600 hover:bg-green-700">Adicionar Desafio</button>
+        </form>
+    </div>
+
+    <!-- Lista de Desafios Existentes -->
+    <h3 class="text-xl font-semibold text-yellow-400 mb-4">Desafios Existentes</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+             <thead>
+                <tr class="bg-gray-800 border-b border-gray-700">
+                    <th class="p-3">Título</th>
+                    <th class="p-3">Nível</th>
+                    <th class="p-3">Pontos</th>
+                    <th class="p-3">Ação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for challenge in challenges %}
+                <tr class="border-b border-gray-700">
+                    <td class="p-3">{{ challenge.title }}</td>
+                    <td class="p-3">{{ challenge.level_required }}</td>
+                    <td class="p-3">{{ challenge.points_reward }}</td>
+                    <td class="p-3">
+                        <form action="{{ url_for('delete_challenge', challenge_id=challenge.id) }}" method="POST" onsubmit="return confirm('Tem a certeza que quer apagar este desafio?');">
+                            <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm transition">Apagar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

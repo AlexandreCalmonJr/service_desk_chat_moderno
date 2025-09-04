@@ -15,13 +15,7 @@ import spacy.cli
 from flask_caching import Cache
 import click
 from flask.cli import with_appcontext
-# CONFIGURAÇÃO DA GAMIFICAÇÃO
-LEVELS = {
-    'Iniciante': {'min_points': 0, 'next_level_points': 50, 'insignia': '🌱'},
-    'Dados de Prata': {'min_points': 50, 'next_level_points': 150, 'insignia': '🥈'},
-    'Dados de Ouro': {'min_points': 150, 'next_level_points': 300, 'insignia': '🥇'},
-    'Mestre dos Dados': {'min_points': 300, 'next_level_points': float('inf'), 'insignia': '🏆'}
-}
+from flask_caching import Cache
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
@@ -52,6 +46,12 @@ except OSError:
 
 
 # Modelos
+
+class Level(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    min_points = db.Column(db.Integer, nullable=False, default=0)
+    insignia_image_url = db.Column(db.String(255), default='default.png')
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -138,6 +138,17 @@ class Team(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+@app.context_processor
+def inject_gamification_data():
+    data = {}
+    if current_user.is_authenticated:
+        if current_user.level:
+            data['user_level_insignia'] = url_for('uploaded_insignia', filename=current_user.level.insignia_image_url)
+        else:
+            default_level = Level.query.order_by(Level.min_points.asc()).first()
+            if default_level:
+                data['user_level_insignia'] = url_for('uploaded_insignia', filename=default_level.insignia_image_url)
+    return data
 # Inicialização do banco de dados e categorias padrão
 with app.app_context():
     db.create_all()
@@ -318,19 +329,21 @@ def find_faq_by_nlp(message):
     return [match[0] for match in matches]
 
 def update_user_level(user):
-    """Verifica os pontos do utilizador e atualiza o seu nível se necessário."""
-    current_level = user.level
-    new_level = current_level
+    """Verifica os pontos do utilizador e atualiza o seu nível."""
+    # Busca os níveis ordenados por pontos, do maior para o menor
+    levels = Level.query.order_by(Level.min_points.desc()).all()
+    current_level_id = user.level_id
+    new_level_id = current_level_id
 
-    for level_name, level_info in reversed(list(LEVELS.items())):
-        if user.points >= level_info['min_points']:
-            new_level = level_name
+    for level in levels:
+        if user.points >= level.min_points:
+            new_level_id = level.id
             break
-
-    if new_level != current_level:
-        user.level = new_level
-        # Não precisamos de db.session.commit() aqui, pois será chamado na rota.
-        flash(f'Subiu de nível! Você agora é {new_level}!', 'success')
+    
+    if new_level_id != current_level_id:
+        user.level_id = new_level_id
+        new_level_obj = Level.query.get(new_level_id)
+        flash(f'Subiu de nível! Você agora é {new_level_obj.name}!', 'success')
 
 @app.route('/admin/users')
 @login_required
@@ -349,6 +362,10 @@ def inject_user_gamification_data():
         insignia = level_info.get('insignia', '')
         return dict(user_level_insignia=insignia)
     return dict()
+
+@app.route('/uploads/insignias/<filename>')
+def uploaded_insignia(filename):
+    return send_from_directory(app.config['INSIGNIA_FOLDER'], filename)
 
 @app.route('/ranking')
 @login_required
@@ -890,6 +907,99 @@ def leave_team():
     flash(f'Você saiu do time "{team.name}".', 'success')
     return redirect(url_for('teams_list'))
 
+
+# --- ROTAS DE ADMINISTRAÇÃO ---
+
+@app.route('/admin/levels', methods=['GET', 'POST'])
+@login_required
+def admin_levels():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        name = request.form.get('name')
+        min_points = request.form.get('min_points', type=int)
+        insignia_file = request.files.get('insignia_image')
+        
+        filename = 'default.png'
+        if insignia_file and insignia_file.filename != '':
+            filename = secure_filename(insignia_file.filename)
+            insignia_file.save(os.path.join(app.config['INSIGNIA_FOLDER'], filename))
+
+        new_level = Level(name=name, min_points=min_points, insignia_image_url=filename)
+        db.session.add(new_level)
+        db.session.commit()
+        flash('Novo nível criado com sucesso!', 'success')
+        return redirect(url_for('admin_levels'))
+
+    levels = Level.query.order_by(Level.min_points.asc()).all()
+    return render_template('admin_levels.html', levels=levels)
+
+@app.route('/admin/teams')
+@login_required
+def admin_teams():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    all_teams = Team.query.all()
+    return render_template('admin_teams.html', teams=all_teams)
+
+@app.route('/admin/teams/delete/<int:team_id>', methods=['POST'])
+@login_required
+def admin_delete_team(team_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    team_to_delete = Team.query.get_or_404(team_id)
+    # Remove todos os membros do time antes de o apagar
+    for member in team_to_delete.members:
+        member.team_id = None
+    db.session.delete(team_to_delete)
+    db.session.commit()
+    flash(f'O time "{team_to_delete.name}" foi dissolvido.', 'success')
+    return redirect(url_for('admin_teams'))
+
+# --- ROTAS DE GESTÃO DE TIME (PARA O DONO) ---
+
+@app.route('/team/manage')
+@login_required
+def manage_team():
+    if not current_user.team:
+        flash('Você não pertence a um time.', 'error')
+        return redirect(url_for('teams_list'))
+    
+    team = current_user.team
+    if team.owner_id != current_user.id:
+        flash('Apenas o dono do time pode gerir os membros.', 'error')
+        return redirect(url_for('teams_list'))
+
+    return render_template('manage_team.html', team=team)
+
+@app.route('/team/kick/<int:user_id>', methods=['POST'])
+@login_required
+def kick_from_team(user_id):
+    if not current_user.team or current_user.team.owner_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('teams_list'))
+
+    user_to_kick = User.query.get_or_404(user_id)
+    if user_to_kick.team_id != current_user.team_id:
+        flash('Este utilizador não pertence ao seu time.', 'error')
+        return redirect(url_for('manage_team'))
+    
+    if user_to_kick.id == current_user.id:
+        flash('Você não pode expulsar a si mesmo.', 'error')
+        return redirect(url_for('manage_team'))
+
+    user_to_kick.team_id = None
+    db.session.commit()
+    flash(f'O utilizador {user_to_kick.name} foi removido do time.', 'success')
+    return redirect(url_for('manage_team'))
+
+
 if __name__ == '__main__':
     app.run(debug=True)
     
@@ -915,5 +1025,8 @@ def create_admin(name, email, password):
     db.session.add(admin_user)
     db.session.commit()
     print(f"Administrador '{name}' criado com sucesso!")
+    
+
+
 
 app.cli.add_command(create_admin)    
