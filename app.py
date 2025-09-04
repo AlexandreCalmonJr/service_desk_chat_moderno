@@ -14,7 +14,13 @@ import spacy
 import spacy.cli
 from flask_caching import Cache
 
-
+# CONFIGURAÇÃO DA GAMIFICAÇÃO
+LEVELS = {
+    'Iniciante': {'min_points': 0, 'next_level_points': 50, 'insignia': '🌱'},
+    'Dados de Prata': {'min_points': 50, 'next_level_points': 150, 'insignia': '🥈'},
+    'Dados de Ouro': {'min_points': 150, 'next_level_points': 300, 'insignia': '🥇'},
+    'Mestre dos Dados': {'min_points': 300, 'next_level_points': float('inf'), 'insignia': '🏆'}
+}
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
@@ -54,6 +60,29 @@ class User(UserMixin, db.Model):
     phone = db.Column(db.String(20))
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    points = db.Column(db.Integer, default=0)
+    level = db.Column(db.String(50), default='Iniciante')
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    
+class Challenge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    level_required = db.Column(db.String(50), default='Iniciante')
+    points_reward = db.Column(db.Integer, default=10)
+    # Resposta esperada (para verificação simples)
+    expected_answer = db.Column(db.String(500), nullable=False)
+    # ID da FAQ que este desafio desbloqueia (opcional)
+    unlocks_faq_id = db.Column(db.Integer, db.ForeignKey('faq.id'), nullable=True)
+
+class UserChallenge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), nullable=False)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('completed_challenges', lazy=True))
+    challenge = db.relationship('Challenge', backref=db.backref('completions', lazy=True))
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -90,7 +119,20 @@ class ChatMessage(db.Model):
     feedback = db.Column(db.String(10), nullable=True) # 'helpful' or 'unhelpful'
 
     user = db.relationship('User', backref=db.backref('chat_messages', lazy=True))
-    faq = db.relationship('FAQ', backref=db.backref('chat_suggestions', lazy=True))
+    
+class Team(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relacionamento para aceder aos membros do time
+    members = db.relationship('User', backref='team', lazy='dynamic')
+
+    @property
+    def total_points(self):
+        # Calcula a pontuação total do time somando os pontos de todos os membros
+        return sum(member.points for member in self.members)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -275,10 +317,41 @@ def find_faq_by_nlp(message):
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches]
 
+def update_user_level(user):
+    """Verifica os pontos do utilizador e atualiza o seu nível se necessário."""
+    current_level = user.level
+    new_level = current_level
 
+    for level_name, level_info in reversed(list(LEVELS.items())):
+        if user.points >= level_info['min_points']:
+            new_level = level_name
+            break
 
+    if new_level != current_level:
+        user.level = new_level
+        # Não precisamos de db.session.commit() aqui, pois será chamado na rota.
+        flash(f'Subiu de nível! Você agora é {new_level}!', 'success')
 
+@app.context_processor
+def inject_user_gamification_data():
+    if current_user.is_authenticated:
+        level_info = LEVELS.get(current_user.level, {})
+        insignia = level_info.get('insignia', '')
+        return dict(user_level_insignia=insignia)
+    return dict()
 
+@app.route('/ranking')
+@login_required
+def ranking():
+    # Ranking individual (como antes)
+    ranked_users = User.query.order_by(User.points.desc()).all()
+
+    # Ranking de times
+    all_teams = Team.query.all()
+    # Ordena os times pela pontuação total (calculada na propriedade do modelo)
+    ranked_teams = sorted(all_teams, key=lambda t: t.total_points, reverse=True)
+
+    return render_template('ranking.html', ranked_users=ranked_users, ranked_teams=ranked_teams)
 # Rotas
 @app.route('/')
 @login_required
@@ -578,6 +651,126 @@ def export_faqs():
     response.headers['Content-Disposition'] = 'attachment; filename=faqs_backup.json'
     return response
 
+@app.route('/challenges')
+@login_required
+def list_challenges():
+    # Encontra os IDs dos desafios que o utilizador já completou
+    completed_challenges_ids = [uc.challenge_id for uc in current_user.completed_challenges]
+
+    # Encontra o nível atual e os pontos mínimos para esse nível
+    user_current_level_name = current_user.level
+    user_level_min_points = LEVELS.get(user_current_level_name, {}).get('min_points', 0)
+
+    # Busca desafios que o utilizador ainda não completou
+    available_challenges_query = Challenge.query.filter(Challenge.id.notin_(completed_challenges_ids))
+
+    # Filtra os desafios por nível
+    unlocked_challenges = []
+    locked_challenges = []
+
+    for challenge in available_challenges_query.all():
+        challenge_level_min_points = LEVELS.get(challenge.level_required, {}).get('min_points', float('inf'))
+        if user_level_min_points >= challenge_level_min_points:
+            unlocked_challenges.append(challenge)
+        else:
+            locked_challenges.append(challenge)
+
+    return render_template('challenges.html', 
+                            unlocked_challenges=unlocked_challenges, 
+                            locked_challenges=locked_challenges)
+
+@app.route('/challenges/submit/<int:challenge_id>', methods=['POST'])
+@login_required
+def submit_challenge(challenge_id):
+    challenge = Challenge.query.get_or_404(challenge_id)
+    submitted_answer = request.form.get('answer').strip()
+
+    # Verificação simples (compara a resposta enviada com a resposta esperada)
+    if submitted_answer == challenge.expected_answer:
+        # Verifica se o utilizador já não completou este desafio antes
+        existing_completion = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=challenge_id).first()
+        if not existing_completion:
+            # Dá os pontos ao utilizador
+            current_user.points += challenge.points_reward
+
+            # Chama a função para verificar se o utilizador subiu de nível
+            update_user_level(current_user)
+
+            # Regista que o desafio foi completo
+            completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
+            db.session.add(completion)
+            db.session.commit()# Dá os pontos ao utilizador
+            current_user.points += challenge.points_reward
+            
+            # Regista que o desafio foi completo
+            completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
+            db.session.add(completion)
+            db.session.commit()
+
+            flash(f'Parabéns! Você completou o desafio "{challenge.title}" e ganhou {challenge.points_reward} pontos!', 'success')
+        else:
+            flash('Você já completou este desafio.', 'info')
+    else:
+        flash('Resposta incorreta. Tente novamente!', 'error')
+
+    return redirect(url_for('list_challenges'))
+
+@app.route('/teams', methods=['GET', 'POST'])
+@login_required
+def teams_list():
+    if request.method == 'POST':
+        # Lógica para criar um novo time
+        if current_user.team_id:
+            flash('Você já pertence a um time. Saia do seu time atual para criar um novo.', 'error')
+            return redirect(url_for('teams_list'))
+
+        team_name = request.form.get('team_name')
+        if Team.query.filter_by(name=team_name).first():
+            flash('Já existe um time com este nome.', 'error')
+        else:
+            new_team = Team(name=team_name, owner_id=current_user.id)
+            db.session.add(new_team)
+            # Adiciona o criador como o primeiro membro
+            current_user.team = new_team
+            db.session.commit()
+            flash(f'Time "{team_name}" criado com sucesso!', 'success')
+            return redirect(url_for('teams_list'))
+
+    all_teams = Team.query.all()
+    return render_template('teams.html', teams=all_teams)
+
+@app.route('/teams/join/<int:team_id>', methods=['POST'])
+@login_required
+def join_team(team_id):
+    if current_user.team_id:
+        flash('Você já pertence a um time.', 'error')
+        return redirect(url_for('teams_list'))
+
+    team_to_join = Team.query.get_or_404(team_id)
+    current_user.team = team_to_join
+    db.session.commit()
+    flash(f'Você entrou no time "{team_to_join.name}"!', 'success')
+    return redirect(url_for('teams_list'))
+
+@app.route('/teams/leave', methods=['POST'])
+@login_required
+def leave_team():
+    if not current_user.team_id:
+        flash('Você não pertence a nenhum time.', 'error')
+        return redirect(url_for('teams_list'))
+
+    team = current_user.team
+    # Lógica adicional: se o dono sair, o que acontece?
+    # Versão simples: o time continua a existir.
+    # Versão complexa: transferir posse ou apagar o time se for o último membro.
+    if team.owner_id == current_user.id:
+        flash('Você é o dono do time e não pode sair. (Implementar lógica de transferência de posse ou apagar o time).', 'warning')
+        return redirect(url_for('teams_list'))
+
+    current_user.team_id = None
+    db.session.commit()
+    flash(f'Você saiu do time "{team.name}".', 'success')
+    return redirect(url_for('teams_list'))
 
 if __name__ == '__main__':
     app.run(debug=True)

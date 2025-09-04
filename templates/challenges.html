@@ -1,0 +1,42 @@
+<main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
+    <div class="w-full max-w-2xl p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% endwith %}
+
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Desafios Disponíveis</h2>
+
+        {% if unlocked_challenges %}
+            {% for challenge in unlocked_challenges %}
+                <div class="mb-6 p-4 border rounded-lg dark:border-gray-700">
+                    <h3 class="font-bold text-lg">{{ challenge.title }}</h3>
+                    <p class="text-sm text-gray-500 mb-2">Recompensa: {{ challenge.points_reward }} pontos</p>
+                    <p class="mb-3">{{ challenge.description }}</p>
+                    <form method="POST" action="{{ url_for('submit_challenge', challenge_id=challenge.id) }}" class="space-y-2">
+                        <textarea name="answer" rows="3" class="chat-input w-full" placeholder="Digite sua resposta aqui..."></textarea>
+                        <button type="submit" class="chat-button w-full">Enviar Resposta</button>
+                    </form>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-600 dark:text-gray-400">Você já completou todos os desafios disponíveis para o seu nível. Parabéns!</p>
+        {% endif %}
+
+        <hr class="my-8 dark:border-gray-700">
+
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Próximos Desafios</h2>
+        {% if locked_challenges %}
+            {% for challenge in locked_challenges %}
+                <div class="mb-4 p-4 border rounded-lg bg-gray-100 dark:bg-gray-700 opacity-60">
+                    <h3 class="font-bold text-lg flex items-center">
+                        <i class="fas fa-lock mr-2"></i>
+                        {{ challenge.title }}
+                    </h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Requer nível: {{ challenge.level_required }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-600 dark:text-gray-400">Não há mais desafios no horizonte. Você é um verdadeiro mestre!</p>
+        {% endif %}
+    </div>
+</main>
