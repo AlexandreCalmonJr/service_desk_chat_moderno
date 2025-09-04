@@ -6,59 +6,156 @@
     <title>Assistente de Service Desk - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .floating-animation {
+            animation: floating 3s ease-in-out infinite;
+        }
+        @keyframes floating {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        .pulse-glow {
+            animation: pulseGlow 2s ease-in-out infinite alternate;
+        }
+        @keyframes pulseGlow {
+            from { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+            to { box-shadow: 0 0 30px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.3); }
+        }
+    </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-            <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-        </button>
-    </header>
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
-        <div class="text-center mb-4">
-            <svg class="mx-auto h-16 w-16 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.125 2.994 2.707 3.227 1.068.158 2.148.279 3.238.364.494.03.994.037 1.49.037h.044c.594 0 1.19-.014 1.784-.042 1.092-.086 2.174-.208 3.244-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.344 48.344 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
-            </svg>
-        </div>
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 text-center mb-6">Faça Login</h2>
+<body class="min-h-screen gradient-bg flex items-center justify-center p-4 transition-all duration-500">
+    <!-- Background Elements -->
+    <div class="absolute inset-0 overflow-hidden">
+        <div class="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 floating-animation"></div>
+        <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 floating-animation" style="animation-delay: 2s;"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-30 floating-animation" style="animation-delay: 4s;"></div>
+    </div>
 
+    <!-- Login Container -->
+    <div class="relative z-10 w-full max-w-md">
+        <div class="glass-effect rounded-2xl p-8 shadow-2xl pulse-glow">
+            <!-- Logo Section -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 floating-animation">
+                    <i class="fas fa-headset text-2xl text-white"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white mb-2">Service Desk</h1>
+                <p class="text-blue-100 text-sm">Assistente Inteligente</p>
+            </div>
+
+            <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
+                        <div class="mb-4 p-3 rounded-lg text-sm animate-pulse {% if category == 'error' %}bg-red-500/20 border border-red-400/30 text-red-100{% else %}bg-green-500/20 border border-green-400/30 text-green-100{% endif %}">
+                            <i class="fas {% if category == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %} mr-2"></i>
                             {{ message }}
                         </div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
 
-            <form method="POST" action="/login" class="space-y-4">
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input type="email" id="email" name="email" required class="chat-input w-full" placeholder="Digite seu email">
+            <!-- Login Form -->
+            <form method="POST" action="/login" class="space-y-6">
+                <div class="space-y-4">
+                    <div class="relative">
+                        <label for="email" class="block text-sm font-medium text-blue-100 mb-2">
+                            <i class="fas fa-envelope mr-2"></i>Email
+                        </label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required 
+                            class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
+                            placeholder="seu@email.com"
+                        >
+                    </div>
+                    
+                    <div class="relative">
+                        <label for="password" class="block text-sm font-medium text-blue-100 mb-2">
+                            <i class="fas fa-lock mr-2"></i>Senha
+                        </label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
+                            placeholder="••••••••"
+                        >
+                    </div>
                 </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Senha</label>
-                    <input type="password" id="password" name="password" required class="chat-input w-full" placeholder="Digite sua senha">
-                </div>
-                <button type="submit" class="chat-button w-full">Entrar</button>
+
+                <button 
+                    type="submit" 
+                    class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-xl hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
+                >
+                    <i class="fas fa-sign-in-alt mr-2"></i>
+                    Entrar
+                </button>
             </form>
-            <p class="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
-                Não tem uma conta? <a href="/register" class="text-blue-600 hover:underline dark:text-blue-400">Registre-se</a>
-            </p>
+
+            <!-- Register Link -->
+            <div class="mt-6 text-center">
+                <p class="text-blue-100 text-sm">
+                    Não tem uma conta? 
+                    <a href="/register" class="text-yellow-300 hover:text-yellow-400 font-medium hover:underline transition-colors duration-300">
+                        Registre-se aqui
+                    </a>
+                </p>
+            </div>
+
+            <!-- Theme Toggle -->
+            <button 
+                class="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition-colors duration-300"
+                onclick="toggleTheme()" 
+                title="Alternar tema"
+            >
+                <i class="fas fa-moon"></i>
+            </button>
         </div>
-    </main>
+
+        <!-- Decorative Elements -->
+        <div class="absolute -top-6 -left-6 w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full opacity-80 floating-animation"></div>
+        <div class="absolute -bottom-4 -right-4 w-8 h-8 bg-gradient-to-br from-green-400 to-blue-500 rounded-full opacity-80 floating-animation" style="animation-delay: 1s;"></div>
+    </div>
 
     <script>
         function toggleTheme() {
             document.body.classList.toggle('dark');
-            const themeToggle = document.querySelector('.theme-toggle i');
+            const themeToggle = document.querySelector('button[onclick="toggleTheme()"] i');
             themeToggle.classList.toggle('fa-moon');
             themeToggle.classList.toggle('fa-sun');
         }
+
+        // Add subtle hover effects to form inputs
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', function() {
+                this.parentElement.style.transform = 'scale(1.02)';
+            });
+            
+            input.addEventListener('blur', function() {
+                this.parentElement.style.transform = 'scale(1)';
+            });
+        });
+
+        // Add loading effect to submit button
+        document.querySelector('form').addEventListener('submit', function() {
+            const button = this.querySelector('button[type="submit"]');
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Entrando...';
+            button.disabled = true;
+        });
     </script>
 </body>
 </html>

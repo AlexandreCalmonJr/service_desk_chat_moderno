@@ -127,8 +127,7 @@ class Team(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relacionamento para aceder aos membros do time
-    members = db.relationship('User', backref='team', lazy='dynamic')
-
+    members = db.relationship('User', foreign_keys='User.team_id', backref='team', lazy='dynamic')
     @property
     def total_points(self):
         # Calcula a pontuação total do time somando os pontos de todos os membros
