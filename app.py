@@ -353,15 +353,20 @@ def inject_user_gamification_data():
 @app.route('/ranking')
 @login_required
 def ranking():
-    # Ranking individual (como antes)
+    # Busca todos os utilizadores, ordenados por pontos (do maior para o menor)
     ranked_users = User.query.order_by(User.points.desc()).all()
-
+    
     # Ranking de times
     all_teams = Team.query.all()
     # Ordena os times pela pontuação total (calculada na propriedade do modelo)
     ranked_teams = sorted(all_teams, key=lambda t: t.total_points, reverse=True)
-
-    return render_template('ranking.html', ranked_users=ranked_users, ranked_teams=ranked_teams)
+    
+    return render_template(
+        'ranking.html', 
+        ranked_users=ranked_users, 
+        ranked_teams=ranked_teams,
+        LEVELS=LEVELS  # <-- ESTA É A CORREÇÃO
+    )
 # Rotas
 @app.route('/')
 @login_required
@@ -553,6 +558,30 @@ def chat():
 
     return jsonify(resposta)
 
+@app.route('/setup-first-admin-a1b2c3d4e5')
+def setup_first_admin():
+    # --- PERSONALIZE ESTES DADOS ---
+    ADMIN_EMAIL = "admin@d3vb4.com"
+    ADMIN_PASSWORD = "d3vb4_admin!"
+    ADMIN_NAME = "Administrador"
+    # -----------------------------
+
+    # Verifica se o administrador já existe
+    if User.query.filter_by(email=ADMIN_EMAIL).first():
+        return f"<h1>Erro</h1><p>O administrador com o email {ADMIN_EMAIL} já existe.</p>"
+
+    # Cria o novo administrador
+    hashed_password = generate_password_hash(ADMIN_PASSWORD)
+    admin_user = User(
+        name=ADMIN_NAME,
+        email=ADMIN_EMAIL,
+        password=hashed_password,
+        is_admin=True
+    )
+    db.session.add(admin_user)
+    db.session.commit()
+    
+    return f"<h1>Sucesso</h1><p>Administrador criado com o email {ADMIN_EMAIL}. Por favor, exclua ou proteja esta rota imediatamente.</p>"
 
 @app.route('/chat/feedback', methods=['POST'])
 @login_required
