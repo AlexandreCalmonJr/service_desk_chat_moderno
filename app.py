@@ -541,15 +541,32 @@ def register():
         email = request.form['email']
         password = generate_password_hash(request.form['password'])
         phone = request.form.get('phone')
+
+        # Busca o nível inicial
         initial_level = Level.query.filter_by(name='Iniciante').first()
+        
+        # VERIFICAÇÃO IMPORTANTE: E se o nível 'Iniciante' não existir?
+        if not initial_level:
+            flash('Erro crítico de configuração: Nível "Iniciante" não encontrado. Por favor, contate o suporte.', 'error')
+            return redirect(url_for('register'))
+
         if User.query.filter_by(email=email).first():
             flash('Email já registrado.', 'error')
         else:
-            user = User(name=name, email=email, password=password, phone=phone, is_admin=False)
+            # CORREÇÃO APLICADA AQUI!
+            user = User(
+                name=name, 
+                email=email, 
+                password=password, 
+                phone=phone, 
+                is_admin=False, 
+                level_id=initial_level.id  # <-- Adicionamos o ID do nível
+            )
             db.session.add(user)
             db.session.commit()
             flash('Registro concluído! Faça login.', 'success')
             return redirect(url_for('login'))
+            
     return render_template('register.html')
 
 @app.route('/logout')
