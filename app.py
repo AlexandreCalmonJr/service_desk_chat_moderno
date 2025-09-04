@@ -16,6 +16,7 @@ from flask_caching import Cache
 import click
 from flask.cli import with_appcontext
 from flask_caching import Cache
+from PIL import Image
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
@@ -30,11 +31,15 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
+    
+app.config['CACHE_TYPE'] = 'RedisCache'
+app.config['CACHE_REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
+cache = Cache(app)
 
 # Configuração do spaCy
 try:
@@ -62,8 +67,10 @@ class User(UserMixin, db.Model):
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     points = db.Column(db.Integer, default=0)
-    level = db.Column(db.String(50), default='Iniciante')
+    level_id = db.Column(db.Integer, db.ForeignKey('level.id'))
+    level = db.relationship('Level', backref='users')
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    
     
 class Challenge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -140,15 +147,16 @@ def load_user(user_id):
 
 @app.context_processor
 def inject_gamification_data():
-    data = {}
+    """Injeta dados de gamificação em todos os templates."""
     if current_user.is_authenticated:
-        if current_user.level:
-            data['user_level_insignia'] = url_for('uploaded_insignia', filename=current_user.level.insignia_image_url)
-        else:
-            default_level = Level.query.order_by(Level.min_points.asc()).first()
-            if default_level:
-                data['user_level_insignia'] = url_for('uploaded_insignia', filename=default_level.insignia_image_url)
-    return data
+        # --- CORREÇÃO APLICADA AQUI ---
+        # Garante que mesmo que o nível seja nulo, a aplicação não falha
+        insignia_url = None
+        if current_user.level and current_user.level.insignia_image_url:
+            insignia_url = url_for('uploaded_insignia', filename=current_user.level.insignia_image_url)
+        
+        return dict(user_level_insignia=insignia_url)
+    return dict()
 # Inicialização do banco de dados e categorias padrão
 with app.app_context():
     db.create_all()
@@ -333,17 +341,17 @@ def update_user_level(user):
     # Busca os níveis ordenados por pontos, do maior para o menor
     levels = Level.query.order_by(Level.min_points.desc()).all()
     current_level_id = user.level_id
-    new_level_id = current_level_id
+    new_level = Level.query.filter(Level.min_points <= user.points).order_by(Level.min_points.desc()).first()
+
 
     for level in levels:
         if user.points >= level.min_points:
             new_level_id = level.id
             break
     
-    if new_level_id != current_level_id:
-        user.level_id = new_level_id
-        new_level_obj = Level.query.get(new_level_id)
-        flash(f'Subiu de nível! Você agora é {new_level_obj.name}!', 'success')
+    if new_level and (not user.level or user.level.id != new_level.id):
+        user.level = new_level
+        flash(f'Subiu de nível! Você agora é {new_level.name}!', 'success')
 
 @app.route('/admin/users')
 @login_required
@@ -523,6 +531,7 @@ def register():
         email = request.form['email']
         password = generate_password_hash(request.form['password'])
         phone = request.form.get('phone')
+        initial_level = Level.query.filter_by(name='Iniciante').first()
         if User.query.filter_by(email=email).first():
             flash('Email já registrado.', 'error')
         else:
