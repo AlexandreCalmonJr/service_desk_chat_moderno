@@ -4,19 +4,22 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sentence_transformers import SentenceTransformer, util
 import os
 import csv
 import json
 import re
 from PyPDF2 import PdfReader
 from datetime import datetime
-import torch
+import spacy
+import spacy.cli
+from flask_caching import Cache
+
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-
+# Configuração do Cache (simples, em memória)
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 # Configuração do banco de dados
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -31,15 +34,14 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-try:
-    semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
-except Exception as e:
-    print(f"Erro ao carregar o modelo de sentence-transformer: {e}")
-    semantic_model = None
-
-faq_embeddings = {}
 
 # Configuração do spaCy
+try:
+    nlp = spacy.load('pt_core_news_sm')
+except OSError:
+    print("Modelo pt_core_news_sm não encontrado. A fazer o download...")
+    spacy.cli.download('pt_core_news_sm')
+    nlp = spacy.load('pt_core_news_sm')
 
 
 # Modelos
@@ -222,57 +224,60 @@ def is_video_url(url):
     video_extensions = ('.mp4', '.webm', '.ogg')
     return url and (any(url.lower().endswith(ext) for ext in video_extensions) or 'youtube.com' in url.lower() or 'youtu.be' in url.lower())
 
-def find_faq_by_semantic_similarity(user_message, threshold=0.6):
-    """Encontra a FAQ mais relevante usando similaridade de cosseno."""
-    if not semantic_model or not faq_embeddings:
+def find_faqs_by_keywords(message):
+    search_words = set(message.lower().split())
+    if not search_words:
         return []
 
-    # Converte a mensagem do usuário em um vetor
-    user_embedding = semantic_model.encode(user_message, convert_to_tensor=True)
-
-    # Prepara os vetores das FAQs
-    faq_ids = list(faq_embeddings.keys())
-    corpus_embeddings = torch.stack(list(faq_embeddings.values()))
-
-    # Calcula a similaridade de cosseno entre a pergunta do usuário e todas as FAQs
-    cos_scores = util.pytorch_cos_sim(user_embedding, corpus_embeddings)[0]
-    
-    # Encontra os melhores resultados
-    top_results = torch.topk(cos_scores, k=min(5, len(faq_ids)))
-
+    faqs = FAQ.query.all()
     matches = []
-    for score, idx in zip(top_results[0], top_results[1]):
-        if score >= threshold:
-            faq_id = faq_ids[idx]
-            faq = FAQ.query.get(faq_id)
-            if faq:
-                matches.append(faq)
-    
-    return matches
 
-# Não se esqueça de atualizar a chamada na rota /chat:
-# faq_matches = find_faq_by_semantic_similarity(mensagem)
-def update_faq_embeddings():
-    """Converte todas as FAQs do banco em vetores e armazena em memória."""
-    global faq_embeddings
-    if not semantic_model:
-        print("Modelo semântico não carregado. Abortando a criação de embeddings.")
-        return
+    for faq in faqs:
+        question_words = set(faq.question.lower().split())
+        answer_words = set(faq.answer.lower().split())
 
-    with app.app_context():
-        faqs = FAQ.query.all()
-        if faqs:
-            # Converte as perguntas das FAQs em vetores
-            questions = [faq.question for faq in faqs]
-            embeddings = semantic_model.encode(questions, convert_to_tensor=True)
-            
-            # Mapeia o ID da FAQ para seu respectivo vetor
-            faq_embeddings = {faqs[i].id: embeddings[i] for i in range(len(faqs))}
-            print(f"{len(faq_embeddings)} embeddings de FAQs carregados.")
+        # Conta quantas palavras da busca aparecem na FAQ
+        score = len(search_words.intersection(question_words)) * 2
+        score += len(search_words.intersection(answer_words))
 
-# Chame a função na inicialização do app
-with app.app_context():
-    update_faq_embeddings()
+        if score > 0:
+            matches.append((faq, score))
+
+    # Ordena os resultados pelo score (mais relevante primeiro)
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return [match[0] for match in matches]
+
+@cache.cached(timeout=600, key_prefix='faq_search')
+def find_faq_by_nlp(message):
+    """Usa o spaCy para extrair palavras-chave e encontrar FAQs relevantes."""
+    doc = nlp(message.lower())
+
+    # Extrai substantivos, verbos e nomes próprios como palavras-chave
+    keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ in ['NOUN', 'PROPN', 'VERB']}
+
+    if not keywords:
+        return []
+
+    faqs = FAQ.query.all()
+    matches = []
+
+    for faq in faqs:
+        question_doc = nlp(faq.question.lower())
+        answer_doc = nlp(faq.answer.lower())
+
+        faq_keywords = {token.lemma_ for token in question_doc if not token.is_stop and not token.is_punct}
+        faq_keywords.update({token.lemma_ for token in answer_doc if not token.is_stop and not token.is_punct})
+
+        score = len(keywords.intersection(faq_keywords))
+        if score > 0:
+            matches.append((faq, score))
+
+    matches.sort(key=lambda x: x[1], reverse=True)
+    return [match[0] for match in matches]
+
+
+
+
 
 # Rotas
 @app.route('/')
@@ -416,26 +421,8 @@ def chat():
         'text': "Desculpe, não entendi. Tente reformular a pergunta.",
         'html': False,
         'state': 'normal',
-        'options': [],
-        'message_id': None
+        'options': []
     }
-    
-    chat_message = ChatMessage(user_id=current_user.id, user_message=mensagem)
-
-    if 'faq_selection' in session and mensagem.startswith('faq_'):
-        faq_id = mensagem.replace('faq_', '')
-        faq_ids = session.get('faq_selection', [])
-        if int(faq_id) in faq_ids:
-            selected_faq = FAQ.query.get(int(faq_id))
-            if selected_faq:
-                resposta['text'] = format_faq_response(selected_faq.id, selected_faq.question, selected_faq.answer, selected_faq.image_url, selected_faq.video_url, selected_faq.file_name)
-                resposta['html'] = True
-                faq_matches = FAQ.query.filter(FAQ.id.in_(faq_ids)).all()
-                resposta['state'] = 'faq_selection'
-                resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
-                return jsonify(resposta)
-        resposta['text'] = "Opção inválida. Por favor, escolha uma FAQ ou faça uma nova mensagem."
-        return jsonify(resposta)
 
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
@@ -445,7 +432,7 @@ def chat():
         if solution_response:
             resposta['text'] = solution_response
         else:
-            faq_matches = find_faq_by_keywords(mensagem)
+            faq_matches = find_faq_by_nlp(mensagem)
             if faq_matches:
                 if len(faq_matches) == 1:
                     faq = faq_matches[0]
@@ -457,48 +444,10 @@ def chat():
                     resposta['state'] = 'faq_selection'
                     resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
                     resposta['html'] = True
-                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
+                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5] # Limita a 5 opções
             else:
-                if "windows" in mensagem.lower():
-                    resposta['text'] = format_faq_response(
-                        None,  # FAQ sem ID, pois é estática
-                        "O que é o modo de segurança no Windows?",
-                        "O Modo de Segurança no Windows é uma opção de inicialização que carrega apenas os drivers e serviços essenciais, útil para solucionar problemas. Para acessá-lo, reinicie o computador e pressione F8 antes do carregamento do sistema, ou configure nas Configurações de Inicialização Avançadas.",
-                        None,
-                        None,
-                        None  # Sem arquivo associado
-                    )
-                    resposta['html'] = True
-                else:
-                    resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta ou consulte a página de FAQs."
-                    resposta['html'] = False
-                    
-        faq_matches = find_faq_by_keywords(mensagem) # Vamos substituir isso na próxima etapa
-    
-    if faq_matches:
-        if len(faq_matches) == 1:
-            faq = faq_matches[0]
-            resposta['text'] = format_faq_response(faq.id, faq.question, faq.answer, faq.image_url, faq.video_url, faq.file_name)
-            resposta['html'] = True
-            chat_message.bot_response = faq.answer
-            chat_message.faq_id_suggestion = faq.id
-        else:
-            # Lógica para múltiplas FAQs
-            faq_ids = [faq.id for faq in faq_matches]
-            session['faq_selection'] = faq_ids
-            resposta['state'] = 'faq_selection'
-            resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
-            resposta['html'] = True
-            resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches]
-            chat_message.bot_response = "Múltiplas FAQs encontradas."
-    else:
-        resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
-        chat_message.bot_response = resposta['text']
+                resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
 
-    
-    resposta['message_id'] = chat_message.id               
-    db.session.add(chat_message)
-    db.session.commit()
     return jsonify(resposta)
 
 

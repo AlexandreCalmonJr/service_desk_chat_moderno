@@ -1,2 +1,1 @@
-web: gunicorn app:app --workers 1 --threads 2 --timeout 120 --preload
-
+web: python -m spacy download pt_core_news_sm && gunicorn app:app --workers 1 --timeout 120
