@@ -13,7 +13,8 @@ from datetime import datetime
 import spacy
 import spacy.cli
 from flask_caching import Cache
-
+import click
+from flask.cli import with_appcontext
 # CONFIGURAÇÃO DA GAMIFICAÇÃO
 LEVELS = {
     'Iniciante': {'min_points': 0, 'next_level_points': 50, 'insignia': '🌱'},
@@ -331,6 +332,16 @@ def update_user_level(user):
         # Não precisamos de db.session.commit() aqui, pois será chamado na rota.
         flash(f'Subiu de nível! Você agora é {new_level}!', 'success')
 
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem ver esta página.', 'error')
+        return redirect(url_for('index'))
+
+    all_users = User.query.order_by(User.name).all()
+    return render_template('admin_users.html', users=all_users)
+
 @app.context_processor
 def inject_user_gamification_data():
     if current_user.is_authenticated:
@@ -356,6 +367,26 @@ def ranking():
 @login_required
 def index():
     return render_template('index.html')
+
+@app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
+@login_required
+def toggle_admin(user_id):
+    if not current_user.is_admin:
+        return redirect(url_for('index'))
+
+    user_to_modify = User.query.get_or_404(user_id)
+
+    # Proteção para não remover a sua própria permissão de admin
+    if user_to_modify.id == current_user.id:
+        flash('Você não pode remover a sua própria permissão de administrador.', 'error')
+        return redirect(url_for('admin_users'))
+
+    user_to_modify.is_admin = not user_to_modify.is_admin
+    db.session.commit()
+
+    status = "administrador" if user_to_modify.is_admin else "utilizador normal"
+    flash(f'O utilizador {user_to_modify.name} é agora um {status}.', 'success')
+    return redirect(url_for('admin_users'))
 
 @app.route('/chat-page')
 @login_required
@@ -773,3 +804,28 @@ def leave_team():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
+    
+@click.command(name='create-admin')
+@with_appcontext
+@click.option('--name', required=True, help='O nome do administrador.')
+@click.option('--email', required=True, help='O email do administrador.')
+@click.option('--password', required=True, help='A senha do administrador.')
+def create_admin(name, email, password):
+    """Cria um novo utilizador administrador."""
+    if User.query.filter_by(email=email).first():
+        print(f"Erro: O email '{email}' já existe.")
+        return
+
+    hashed_password = generate_password_hash(password)
+    admin_user = User(
+        name=name,
+        email=email,
+        password=hashed_password,
+        is_admin=True
+    )
+    db.session.add(admin_user)
+    db.session.commit()
+    print(f"Administrador '{name}' criado com sucesso!")
+
+app.cli.add_command(create_admin)    

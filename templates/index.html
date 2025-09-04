@@ -6,439 +6,78 @@
     <title>Assistente de Service Desk - Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="/static/styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- Link para o Syntax Highlighting (se estiver a usar a funcionalidade de código) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <style>
-        :root {
-            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --shadow-large: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
-        
-        .glass-effect {
-            backdrop-filter: blur(16px) saturate(180%);
-            background-color: rgba(255, 255, 255, 0.75);
-            border: 1px solid rgba(255, 255, 255, 0.125);
-        }
-        
-        .dark .glass-effect {
-            background-color: rgba(31, 41, 55, 0.75);
-            border: 1px solid rgba(55, 65, 81, 0.125);
-        }
-        
-        .animate-float {
-            animation: float 3s ease-in-out infinite;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        .gradient-text {
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .btn-gradient {
-            background: var(--gradient-primary);
-            transition: all 0.3s ease;
-        }
-        
-        .btn-gradient:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-large);
-        }
-        
-        .notification-badge {
-            animation: pulse 2s infinite;
-        }
-        
-        .mobile-menu-slide {
-            transition: transform 0.3s ease-in-out;
-            transform: translateX(100%);
-        }
-        
-        .mobile-menu-slide.active {
-            transform: translateX(0);
-        }
-    </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900 flex flex-col min-h-screen transition-all duration-300">
+<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
 
-    <!-- Header melhorado -->
-    <header class="glass-effect shadow-lg p-4 fixed top-0 left-0 right-0 z-50">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center space-x-4">
-                <div class="animate-float">
-                    <i class="fas fa-robot text-2xl text-blue-600 dark:text-blue-400"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold gradient-text">Assistente de Service Desk</h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                        {{ user_level_insignia }} Olá, {{ current_user.name }}!
-                    </p>
-                </div>
-            </div>
+    <!-- CABEÇALHO RESPONSIVO COMPLETO -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
+        <!-- Título e Nome do Utilizador -->
+        <div class="flex items-center space-x-3">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
+            <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
+                {{ user_level_insignia }} Olá, {{ current_user.name }}!
+            </span>
+        </div>
 
-            <!-- Desktop Navigation -->
-            <nav class="hidden lg:flex items-center space-x-2">
-                <a href="{{ url_for('list_challenges') }}" class="nav-link">
-                    <i class="fas fa-trophy"></i> Desafios
-                </a>
-                <a href="{{ url_for('teams_list') }}" class="nav-link">
-                    <i class="fas fa-users"></i> Times
-                </a>
-                <a href="{{ url_for('ranking') }}" class="nav-link">
-                    <i class="fas fa-medal"></i> Ranking
-                </a>
-                {% if current_user.is_admin %}
-                    <a href="/admin/faq" class="nav-link notification-badge">
-                        <i class="fas fa-cogs"></i> Gerir FAQs
-                    </a>
-                {% endif %}
-                <a href="/faqs" class="nav-link">
-                    <i class="fas fa-question-circle"></i> FAQs
-                </a>
-                <a href="/profile" class="nav-link">
-                    <i class="fas fa-user-circle"></i> Perfil
-                </a>
-                <a href="/logout" class="nav-link text-red-600 hover:text-red-800">
-                    <i class="fas fa-sign-out-alt"></i> Sair
-                </a>
-                <button class="theme-toggle ml-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" onclick="toggleTheme()" title="Alternar tema">
-                    <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-                </button>
-            </nav>
+        <!-- Menu para Ecrãs Grandes -->
+        <div class="hidden md:flex items-center space-x-3">
+            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
+            {% if current_user.is_admin %}
+                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
+            {% endif %}
+            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Ver FAQs</a>
+            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Sair</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
+            </button>
+        </div>
 
-            <!-- Mobile menu button -->
-            <button id="menu-button" class="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                <i class="fas fa-bars text-xl"></i>
+        <!-- Botão de Menu Hambúrguer para Ecrãs Pequenos -->
+        <div class="md:hidden flex items-center">
+            <button id="menu-button" class="text-gray-900 dark:text-gray-100 focus:outline-none">
+                <i class="fas fa-bars fa-lg"></i>
             </button>
         </div>
     </header>
 
-    <!-- Mobile Navigation -->
-    <div id="mobile-menu" class="lg:hidden fixed top-0 right-0 h-full w-80 glass-effect z-40 mobile-menu-slide">
-        <div class="p-6 pt-20">
-            <div class="flex flex-col space-y-4">
-                <a href="{{ url_for('list_challenges') }}" class="mobile-nav-link">
-                    <i class="fas fa-trophy"></i> Desafios
-                </a>
-                <a href="{{ url_for('teams_list') }}" class="mobile-nav-link">
-                    <i class="fas fa-users"></i> Times
-                </a>
-                <a href="{{ url_for('ranking') }}" class="mobile-nav-link">
-                    <i class="fas fa-medal"></i> Ranking
-                </a>
-                {% if current_user.is_admin %}
-                    <a href="/admin/faq" class="mobile-nav-link">
-                        <i class="fas fa-cogs"></i> Gerir FAQs
-                    </a>
-                {% endif %}
-                <a href="/faqs" class="mobile-nav-link">
-                    <i class="fas fa-question-circle"></i> FAQs
-                </a>
-                <a href="/profile" class="mobile-nav-link">
-                    <i class="fas fa-user-circle"></i> Perfil
-                </a>
-                <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
-                    <button class="mobile-nav-link w-full text-left" onclick="toggleTheme()">
-                        <i class="fas fa-moon"></i> Alternar Tema
-                    </button>
-                    <a href="/logout" class="mobile-nav-link text-red-600">
-                        <i class="fas fa-sign-out-alt"></i> Sair
-                    </a>
-                </div>
+    <!-- Menu Dropdown para Ecrãs Pequenos -->
+    <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48">
+        <div class="flex flex-col space-y-3">
+            <a href="{{ url_for('list_challenges') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ranking</a>
+             {% if current_user.is_admin %}
+                <a href="{{ url_for('admin_users') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faq') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir FAQs</a>
+            {% endif %}
+            <a href="{{ url_for('faqs') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ver FAQs</a>
+            <a href="{{ url_for('profile') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-600">Sair</a>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
+                <button class="theme-toggle w-full text-left text-gray-800 dark:text-gray-200" onclick="toggleTheme()" title="Alternar tema">
+                    <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i> Alternar Tema
+                </button>
             </div>
         </div>
     </div>
-
-    <!-- Mobile menu overlay -->
-    <div id="mobile-overlay" class="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30 hidden"></div>
     
-    <main class="flex-1 flex flex-col items-center justify-center pt-24 pb-4 px-4">
-        <!-- Chat Container Melhorado -->
-        <div class="chat-container w-full max-w-4xl flex flex-col h-[calc(100vh-8rem)]">
-            <div class="chat-body flex-1 overflow-y-auto p-6 glass-effect rounded-t-2xl" id="chat-body">
-                <div class="chat-message bot flex items-start space-x-4 mb-6">
-                    <div class="avatar flex-shrink-0 w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                        <i class="fas fa-robot text-white"></i>
-                    </div>
-                    <div class="message-bubble bg-white dark:bg-gray-800 p-4 rounded-2xl rounded-tl-sm shadow-soft max-w-3xl">
-                        <p class="text-gray-800 dark:text-gray-200">
-                            👋 Sou seu assistente de Service Desk! Como posso ajudar hoje? 
-                        </p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                            Tente comandos como: <span class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">'Encerrar chamado &lt;ID&gt;'</span>, 
-                            <span class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">'Sugerir solução para &lt;problema&gt;'</span>, 
-                            ou faça uma pergunta!
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="chat-footer p-6 glass-effect rounded-b-2xl shadow-lg">
-                <div class="typing-indicator hidden mb-3" id="typing-indicator">
-                    <div class="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
-                        <div class="flex space-x-1">
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                        </div>
-                        <span class="text-sm">Assistente digitando...</span>
-                    </div>
-                </div>
-                
-                <div class="flex items-end space-x-3">
-                    <div class="flex-1 relative">
-                        <textarea 
-                            id="chat-input" 
-                            class="w-full p-4 pr-12 border-2 border-gray-200 dark:border-gray-600 rounded-2xl resize-none focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-all bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100" 
-                            rows="1" 
-                            placeholder="Digite sua mensagem..."
-                            style="min-height: 56px; max-height: 120px;"
-                        ></textarea>
-                        <button 
-                            id="emoji-button" 
-                            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                            title="Adicionar emoji"
-                        >
-                            <i class="fas fa-smile"></i>
-                        </button>
-                    </div>
-                    <button 
-                        onclick="enviarMensagem()" 
-                        class="btn-gradient text-white px-6 py-4 rounded-2xl font-medium shadow-medium hover:shadow-large transition-all flex items-center space-x-2"
-                        id="send-button"
-                    >
-                        <i class="fas fa-paper-plane"></i>
-                        <span class="hidden sm:inline">Enviar</span>
-                    </button>
-                </div>
-            </div>
-        </div>
+    <!-- CONTEÚDO PRINCIPAL (CHAT) -->
+    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
+        {% include 'chat.html' %}
     </main>
 
+    <!-- SCRIPTS GLOBAIS -->
     <script>
-        const chatBody = document.getElementById('chat-body');
-        const chatInput = document.getElementById('chat-input');
-        const typingIndicator = document.getElementById('typing-indicator');
-        const sendButton = document.getElementById('send-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const mobileOverlay = document.getElementById('mobile-overlay');
-        const menuButton = document.getElementById('menu-button');
-        
-        let chatState = 'normal';
-        let lastOptions = [];
-
-        // Auto-resize textarea
-        chatInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        // Mobile menu functionality
-        menuButton.addEventListener('click', function() {
-            mobileMenu.classList.add('active');
-            mobileOverlay.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        });
-
-        mobileOverlay.addEventListener('click', function() {
-            mobileMenu.classList.remove('active');
-            mobileOverlay.classList.add('hidden');
-            document.body.style.overflow = 'auto';
-        });
-
-        async function enviarMensagem() {
-            const mensagem = chatInput.value.trim();
-            if (!mensagem) return;
-
-            // Disable send button during processing
-            sendButton.disabled = true;
-            sendButton.classList.add('opacity-50');
-
-            adicionarMensagem(mensagem, 'user');
-            chatInput.value = '';
-            chatInput.style.height = 'auto';
-            chatBody.scrollTop = chatBody.scrollHeight;
-
-            // Show typing indicator
-            typingIndicator.classList.remove('hidden');
-            const statusMessage = adicionarMensagem('Buscando no banco de dados...', 'bot', true, null, true);
-            chatBody.scrollTop = chatBody.scrollHeight;
-
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mensagem: mensagem })
-                });
-                const data = await response.json();
-                
-                chatBody.removeChild(statusMessage);
-                adicionarMensagem(data.text, 'bot', data.html, data.options);
-                chatState = data.state || 'normal';
-                
-                if (chatState === 'faq_selection') {
-                    chatInput.placeholder = 'Clique em uma FAQ acima ou digite uma nova mensagem...';
-                } else {
-                    chatInput.placeholder = 'Digite sua mensagem...';
-                }
-            } catch (error) {
-                chatBody.removeChild(statusMessage);
-                adicionarMensagem('❌ Erro ao processar a solicitação. Tente novamente.', 'bot');
-            } finally {
-                typingIndicator.classList.add('hidden');
-                sendButton.disabled = false;
-                sendButton.classList.remove('opacity-50');
-                chatBody.scrollTop = chatBody.scrollHeight;
-            }
-        }
-
-        async function selecionarFAQ(faqId) {
-            typingIndicator.classList.remove('hidden');
-            const statusMessage = adicionarMensagem('Buscando informações...', 'bot', true, null, true);
-            chatBody.scrollTop = chatBody.scrollHeight;
-
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mensagem: `faq_${faqId}` })
-                });
-                const data = await response.json();
-                
-                chatBody.removeChild(statusMessage);
-                adicionarMensagem(data.text, 'bot', data.html, data.options);
-                chatState = data.state || 'normal';
-                chatInput.placeholder = chatState === 'faq_selection' ? 
-                    'Clique em uma FAQ acima ou digite uma nova mensagem...' : 
-                    'Digite sua mensagem...';
-            } catch (error) {
-                chatBody.removeChild(statusMessage);
-                adicionarMensagem('❌ Erro ao processar a solicitação.', 'bot');
-            } finally {
-                typingIndicator.classList.add('hidden');
-                chatBody.scrollTop = chatBody.scrollHeight;
-            }
-        }
-
-        function adicionarMensagem(texto, tipo, isHtml = false, options = [], isSearching = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message ${tipo} flex items-start space-x-4 mb-6`;
-            
-            const avatarDiv = document.createElement('div');
-            avatarDiv.className = 'avatar flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center';
-            
-            if (tipo === 'user') {
-                avatarDiv.className += ' bg-gradient-to-r from-green-500 to-blue-600';
-                avatarDiv.innerHTML = '<i class="fas fa-user text-white"></i>';
-            } else {
-                avatarDiv.className += ' bg-gradient-to-r from-blue-500 to-purple-600';
-                avatarDiv.innerHTML = '<i class="fas fa-robot text-white"></i>';
-            }
-            
-            const bubbleDiv = document.createElement('div');
-            bubbleDiv.className = `message-bubble p-4 rounded-2xl shadow-soft max-w-3xl ${
-                tipo === 'user' ? 
-                'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-tr-sm ml-auto' : 
-                'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-tl-sm'
-            }`;
-
-            if (isHtml) {
-                if (isSearching) {
-                    bubbleDiv.innerHTML = `
-                        <div class="flex items-center space-x-3">
-                            <div class="animate-spin">
-                                <i class="fas fa-circle-notch text-blue-500"></i>
-                            </div>
-                            <span>Processando sua solicitação...</span>
-                        </div>
-                    `;
-                } else {
-                    bubbleDiv.innerHTML = texto;
-                    // Style media elements
-                    const videos = bubbleDiv.querySelectorAll('video, iframe');
-                    videos.forEach(video => {
-                        video.style.maxWidth = '100%';
-                        video.style.height = 'auto';
-                        video.style.borderRadius = '12px';
-                    });
-                    const images = bubbleDiv.querySelectorAll('img');
-                    images.forEach(image => {
-                        image.style.maxWidth = '100%';
-                        image.style.height = 'auto';
-                        image.style.borderRadius = '8px';
-                    });
-                    const links = bubbleDiv.querySelectorAll('a');
-                    links.forEach(link => {
-                        link.className = 'text-blue-600 dark:text-blue-400 hover:underline font-medium';
-                    });
-                }
-            } else {
-                bubbleDiv.textContent = texto;
-            }
-
-            if (options && options.length > 0) {
-                const optionsString = JSON.stringify(options);
-                if (optionsString !== JSON.stringify(lastOptions)) {
-                    const optionsDiv = document.createElement('div');
-                    optionsDiv.className = 'mt-4 space-y-2';
-                    options.forEach((option, index) => {
-                        const button = document.createElement('button');
-                        button.className = 'w-full text-left px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all transform hover:-translate-y-1 shadow-medium hover:shadow-large';
-                        button.textContent = option.question;
-                        button.onclick = () => selecionarFAQ(option.id);
-                        // Add animation delay for staggered appearance
-                        button.style.animationDelay = `${index * 0.1}s`;
-                        button.classList.add('animate-fade-in-up');
-                        optionsDiv.appendChild(button);
-                    });
-                    bubbleDiv.appendChild(optionsDiv);
-                    lastOptions = options;
-                }
-            }
-
-            if (tipo === 'user') {
-                messageDiv.appendChild(bubbleDiv);
-                messageDiv.appendChild(avatarDiv);
-                messageDiv.classList.add('flex-row-reverse');
-            } else {
-                messageDiv.appendChild(avatarDiv);
-                messageDiv.appendChild(bubbleDiv);
-            }
-            
-            chatBody.appendChild(messageDiv);
-            
-            // Add entrance animation
-            messageDiv.style.opacity = '0';
-            messageDiv.style.transform = 'translateY(20px)';
-            setTimeout(() => {
-                messageDiv.style.transition = 'all 0.3s ease';
-                messageDiv.style.opacity = '1';
-                messageDiv.style.transform = 'translateY(0)';
-            }, 10);
-            
-            return messageDiv;
-        }
-
-        // Enhanced keyboard handling
-        chatInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                enviarMensagem();
-            }
-        });
-
-        // Theme toggle function
+        // Função para alternar o tema claro/escuro
         function toggleTheme() {
             document.body.classList.toggle('dark');
             const themeIcons = document.querySelectorAll('.theme-toggle i');
@@ -446,71 +85,16 @@
                 icon.classList.toggle('fa-moon');
                 icon.classList.toggle('fa-sun');
             });
-            
-            // Save theme preference
-            localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
         }
 
-        // Load saved theme
-        window.addEventListener('load', () => {
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark') {
-                document.body.classList.add('dark');
-                document.querySelectorAll('.theme-toggle i').forEach(icon => {
-                    icon.classList.remove('fa-moon');
-                    icon.classList.add('fa-sun');
-                });
-            }
-            chatBody.scrollTop = chatBody.scrollHeight;
-        });
+        // Script para o menu hambúrguer
+        const menuButton = document.getElementById('menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (menuButton) {
+            menuButton.onclick = function() {
+                mobileMenu.classList.toggle('hidden');
+            };
+        }
     </script>
-
-    <style>
-        .nav-link {
-            @apply px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200 flex items-center space-x-2;
-        }
-        
-        .mobile-nav-link {
-            @apply flex items-center space-x-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-all duration-200;
-        }
-        
-        @keyframes fade-in-up {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .animate-fade-in-up {
-            animation: fade-in-up 0.3s ease forwards;
-        }
-        
-        .chat-input:focus {
-            outline: none;
-        }
-        
-        @media (max-width: 768px) {
-            .chat-container {
-                max-width: 100%;
-                height: calc(100vh - 5rem);
-            }
-            
-            .chat-body {
-                padding: 1rem;
-            }
-            
-            .chat-footer {
-                padding: 1rem;
-            }
-            
-            .message-bubble {
-                max-width: 85% !important;
-            }
-        }
-    </style>
 </body>
 </html>
