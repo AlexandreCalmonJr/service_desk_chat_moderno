@@ -1,52 +1,80 @@
-{% extends "base_layout.html" %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente de Service Desk - Gerir Utilizadores</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+    
+    <!-- COPIE O CABEÇALHO COMPLETO E O MENU MÓVEL DO 'index.html' AQUI -->
+    <!-- ... -->
+    
+    <main class="flex-1 flex flex-col items-center pt-24 px-4 w-full">
+        <div class="w-full max-w-5xl p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">Gestão de Utilizadores</h2>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% elif category == 'success' %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% else %}bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
-{% block title %}Gerir Utilizadores{% endblock %}
-
-{% block content %}
-<div class="w-full max-w-5xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Gestão de Utilizadores</h2>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left">
-            <thead>
-                <tr class="bg-gray-800 border-b border-gray-700">
-                    <th class="p-3">Nome</th>
-                    <th class="p-3">Email</th>
-                    <th class="p-3">Time</th>
-                    <th class="p-3">Pontos</th>
-                    <th class="p-3">Status</th>
-                    <th class="p-3">Ação</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                    <tr class="border-b border-gray-700">
-                        <td class="p-3">{{ user.name }}</td>
-                        <td class="p-3">{{ user.email }}</td>
-                        <td class="p-3">{{ user.team.name if user.team else 'Nenhum' }}</td>
-                        <td class="p-3">{{ user.points }}</td>
-                        <td class="p-3">
-                            {% if user.is_admin %}
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-200 text-green-800">Admin</span>
-                            {% else %}
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-gray-200">Utilizador</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-3">
-                            {% if user.id != current_user.id %}
-                                <form action="{{ url_for('toggle_admin', user_id=user.id) }}" method="POST">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-200 dark:bg-gray-700">
+                            <th class="p-3">Nome</th>
+                            <th class="p-3">Email</th>
+                            <th class="p-3">Time</th>
+                            <th class="p-3">Pontos</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                            <tr class="border-b dark:border-gray-700">
+                                <td class="p-3">{{ user.name }}</td>
+                                <td class="p-3">{{ user.email }}</td>
+                                <td class="p-3">{{ user.team.name if user.team else 'Nenhum' }}</td>
+                                <td class="p-3">{{ user.points }}</td>
+                                <td class="p-3">
                                     {% if user.is_admin %}
-                                        <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm transition">Remover Admin</button>
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-200 text-green-800">Admin</span>
                                     {% else %}
-                                        <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition">Tornar Admin</button>
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">Utilizador</span>
                                     {% endif %}
-                                </form>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endblock %}
+                                </td>
+                                <td class="p-3">
+                                    {% if user.id != current_user.id %}
+                                        <form action="{{ url_for('toggle_admin', user_id=user.id) }}" method="POST">
+                                            {% if user.is_admin %}
+                                                <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm transition">Remover Admin</button>
+                                            {% else %}
+                                                <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition">Tornar Admin</button>
+                                            {% endif %}
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- COPIE OS SCRIPTS GLOBAIS DO 'index.html' AQUI -->
+    <!-- ... -->
+</body>
+</html>
 

@@ -3,65 +3,51 @@
 {% block title %}Rankings{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-4xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Rankings</h2>
+    <section class="ranking">
+        <h2>Rankings</h2>
 
-    <!-- Ranking Individual -->
-    <div class="mb-10">
-        <h3 class="text-xl font-semibold text-yellow-400 mb-4">Ranking Individual</h3>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead>
-                    <tr class="bg-gray-800 border-b border-gray-700">
-                        <th class="p-3">Pos.</th>
-                        <th class="p-3">Utilizador</th>
-                        <th class="p-3">Nível</th>
-                        <th class="p-3 text-right">Pontos</th>
+        <h3>Ranking Individual</h3>
+        <table class="ranking-table">
+            <thead>
+                <tr>
+                    <th>Pos.</th>
+                    <th>Utilizador</th>
+                    <th>Nível</th>
+                    <th>Pontos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in ranked_users %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.level.name if user.level else 'N/A' }}</td>
+                        <td>{{ user.points }}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for user in ranked_users %}
-                        <tr class="border-b border-gray-700 hover:bg-gray-800/50 {% if user.id == current_user.id %} bg-blue-900/30 font-bold {% endif %}">
-                            <td class="p-3">{{ loop.index }}</td>
-                            <td class="p-3 flex items-center gap-2">
-                                <img src="{{ url_for('uploaded_insignia', filename=user.level.insignia_image_url) if user.level else '' }}" class="w-6 h-6">
-                                <span>{{ user.name }}</span>
-                            </td>
-                            <td class="p-3">{{ user.level.name if user.level else 'N/A' }}</td>
-                            <td class="p-3 text-right">{{ user.points }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+                {% endfor %}
+            </tbody>
+        </table>
 
-    <!-- Ranking de Times -->
-    <div>
-        <h3 class="text-xl font-semibold text-yellow-400 mb-4">Ranking de Times</h3>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead>
-                    <tr class="bg-gray-800 border-b border-gray-700">
-                        <th class="p-3">Pos.</th>
-                        <th class="p-3">Time</th>
-                        <th class="p-3">Membros</th>
-                        <th class="p-3 text-right">Pontos Totais</th>
+        <h3>Ranking de Times</h3>
+        <table class="ranking-table">
+            <thead>
+                <tr>
+                    <th>Pos.</th>
+                    <th>Time</th>
+                    <th>Membros</th>
+                    <th>Pontos Totais</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in ranked_teams %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ team.name }}</td>
+                        <td>{{ team.members.count() }}</td>
+                        <td>{{ team.total_points }}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for team in ranked_teams %}
-                        <tr class="border-b border-gray-700 hover:bg-gray-800/50 {% if current_user.team_id == team.id %} bg-blue-900/30 font-bold {% endif %}">
-                            <td class="p-3">{{ loop.index }}</td>
-                            <td class="p-3 font-semibold text-white">{{ team.name }}</td>
-                            <td class="p-3">{{ team.members.count() }}</td>
-                            <td class="p-3 text-right">{{ team.total_points }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
 {% endblock %}
-

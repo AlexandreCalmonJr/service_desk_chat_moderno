@@ -3,42 +3,34 @@
 {% block title %}Desafios{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-3xl mx-auto space-y-8">
-    <div>
-        <h2 class="text-2xl font-bold text-green-400 mb-4">Desafios Disponíveis</h2>
+    <section class="challenges">
+        <h2>Desafios Disponíveis</h2>
         {% if unlocked_challenges %}
             {% for challenge in unlocked_challenges %}
-                <div class="mb-6 p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
-                    <h3 class="font-bold text-xl text-yellow-400">{{ challenge.title }}</h3>
-                    <p class="text-sm text-gray-500 mb-3">Recompensa: {{ challenge.points_reward }} pontos</p>
-                    <p class="mb-4 text-gray-300">{{ challenge.description }}</p>
-                    <form method="POST" action="{{ url_for('submit_challenge', challenge_id=challenge.id) }}" class="space-y-3">
-                        <textarea name="answer" rows="3" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500" placeholder="Digite sua resposta aqui..."></textarea>
-                        <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">Enviar Resposta</button>
+                <div class="challenge-card message-bubble">
+                    <h3>{{ challenge.title }}</h3>
+                    <p><strong>Recompensa:</strong> {{ challenge.points_reward }} pontos</p>
+                    <p>{{ challenge.description }}</p>
+                    <form method="POST" action="{{ url_for('submit_challenge', challenge_id=challenge.id) }}">
+                        <textarea name="response" placeholder="Digite sua resposta" required class="chat-input"></textarea>
+                        <button type="submit" class="chat-button">Enviar Resposta</button>
                     </form>
                 </div>
             {% endfor %}
         {% else %}
-            <p class="text-gray-400">Você já completou todos os desafios para o seu nível. Parabéns!</p>
+            <p class="message-bubble">Você já completou todos os desafios para o seu nível. Parabéns!</p>
         {% endif %}
-    </div>
 
-    <div>
-        <h2 class="text-2xl font-bold text-gray-400 mb-4">Próximos Desafios</h2>
+        <h2>Próximos Desafios</h2>
         {% if locked_challenges %}
-             {% for challenge in locked_challenges %}
-                <div class="mb-4 p-4 border rounded-lg bg-gray-800/50 border-gray-700 opacity-60">
-                     <h3 class="font-bold text-lg flex items-center text-gray-300">
-                        <i class="fas fa-lock mr-2"></i>
-                        {{ challenge.title }}
-                    </h3>
-                    <p class="text-sm text-gray-500">Requer nível: {{ challenge.level_required }}</p>
+            {% for challenge in locked_challenges %}
+                <div class="challenge-card message-bubble locked">
+                    <h3>{{ challenge.title }}</h3>
+                    <p><strong>Requer nível:</strong> {{ challenge.level_required }}</p>
                 </div>
             {% endfor %}
         {% else %}
-            <p class="text-gray-500">Não há mais desafios no horizonte. Você é um verdadeiro mestre!</p>
+            <p class="message-bubble">Não há mais desafios no horizonte. Você é um verdadeiro mestre!</p>
         {% endif %}
-    </div>
-</div>
+    </section>
 {% endblock %}
-

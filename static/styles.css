@@ -1,3 +1,4 @@
+/* Your original styles.css */
 body {
     font-family: 'Inter', sans-serif;
     background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
@@ -166,6 +167,12 @@ body.dark {
     transform: translateY(-2px);
     background: linear-gradient(90deg, #2563eb 0%, #3b82f6 100%);
 }
+.btn-danger {
+    background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%);
+}
+.btn-danger:hover {
+    background: linear-gradient(90deg, #b91c1c 0%, #dc2626 100%);
+}
 .typing-indicator {
     display: none;
     font-size: 0.875rem;
@@ -201,4 +208,105 @@ body.dark {
     .message-bubble {
         max-width: 85%;
     }
+}
+
+/* Additional styles for non-chat pages */
+body {
+    display: block; /* Override chat-specific centering for other pages */
+    align-items: stretch;
+}
+main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+.top-nav {
+    background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+    padding: 1rem;
+}
+.top-nav ul {
+    list-style: none;
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+}
+.top-nav a {
+    color: white;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 500;
+}
+.top-nav a:hover {
+    text-decoration: underline;
+}
+section {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+.dark section {
+    background: #1f2937;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+h2, h3 {
+    color: #1e3a8a;
+    margin-bottom: 1rem;
+}
+.dark h2, .dark h3 {
+    color: #60a5fa;
+}
+.profile-form, .team-form {
+    display: grid;
+    gap: 1rem;
+}
+.profile-info .info-item {
+    display: flex;
+    flex-direction: column;
+}
+.profile-info .info-item label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+.teams-table, .ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+.teams-table th, .teams-table td,
+.ranking-table th, .ranking-table td {
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    text-align: left;
+}
+.dark .teams-table th, .dark .teams-table td,
+.dark .ranking-table th, .dark .ranking-table td {
+    border-color: #4b5563;
+}
+.teams-table th, .ranking-table th {
+    background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+    color: white;
+}
+.current-team, .create-team {
+    margin-bottom: 2rem;
+}
+.team-actions {
+    display: flex;
+    gap: 1rem;
+}
+.challenge-card {
+    margin-bottom: 1.5rem;
+}
+.challenge-card.locked {
+    opacity: 0.7;
+}
+footer {
+    background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%);
+    color: white;
+    text-align: center;
+    padding: 1rem;
+    position: relative;
+    bottom: 0;
+    width: 100%;
 }
