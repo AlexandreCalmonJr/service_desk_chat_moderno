@@ -55,8 +55,8 @@ except OSError:
 class Level(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
-    min_points = db.Column(db.Integer, nullable=False, default=0)
-    insignia_image_url = db.Column(db.String(255), default='default.png')
+    min_points = db.Column(db.Integer, unique=True, nullable=False, index=True)
+    insignia = db.Column(db.String(10), nullable=False, default='🌱')
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -67,7 +67,7 @@ class User(UserMixin, db.Model):
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     points = db.Column(db.Integer, default=0)
-    level_id = db.Column(db.Integer, db.ForeignKey('level.id'))
+    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=False)
     level = db.relationship('Level', backref='users')
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
     
@@ -337,20 +337,14 @@ def find_faq_by_nlp(message):
     return [match[0] for match in matches]
 
 def update_user_level(user):
-    """Verifica os pontos do utilizador e atualiza o seu nível."""
-    # Busca os níveis ordenados por pontos, do maior para o menor
-    levels = Level.query.order_by(Level.min_points.desc()).all()
+    """Verifica os pontos do utilizador e atualiza o seu nível se necessário."""
     current_level_id = user.level_id
+
+    # Encontra o nível mais alto que o utilizador alcançou
     new_level = Level.query.filter(Level.min_points <= user.points).order_by(Level.min_points.desc()).first()
 
-
-    for level in levels:
-        if user.points >= level.min_points:
-            new_level_id = level.id
-            break
-    
-    if new_level and (not user.level or user.level.id != new_level.id):
-        user.level = new_level
+    if new_level and new_level.id != current_level_id:
+        user.level_id = new_level.id
         flash(f'Subiu de nível! Você agora é {new_level.name}!', 'success')
 
 @app.route('/admin/users')
@@ -366,14 +360,30 @@ def admin_users():
 @app.context_processor
 def inject_user_gamification_data():
     if current_user.is_authenticated:
-        level_info = LEVELS.get(current_user.level, {})
-        insignia = level_info.get('insignia', '')
-        return dict(user_level_insignia=insignia)
+        return dict(user_level_insignia=current_user.level.insignia)
     return dict()
 
 @app.route('/uploads/insignias/<filename>')
 def uploaded_insignia(filename):
     return send_from_directory(app.config['INSIGNIA_FOLDER'], filename)
+
+@app.route('/admin/dashboard')
+@login_required
+def admin_dashboard():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    # Recolher estatísticas
+    stats = {
+        'total_users': User.query.count(),
+        'total_faqs': FAQ.query.count(),
+        'total_teams': Team.query.count(),
+        'total_challenges_completed': UserChallenge.query.count(),
+        'top_users': User.query.order_by(User.points.desc()).limit(5).all()
+    }
+
+    return render_template('admin_dashboard.html', stats=stats)
 
 @app.route('/ranking')
 @login_required
@@ -1012,7 +1022,20 @@ def kick_from_team(user_id):
 if __name__ == '__main__':
     app.run(debug=True)
     
-    
+with app.app_context():
+    db.create_all() # Garante que todas as tabelas existem
+    if Level.query.count() == 0:
+        print("A semear os níveis iniciais na base de dados...")
+        levels_to_seed = [
+            Level(name='Iniciante', min_points=0, insignia='🌱'),
+            Level(name='Dados de Prata', min_points=50, insignia='🥈'),
+            Level(name='Dados de Ouro', min_points=150, insignia='🥇'),
+            Level(name='Mestre dos Dados', min_points=300, insignia='🏆')
+        ]
+        db.session.bulk_save_objects(levels_to_seed)
+        db.session.commit()
+
+
 @click.command(name='create-admin')
 @with_appcontext
 @click.option('--name', required=True, help='O nome do administrador.')
