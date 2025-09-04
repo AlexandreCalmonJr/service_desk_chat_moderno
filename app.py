@@ -145,18 +145,6 @@ class Team(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-@app.context_processor
-def inject_gamification_data():
-    """Injeta dados de gamificação em todos os templates."""
-    if current_user.is_authenticated:
-        # --- CORREÇÃO APLICADA AQUI ---
-        # Garante que mesmo que o nível seja nulo, a aplicação não falha
-        insignia_url = None
-        if current_user.level and current_user.level.insignia_image_url:
-            insignia_url = url_for('uploaded_insignia', filename=current_user.level.insignia_image_url)
-        
-        return dict(user_level_insignia=insignia_url)
-    return dict()
 # Inicialização do banco de dados e categorias padrão
 with app.app_context():
     db.create_all()
@@ -357,11 +345,17 @@ def admin_users():
     all_users = User.query.order_by(User.name).all()
     return render_template('admin_users.html', users=all_users)
 
+# CÓDIGO NOVO E CORRIGIDO
+
 @app.context_processor
 def inject_user_gamification_data():
-    if current_user.is_authenticated:
+    # Verifica se o usuário está autenticado E se ele tem um nível associado
+    if current_user.is_authenticated and current_user.level:
         return dict(user_level_insignia=current_user.level.insignia)
-    return dict()
+    
+    # Caso contrário, retorna um valor padrão ou um dicionário vazio
+    # para evitar erros no template.
+    return dict(user_level_insignia='?')
 
 @app.route('/uploads/insignias/<filename>')
 def uploaded_insignia(filename):
