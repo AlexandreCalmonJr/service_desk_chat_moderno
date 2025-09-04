@@ -438,6 +438,7 @@ def edit_faq(faq_id):
             faq.file_name = file.filename
             faq.file_data = file.read()
         db.session.commit()
+        cache.clear()
         flash('FAQ atualizada com sucesso!', 'success')
         return redirect(url_for('faqs'))
     return redirect(url_for('faqs', edit=faq_id))
@@ -451,6 +452,7 @@ def delete_faq(faq_id):
     faq = FAQ.query.get_or_404(faq_id)
     db.session.delete(faq)
     db.session.commit()
+    cache.clear()
     flash('FAQ excluída com sucesso!', 'success')
     return redirect(url_for('faqs'))
 
@@ -466,6 +468,7 @@ def delete_multiple_faqs():
         for faq in FAQs_to_delete:
             db.session.delete(faq)
         db.session.commit()
+        cache.clear()
         flash(f'{len(faq_ids)} FAQs excluídas com sucesso!', 'success')
     else:
         flash('Nenhuma FAQ selecionada para exclusão.', 'error')
@@ -621,6 +624,7 @@ def admin_faq():
                 faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url, video_url=video_url, file_name=file_name, file_data=file_data)
                 db.session.add(faq)
                 db.session.commit()
+                cache.clear()
                 flash('FAQ adicionada com sucesso!', 'success')
             else:
                 flash('Preencha todos os campos obrigatórios.', 'error')
@@ -709,6 +713,61 @@ def export_faqs():
     response = jsonify(faqs_list)
     response.headers['Content-Disposition'] = 'attachment; filename=faqs_backup.json'
     return response
+
+@app.route('/admin/challenges', methods=['GET', 'POST'])
+@login_required
+def admin_challenges():
+    if not current_user.is_admin:
+        flash('Acesso negado. Apenas administradores podem gerir desafios.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        # Lógica para adicionar um novo desafio
+        title = request.form.get('title')
+        description = request.form.get('description')
+        level_required = request.form.get('level_required')
+        points_reward = request.form.get('points_reward', type=int)
+        expected_answer = request.form.get('expected_answer')
+        unlocks_faq_id = request.form.get('unlocks_faq_id')
+        
+        # Converte o ID da FAQ para int ou None
+        if unlocks_faq_id and unlocks_faq_id.isdigit():
+            unlocks_faq_id = int(unlocks_faq_id)
+        else:
+            unlocks_faq_id = None
+
+        new_challenge = Challenge(
+            title=title,
+            description=description,
+            level_required=level_required,
+            points_reward=points_reward,
+            expected_answer=expected_answer,
+            unlocks_faq_id=unlocks_faq_id
+        )
+        db.session.add(new_challenge)
+        db.session.commit()
+        flash('Novo desafio adicionado com sucesso!', 'success')
+        return redirect(url_for('admin_challenges'))
+
+    all_challenges = Challenge.query.order_by(Challenge.id).all()
+    all_faqs = FAQ.query.order_by(FAQ.question).all()
+    return render_template('admin_challenges.html', challenges=all_challenges, faqs=all_faqs, levels=LEVELS)
+
+
+@app.route('/admin/challenges/delete/<int:challenge_id>', methods=['POST'])
+@login_required
+def delete_challenge(challenge_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    challenge_to_delete = Challenge.query.get_or_404(challenge_id)
+    # Apaga também o progresso dos utilizadores neste desafio para evitar erros
+    UserChallenge.query.filter_by(challenge_id=challenge_id).delete()
+    db.session.delete(challenge_to_delete)
+    db.session.commit()
+    flash('Desafio apagado com sucesso.', 'success')
+    return redirect(url_for('admin_challenges'))
 
 @app.route('/challenges')
 @login_required
