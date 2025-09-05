@@ -692,29 +692,35 @@ def export_faqs():
 @app.route('/challenges')
 @login_required
 def list_challenges():
+    # Garante que o utilizador tem um nível antes de continuar
+    if not current_user.level:
+        flash('Não foi possível determinar o seu nível. Por favor, contacte o suporte.', 'error')
+        return redirect(url_for('index'))
+
+    # IDs dos desafios já completos
     completed_challenges_ids = [uc.challenge_id for uc in current_user.completed_challenges]
     
-    if current_user.level:
-        user_level_min_points = current_user.level.min_points
-    else:
-        user_level_min_points = 0
+    # Pontos mínimos do nível atual do utilizador
+    user_min_points = current_user.level.min_points
 
-    available_challenges_query = Challenge.query.filter(Challenge.id.notin_(completed_challenges_ids))
+    # Alias para a tabela Level para a junção
+    RequiredLevel = aliased(Level)
 
-    unlocked_challenges = []
-    locked_challenges = []
+    # Busca todos os desafios que o utilizador AINDA NÃO completou
+    all_challenges_query = db.session.query(Challenge).filter(Challenge.id.notin_(completed_challenges_ids))
+    
+    # Junta a tabela de desafios com a tabela de níveis para obter os pontos mínimos de cada desafio
+    all_challenges_query = all_challenges_query.join(RequiredLevel, Challenge.level_required == RequiredLevel.name)
 
-    for challenge in available_challenges_query.all():
-        challenge_level_data = LEVELS.get(challenge.level_required, {})
-        challenge_level_min_points = challenge_level_data.get('min_points', float('inf'))
-        if user_level_min_points >= challenge_level_min_points:
-            unlocked_challenges.append(challenge)
-        else:
-            locked_challenges.append(challenge)
+    # Filtra para desafios desbloqueados (o nível do desafio tem menos ou os mesmos pontos que o nível do utilizador)
+    unlocked_challenges = all_challenges_query.filter(RequiredLevel.min_points <= user_min_points).all()
+    
+    # Filtra para desafios bloqueados
+    locked_challenges = all_challenges_query.filter(RequiredLevel.min_points > user_min_points).all()
 
     return render_template('challenges.html', 
-                            unlocked_challenges=unlocked_challenges, 
-                            locked_challenges=locked_challenges)
+                           unlocked_challenges=unlocked_challenges, 
+                           locked_challenges=locked_challenges)
 
 @app.route('/challenges/submit/<int:challenge_id>', methods=['POST'])
 @login_required

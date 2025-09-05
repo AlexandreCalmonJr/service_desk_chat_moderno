@@ -37,8 +37,9 @@
     </div>
     
     <script>
-        const chatBody = document.getElementById('chat-body');
-        const chatInput = document.getElementById('chat-input');
+        // >>>>>>>>> AQUI ESTÃO AS CORREÇÕES <<<<<<<<<<<
+        const chatBody = document.getElementById('chatBox');       // Corrigido de 'chat-body' para 'chatBox'
+        const chatInput = document.getElementById('chat-input');      // Corrigido de 'chatInput' para 'chat-input'
         const typingIndicator = document.getElementById('typing-indicator');
         let chatState = 'normal';
     
@@ -145,4 +146,4 @@
             }
         });
     </script>
-    
+</div>
