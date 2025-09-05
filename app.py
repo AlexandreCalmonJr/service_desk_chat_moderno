@@ -12,22 +12,14 @@ from PyPDF2 import PdfReader
 from datetime import datetime
 import spacy
 import spacy.cli
-from flask_caching import Cache
 import click
 from flask.cli import with_appcontext
-# CONFIGURAÇÃO DA GAMIFICAÇÃO
-LEVELS = {
-    'Iniciante': {'min_points': 0, 'next_level_points': 50, 'insignia': '🌱'},
-    'Dados de Prata': {'min_points': 50, 'next_level_points': 150, 'insignia': '🥈'},
-    'Dados de Ouro': {'min_points': 150, 'next_level_points': 300, 'insignia': '🥇'},
-    'Mestre dos Dados': {'min_points': 300, 'next_level_points': float('inf'), 'insignia': '🏆'}
-}
+from flask_caching import Cache
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-# Configuração do Cache (simples, em memória)
-cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
-# Configuração do banco de dados
+
+# --- CONFIGURAÇÕES DA APLICAÇÃO ---
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'uma-chave-secreta-padrao-para-desenvolvimento')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -37,10 +29,11 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
 
+# --- INICIALIZAÇÃO DAS EXTENSÕES ---
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 # Configuração do spaCy
 try:
@@ -50,8 +43,13 @@ except OSError:
     spacy.cli.download('pt_core_news_sm')
     nlp = spacy.load('pt_core_news_sm')
 
+# --- MODELOS DA BASE DE DADOS ---
+class Level(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    min_points = db.Column(db.Integer, unique=True, nullable=False, index=True)
+    insignia = db.Column(db.String(10), nullable=False, default='🌱')
 
-# Modelos
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -62,76 +60,19 @@ class User(UserMixin, db.Model):
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     points = db.Column(db.Integer, default=0)
-    level = db.Column(db.String(50), default='Iniciante')
+    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=True) # Alterado para nullable=True
+    level = db.relationship('Level', backref='users')
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
-    
-class Challenge(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(150), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    level_required = db.Column(db.String(50), default='Iniciante')
-    points_reward = db.Column(db.Integer, default=10)
-    # Resposta esperada (para verificação simples)
-    expected_answer = db.Column(db.String(500), nullable=False)
-    # ID da FAQ que este desafio desbloqueia (opcional)
-    unlocks_faq_id = db.Column(db.Integer, db.ForeignKey('faq.id'), nullable=True)
 
-class UserChallenge(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), nullable=False)
-    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    user = db.relationship('User', backref=db.backref('completed_challenges', lazy=True))
-    challenge = db.relationship('Challenge', backref=db.backref('completions', lazy=True))
-
-class Category(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
-
-class FAQ(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    question = db.Column(db.String(200), nullable=False)
-    answer = db.Column(db.Text, nullable=False)
-    image_url = db.Column(db.String(500), nullable=True)
-    video_url = db.Column(db.String(500), nullable=True)
-    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
-    category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
-    file_name = db.Column(db.String(255), nullable=True)
-    file_data = db.Column(db.LargeBinary, nullable=True)
-
-    @property
-    def formatted_answer(self):
-        return format_faq_response(self.id, self.question, self.answer, self.image_url, self.video_url, self.file_name)
-
-class Ticket(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.String(10), unique=True, nullable=False)
-    status = db.Column(db.String(20), default='Aberto')
-    description = db.Column(db.Text)
-
-class ChatMessage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    user_message = db.Column(db.Text, nullable=False)
-    bot_response = db.Column(db.Text)
-    faq_id_suggestion = db.Column(db.Integer, db.ForeignKey('faq.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    feedback = db.Column(db.String(10), nullable=True) # 'helpful' or 'unhelpful'
-
-    user = db.relationship('User', backref=db.backref('chat_messages', lazy=True))
-    
 class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Relacionamento para aceder aos membros do time
     members = db.relationship('User', foreign_keys='User.team_id', backref='team', lazy='dynamic')
+    
     @property
     def total_points(self):
-        # Calcula a pontuação total do time somando os pontos de todos os membros
         return sum(member.points for member in self.members)
 
 @login_manager.user_loader
@@ -318,19 +259,11 @@ def find_faq_by_nlp(message):
     return [match[0] for match in matches]
 
 def update_user_level(user):
-    """Verifica os pontos do utilizador e atualiza o seu nível se necessário."""
-    current_level = user.level
-    new_level = current_level
-
-    for level_name, level_info in reversed(list(LEVELS.items())):
-        if user.points >= level_info['min_points']:
-            new_level = level_name
-            break
-
-    if new_level != current_level:
-        user.level = new_level
-        # Não precisamos de db.session.commit() aqui, pois será chamado na rota.
-        flash(f'Subiu de nível! Você agora é {new_level}!', 'success')
+    current_level_id = user.level_id
+    new_level = Level.query.filter(Level.min_points <= user.points).order_by(Level.min_points.desc()).first()
+    if new_level and new_level.id != current_level_id:
+        user.level_id = new_level.id
+        flash(f'Subiu de nível! Você agora é {new_level.name}!', 'success')
 
 @app.route('/admin/users')
 @login_required
@@ -343,12 +276,13 @@ def admin_users():
     return render_template('admin_users.html', users=all_users)
 
 @app.context_processor
+@app.context_processor
 def inject_user_gamification_data():
-    if current_user.is_authenticated:
-        level_info = LEVELS.get(current_user.level, {})
-        insignia = level_info.get('insignia', '')
-        return dict(user_level_insignia=insignia)
-    return dict()
+    # Verifica se o utilizador está autenticado E se tem um nível associado
+    if current_user.is_authenticated and current_user.level:
+        return dict(user_level_insignia=current_user.level.insignia)
+    # Se não, fornece um valor padrão para evitar erros
+    return dict(user_level_insignia='')
 
 @app.route('/ranking')
 @login_required
@@ -497,15 +431,28 @@ def register():
         name = request.form['name']
         email = request.form['email']
         password = generate_password_hash(request.form['password'])
-        phone = request.form.get('phone')
+        
         if User.query.filter_by(email=email).first():
-            flash('Email já registrado.', 'error')
-        else:
-            user = User(name=name, email=email, password=password, phone=phone, is_admin=False)
-            db.session.add(user)
-            db.session.commit()
-            flash('Registro concluído! Faça login.', 'success')
-            return redirect(url_for('login'))
+            flash('Email já registado.', 'error')
+            return redirect(url_for('register'))
+
+        # Define o nível inicial para novos utilizadores
+        initial_level = Level.query.order_by(Level.min_points).first()
+        if not initial_level:
+            flash('Erro de sistema: Nenhum nível inicial encontrado. Contacte o administrador.', 'error')
+            return redirect(url_for('register'))
+
+        user = User(
+            name=name,
+            email=email,
+            password=password,
+            is_admin=False,
+            level_id=initial_level.id # Garante que o nível é definido no registo
+        )
+        db.session.add(user)
+        db.session.commit()
+        flash('Registo concluído! Faça login.', 'success')
+        return redirect(url_for('login'))
     return render_template('register.html')
 
 @app.route('/logout')
