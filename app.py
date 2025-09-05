@@ -796,15 +796,6 @@ def admin_dashboard():
     }
     return render_template('admin_dashboard.html', stats=stats)
 
-@app.route('/admin/users')
-@login_required
-def admin_users():
-    if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
-    all_users = User.query.order_by(User.name).all()
-    return render_template('admin_users.html', users=all_users)
-
 @app.route('/admin/teams')
 @login_required
 def admin_teams():
