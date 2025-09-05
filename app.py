@@ -680,6 +680,18 @@ def export_faqs():
     response.headers['Content-Disposition'] = 'attachment; filename=faqs_backup.json'
     return response
 
+
+@app.route('/admin/challenges')
+@login_required
+def admin_challenges():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    # Busca todos os desafios para exibi-los
+    all_challenges = Challenge.query.order_by(Challenge.level_required).all()
+    return render_template('admin_challenges.html', challenges=all_challenges)
+
 @app.route('/challenges')
 @login_required
 def list_challenges():
