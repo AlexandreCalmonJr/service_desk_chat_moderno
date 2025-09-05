@@ -32,7 +32,7 @@
             <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">{% block page_title %}Dashboard{% endblock %}</h1>
             <div class="flex items-center space-x-4">
                 <span class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ user_level_insignia }} Olá, {{ current_user.name }}!
+                    {% if current_user.is_authenticated and current_user.level %}{{ current_user.level.insignia }}{% endif %} Olá, {{ current_user.name }}!
                 </span>
                 <a href="{{ url_for('logout') }}" class="text-sm text-gray-600 dark:text-gray-400 hover:underline">Sair</a>
             </div>
