@@ -38,48 +38,41 @@
         return gk_fileData[filename] || "";
         }
         </script>{% extends "base.html" %}
-{% block title %}Ranking - Service Desk{% endblock %}
+{% block title %}Admin - Níveis - Service Desk{% endblock %}
 {% block content %}
-    <h1 class="text-2xl font-bold mb-4">Ranking</h1>
-    <h2 class="text-xl font-semibold mb-2">Usuários</h2>
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md mb-6">
-        <table class="w-full">
-            <thead>
-                <tr class="bg-gray-200 dark:bg-gray-700">
-                    <th class="p-2 text-left">Posição</th>
-                    <th class="p-2 text-left">Nome</th>
-                    <th class="p-2 text-left">Nível</th>
-                    <th class="p-2 text-left">Pontos</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user, index in ranked_users|enumerate %}
-                    <tr class="{% if index % 2 == 0 %}bg-gray-50 dark:bg-gray-800{% else %}bg-white dark:bg-gray-900{% endif %}">
-                        <td class="p-2">{{ index + 1 }}</td>
-                        <td class="p-2">{{ user.name }}</td>
-                        <td class="p-2">{{ user.level.name }} {{ LEVELS[user.level.name].insignia }}</td>
-                        <td class="p-2">{{ user.points }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    <h2 class="text-xl font-semibold mb-2">Times</h2>
+    <h1 class="text-2xl font-bold mb-4">Gerenciar Níveis</h1>
+    <h2 class="text-xl font-semibold mb-2">Adicionar Nível</h2>
+    <form method="POST" enctype="multipart/form-data" class="max-w-md mb-6">
+        <div class="mb-4">
+            <label for="name" class="block text-sm font-medium">Nome</label>
+            <input type="text" id="name" name="name" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+        </div>
+        <div class="mb-4">
+            <label for="min_points" class="block text-sm font-medium">Pontos Mínimos</label>
+            <input type="number" id="min_points" name="min_points" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+        </div>
+        <div class="mb-4">
+            <label for="insignia_image" class="block text-sm font-medium">Insígnia</label>
+            <input type="file" id="insignia_image" name="insignia_image" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Adicionar Nível</button>
+    </form>
+    <h2 class="text-xl font-semibold mb-2">Lista de Níveis</h2>
     <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
         <table class="w-full">
             <thead>
                 <tr class="bg-gray-200 dark:bg-gray-700">
-                    <th class="p-2 text-left">Posição</th>
                     <th class="p-2 text-left">Nome</th>
-                    <th class="p-2 text-left">Pontos Totais</th>
+                    <th class="p-2 text-left">Pontos Mínimos</th>
+                    <th class="p-2 text-left">Insígnia</th>
                 </tr>
             </thead>
             <tbody>
-                {% for team, index in ranked_teams|enumerate %}
-                    <tr class="{% if index % 2 == 0 %}bg-gray-50 dark:bg-gray-800{% else %}bg-white dark:bg-gray-900{% endif %}">
-                        <td class="p-2">{{ index + 1 }}</td>
-                        <td class="p-2">{{ team.name }}</td>
-                        <td class="p-2">{{ team.total_points }}</td>
+                {% for level in levels %}
+                    <tr class="{% if loop.index % 2 == 0 %}bg-gray-50 dark:bg-gray-800{% else %}bg-white dark:bg-gray-900{% endif %}">
+                        <td class="p-2">{{ level.name }}</td>
+                        <td class="p-2">{{ level.min_points }}</td>
+                        <td class="p-2">{{ level.insignia }}</td>
                     </tr>
                 {% endfor %}
             </tbody>

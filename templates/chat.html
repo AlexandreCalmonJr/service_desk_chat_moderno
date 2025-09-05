@@ -1,288 +1,113 @@
-<div class="chat-container" role="application" aria-label="Chat do assistente de service desk">
-    <div class="chat-header">
-        <h2 class="chat-title">
-            <i class="fas fa-robot" aria-hidden="true"></i>
-            Sou seu assistente de Service Desk
-        </h2>
-        <p class="chat-subtitle">Como posso ajudar hoje?</p>
-    </div>
-    
-    <div class="chat-body" id="chatBox" role="log" aria-live="polite" aria-label="Histórico de conversas">
-        <div class="chat-message bot" role="article">
-            <div class="avatar" aria-hidden="true">
-                <i class="fas fa-robot"></i>
-            </div>
-            <div class="message-bubble">
-                <p>Olá! Como posso ajudar você hoje? Tente "Encerrar chamado &lt;ID&gt;", "Sugerir solução para &lt;problema&gt;", ou faça uma pergunta!</p>
-            </div>
-        </div>
-    </div>
-    
-    <div class="chat-footer">
-        <div class="typing-indicator" id="typingIndicator" aria-live="polite" style="display: none;">
-            <div class="typing-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-            <span class="typing-text">O assistente está digitando...</span>
-        </div>
-        
-        <form class="chat-form" onsubmit="return false;" role="form" aria-label="Formulário de envio de mensagem">
-            <div class="input-group">
-                <label for="chatInput" class="sr-only">Digite sua mensagem</label>
-                <textarea 
-                    id="chatInput" 
-                    class="chat-input" 
-                    placeholder="Digite sua mensagem..." 
-                    rows="1"
-                    maxlength="1000"
-                    aria-describedby="input-help"
-                    required
-                ></textarea>
-                <div id="input-help" class="sr-only">Digite sua pergunta ou comando. Pressione Enter para enviar ou Shift+Enter para nova linha.</div>
-                
-                <button 
-                    type="submit" 
-                    id="sendButton" 
-                    class="chat-button send-button"
-                    aria-label="Enviar mensagem"
-                    title="Enviar mensagem (Enter)"
-                >
-                    <i class="fas fa-paper-plane" aria-hidden="true"></i>
-                    <span class="sr-only">Enviar</span>
-                </button>
-            </div>
-            
-            <div class="chat-actions">
-                <button type="button" class="action-button" onclick="clearChat()" aria-label="Limpar conversa" title="Limpar conversa">
-                    <i class="fas fa-trash" aria-hidden="true"></i>
-                    <span>Limpar</span>
-                </button>
-                
-                <button type="button" class="action-button" onclick="exportChat()" aria-label="Exportar conversa" title="Exportar conversa">
-                    <i class="fas fa-download" aria-hidden="true"></i>
-                    <span>Exportar</span>
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const chatBox = document.getElementById('chatBox');
-    const chatInput = document.getElementById('chatInput');
-    const sendButton = document.getElementById('sendButton');
-    const typingIndicator = document.getElementById('typingIndicator');
-    
-    let messageCount = 0;
-
-    // Auto-resize textarea
-    function autoResize(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-    }
-
-    // Add message to chat with improved accessibility
-    function addMessage(message, isUser = false, isHtml = false, options = []) {
-        messageCount++;
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message ${isUser ? 'user' : 'bot'}`;
-        messageDiv.setAttribute('role', 'article');
-        messageDiv.setAttribute('aria-label', `${isUser ? 'Sua mensagem' : 'Resposta do assistente'} ${messageCount}`);
-        
-        const avatarDiv = document.createElement('div');
-        avatarDiv.className = 'avatar';
-        avatarDiv.setAttribute('aria-hidden', 'true');
-        avatarDiv.innerHTML = isUser ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
-        
-        const bubbleDiv = document.createElement('div');
-        bubbleDiv.className = 'message-bubble';
-        
-        if (isHtml) {
-            bubbleDiv.innerHTML = message;
-            // Add copy buttons to code blocks
-            const codeBlocks = bubbleDiv.querySelectorAll('pre code');
-            codeBlocks.forEach(addCopyButton);
-        } else {
-            bubbleDiv.textContent = message;
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
         }
-
-        // Add FAQ options if available
-        if (options && options.length > 0) {
-            const optionsDiv = document.createElement('div');
-            optionsDiv.className = 'faq-options';
-            optionsDiv.setAttribute('role', 'group');
-            optionsDiv.setAttribute('aria-label', 'Opções de FAQ relacionadas');
-            
-            options.forEach((option, index) => {
-                const button = document.createElement('button');
-                button.className = 'faq-option-button';
-                button.textContent = option.question;
-                button.setAttribute('aria-label', `FAQ opção ${index + 1}: ${option.question}`);
-                button.onclick = () => sendMessage(`faq_${option.id}`);
-                optionsDiv.appendChild(button);
-            });
-            bubbleDiv.appendChild(optionsDiv);
-        }
-        
-        if (isUser) {
-            messageDiv.appendChild(bubbleDiv);
-            messageDiv.appendChild(avatarDiv);
-        } else {
-            messageDiv.appendChild(avatarDiv);
-            messageDiv.appendChild(bubbleDiv);
-        }
-        
-        chatBox.appendChild(messageDiv);
-        
-        // Smooth scroll to bottom
-        chatBox.scrollTo({
-            top: chatBox.scrollHeight,
-            behavior: 'smooth'
-        });
-        
-        // Announce new messages to screen readers
-        if (!isUser) {
-            setTimeout(() => {
-                const announcement = document.createElement('div');
-                announcement.setAttribute('aria-live', 'assertive');
-                announcement.setAttribute('aria-atomic', 'true');
-                announcement.className = 'sr-only';
-                announcement.textContent = `Nova resposta do assistente recebida`;
-                document.body.appendChild(announcement);
-                setTimeout(() => document.body.removeChild(announcement), 1000);
-            }, 100);
-        }
-    }
-
-    // Add copy button to code blocks
-    function addCopyButton(codeBlock) {
-        const pre = codeBlock.parentElement;
-        if (pre.tagName.toLowerCase() !== 'pre') return;
-
-        const button = document.createElement('button');
-        button.className = 'copy-code-button';
-        button.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i> Copiar';
-        button.setAttribute('aria-label', 'Copiar código');
-        button.setAttribute('title', 'Copiar código para área de transferência');
-        
-        pre.style.position = 'relative';
-        pre.appendChild(button);
-
-        button.addEventListener('click', async () => {
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
             try {
-                await navigator.clipboard.writeText(codeBlock.textContent);
-                button.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i> Copiado!';
-                button.setAttribute('aria-label', 'Código copiado');
-                setTimeout(() => {
-                    button.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i> Copiar';
-                    button.setAttribute('aria-label', 'Copiar código');
-                }, 2000);
-            } catch (err) {
-                console.error('Erro ao copiar:', err);
-                button.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Erro';
-                setTimeout(() => {
-                    button.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i> Copiar';
-                }, 2000);
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
             }
-        });
-    }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+{% block title %}Chat - Service Desk{% endblock %}
+{% block content %}
+    <h1 class="text-2xl font-bold mb-4">Chat de Suporte</h1>
+    <div id="chat-container" class="bg-white dark:bg-gray-800 p-4 rounded shadow-md h-96 overflow-y-auto mb-4">
+        <!-- Mensagens do chat serão inseridas aqui -->
+    </div>
+    <div class="flex">
+        <input type="text" id="message-input" class="flex-grow p-2 border rounded dark:bg-gray-800 dark:border-gray-700" placeholder="Digite sua mensagem...">
+        <button id="send-message" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ml-2">Enviar</button>
+    </div>
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-message');
 
-    // Send message function
-    async function sendMessage(message) {
-        if (!message || !message.trim()) return;
+        sendButton.addEventListener('click', async () => {
+            const message = messageInput.value.trim();
+            if (!message) return;
 
-        const trimmedMessage = message.trim();
-        addMessage(trimmedMessage, true);
-        chatInput.value = '';
-        autoResize(chatInput);
-        
-        // Show typing indicator
-        typingIndicator.style.display = 'flex';
-        sendButton.disabled = true;
-        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>';
+            // Adicionar mensagem do usuário
+            const userMessage = document.createElement('div');
+            userMessage.className = 'bg-blue-100 dark:bg-blue-900 p-2 rounded mb-2';
+            userMessage.innerHTML = `<strong>Você:</strong> ${message}`;
+            chatContainer.appendChild(userMessage);
+            messageInput.value = '';
 
-        try {
-            const response = await fetch('/chat', {
+            // Enviar mensagem para o servidor
+            const response = await fetch('{{ url_for("chat") }}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mensagem: trimmedMessage })
+                body: JSON.stringify({ mensagem: message })
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
             const data = await response.json();
-            addMessage(data.text, false, data.html, data.options);
-            
-        } catch (error) {
-            console.error('Erro ao enviar mensagem:', error);
-            addMessage('Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.', false);
-        } finally {
-            // Hide typing indicator
-            typingIndicator.style.display = 'none';
-            sendButton.disabled = false;
-            sendButton.innerHTML = '<i class="fas fa-paper-plane" aria-hidden="true"></i>';
-            chatInput.focus();
-        }
-    }
 
-    // Clear chat function
-    function clearChat() {
-        if (confirm('Tem certeza que deseja limpar toda a conversa?')) {
-            const messages = chatBox.querySelectorAll('.chat-message:not(:first-child)');
-            messages.forEach(msg => msg.remove());
-            messageCount = 0;
-            chatInput.focus();
-        }
-    }
+            // Adicionar resposta do bot
+            const botMessage = document.createElement('div');
+            botMessage.className = 'bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2';
+            if (data.html) {
+                botMessage.innerHTML = data.text;
+            } else {
+                botMessage.innerHTML = `<strong>Bot:</strong> ${data.text}`;
+            }
+            chatContainer.appendChild(botMessage);
 
-    // Export chat function
-    function exportChat() {
-        const messages = Array.from(chatBox.querySelectorAll('.chat-message')).map(msg => {
-            const isUser = msg.classList.contains('user');
-            const text = msg.querySelector('.message-bubble').textContent;
-            const timestamp = new Date().toLocaleString();
-            return `[${timestamp}] ${isUser ? 'Você' : 'Assistente'}: ${text}`;
-        }).join('\n');
-
-        const blob = new Blob([messages], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `chat-service-desk-${new Date().toISOString().split('T')[0]}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    // Event listeners
-    sendButton.addEventListener('click', () => {
-        const message = chatInput.value.trim();
-        if (message) sendMessage(message);
-    });
-
-    chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            const message = chatInput.value.trim();
-            if (message) sendMessage(message);
-        }
-    });
-
-    chatInput.addEventListener('input', () => autoResize(chatInput));
-
-    // Make functions globally available
-    window.clearChat = clearChat;
-    window.exportChat = exportChat;
-    window.sendMessage = sendMessage;
-
-    // Focus input on load
-    chatInput.focus();
-});
-</script>
-
+            // Adicionar opções de FAQs, se disponíveis
+            if (data.state === 'faq_selection') {
+                const optionsContainer = document.createElement('div');
+                optionsContainer.className = 'mt-2';
+                data.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2 mb-2';
+                    button.textContent = option.question;
+                    button.onclick = async () => {
+                        const faqResponse = await fetch('{{ url_for("chat") }}', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ mensagem: `Selecionar FAQ ${option.id}` })
+                        });
+                        const faqData = await faqResponse.json();
+                        const faqMessage = document.createElement('div');
+                        faqMessage.className = 'bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2';
+                        faqMessage.innerHTML = faqData.text;
+                        chatContainer.appendChild(faqMessage);
+                        optionsContainer.remove();
+                    };
+                    optionsContainer.appendChild(button);
+                });
+                chatContainer.appendChild(optionsContainer);
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+    </script>
+{% endblock %}

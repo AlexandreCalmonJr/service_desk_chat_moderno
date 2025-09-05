@@ -1,73 +1,68 @@
-{% extends "admin_base.html" %}
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
 
-{% block title %}Resumo{% endblock %}
-{% block page_title %}Resumo Geral{% endblock %}
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
 
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+{% block title %}Admin - Dashboard - Service Desk{% endblock %}
 {% block content %}
-    <!-- Cartões de Estatísticas -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <!-- Utilizadores Totais -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center">
-            <div class="bg-blue-500 text-white rounded-full p-3 mr-4">
-                <i class="fas fa-users fa-2x"></i>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Utilizadores Totais</p>
-                <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.total_users }}</p>
-            </div>
+    <h1 class="text-2xl font-bold mb-4">Painel de Administração</h1>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
+            <h2 class="text-lg font-semibold">Estatísticas</h2>
+            <p>Total de Usuários: {{ stats.total_users }}</p>
+            <p>Total de FAQs: {{ stats.total_faqs }}</p>
+            <p>Total de Times: {{ stats.total_teams }}</p>
+            <p>Desafios Completados: {{ stats.total_challenges_completed }}</p>
         </div>
-        <!-- FAQs Totais -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center">
-            <div class="bg-green-500 text-white rounded-full p-3 mr-4">
-                <i class="fas fa-question-circle fa-2x"></i>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">FAQs Registadas</p>
-                <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.total_faqs }}</p>
-            </div>
-        </div>
-        <!-- Times Totais -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center">
-            <div class="bg-yellow-500 text-white rounded-full p-3 mr-4">
-                <i class="fas fa-shield-alt fa-2x"></i>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Times Criados</p>
-                <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.total_teams }}</p>
-            </div>
-        </div>
-         <!-- Desafios Completos -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center">
-            <div class="bg-red-500 text-white rounded-full p-3 mr-4">
-                <i class="fas fa-trophy fa-2x"></i>
-            </div>
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Desafios Completos</p>
-                <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ stats.total_challenges_completed }}</p>
-            </div>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
+            <h2 class="text-lg font-semibold">Top Usuários</h2>
+            <ul>
+                {% for user in stats.top_users %}
+                    <li>{{ user.name }} - {{ user.points }} pontos ({{ user.level.name }})</li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
-
-    <!-- Ranking Rápido -->
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Top 5 Utilizadores</h3>
-        <table class="w-full text-left">
-             <thead>
-                <tr class="bg-gray-50 dark:bg-gray-700/50">
-                    <th class="p-2">Pos.</th>
-                    <th class="p-2">Utilizador</th>
-                    <th class="p-2 text-right">Pontos</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in stats.top_users %}
-                    <tr class="border-b dark:border-gray-700">
-                        <td class="p-2">{{ loop.index }}</td>
-                        <td class="p-2">{{ user.name }}</td>
-                        <td class="p-2 text-right">{{ user.points }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="space-x-4">
+        <a href="{{ url_for('admin_users') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Gerenciar Usuários</a>
+        <a href="{{ url_for('admin_faq') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Gerenciar FAQs</a>
+        <a href="{{ url_for('admin_challenges') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Gerenciar Desafios</a>
+        <a href="{{ url_for('admin_levels') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Gerenciar Níveis</a>
+        <a href="{{ url_for('admin_teams') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Gerenciar Times</a>
     </div>
 {% endblock %}

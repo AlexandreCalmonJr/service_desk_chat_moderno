@@ -1,80 +1,72 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Gerir Utilizadores</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
-    
-    <!-- COPIE O CABEÇALHO COMPLETO E O MENU MÓVEL DO 'index.html' AQUI -->
-    <!-- ... -->
-    
-    <main class="flex-1 flex flex-col items-center pt-24 px-4 w-full">
-        <div class="w-full max-w-5xl p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">Gestão de Utilizadores</h2>
-            
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% elif category == 'success' %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% else %}bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead>
-                        <tr class="bg-gray-200 dark:bg-gray-700">
-                            <th class="p-3">Nome</th>
-                            <th class="p-3">Email</th>
-                            <th class="p-3">Time</th>
-                            <th class="p-3">Pontos</th>
-                            <th class="p-3">Status</th>
-                            <th class="p-3">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                            <tr class="border-b dark:border-gray-700">
-                                <td class="p-3">{{ user.name }}</td>
-                                <td class="p-3">{{ user.email }}</td>
-                                <td class="p-3">{{ user.team.name if user.team else 'Nenhum' }}</td>
-                                <td class="p-3">{{ user.points }}</td>
-                                <td class="p-3">
-                                    {% if user.is_admin %}
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-200 text-green-800">Admin</span>
-                                    {% else %}
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-800">Utilizador</span>
-                                    {% endif %}
-                                </td>
-                                <td class="p-3">
-                                    {% if user.id != current_user.id %}
-                                        <form action="{{ url_for('toggle_admin', user_id=user.id) }}" method="POST">
-                                            {% if user.is_admin %}
-                                                <button type="submit" class="px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm transition">Remover Admin</button>
-                                            {% else %}
-                                                <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition">Tornar Admin</button>
-                                            {% endif %}
-                                        </form>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
 
-    <!-- COPIE OS SCRIPTS GLOBAIS DO 'index.html' AQUI -->
-    <!-- ... -->
-</body>
-</html>
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
 
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+{% block title %}Admin - Usuários - Service Desk{% endblock %}
+{% block content %}
+    <h1 class="text-2xl font-bold mb-4">Gerenciar Usuários</h1>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="p-2 text-left">Nome</th>
+                    <th class="p-2 text-left">Email</th>
+                    <th class="p-2 text-left">Nível</th>
+                    <th class="p-2 text-left">Admin</th>
+                    <th class="p-2 text-left">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr class="{% if loop.index % 2 == 0 %}bg-gray-50 dark:bg-gray-800{% else %}bg-white dark:bg-gray-900{% endif %}">
+                        <td class="p-2">{{ user.name }}</td>
+                        <td class="p-2">{{ user.email }}</td>
+                        <td class="p-2">{{ user.level.name }} {{ LEVELS[user.level.name].insignia }}</td>
+                        <td class="p-2">{{ 'Sim' if user.is_admin else 'Não' }}</td>
+                        <td class="p-2">
+                            <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}">
+                                <button type="submit" class="text-blue-600 hover:underline">{{ 'Remover Admin' if user.is_admin else 'Tornar Admin' }}</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

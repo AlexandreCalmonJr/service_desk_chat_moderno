@@ -1,44 +1,67 @@
-{% extends "base_layout.html" %}
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
 
-{% block title %}Meu Perfil{% endblock %}
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
 
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+{% block title %}Perfil - Service Desk{% endblock %}
 {% block content %}
-    <section class="profile">
-        <h2>Perfil de Aventureiro</h2>
-        <form method="POST" action="{{ url_for('profile') }}" class="profile-form">
-            <div class="profile-info">
-                <div class="info-item">
-                    <label>Nome</label>
-                    <input type="text" name="name" value="{{ current_user.name }}" required class="chat-input">
-                </div>
-                <div class="info-item">
-                    <label>Email</label>
-                    <input type="email" name="email" value="{{ current_user.email }}" required class="chat-input">
-                </div>
-                <div class="info-item">
-                    <label>Telefone</label>
-                    <input type="tel" name="phone" value="{{ current_user.phone | default('') }}" class="chat-input">
-                </div>
-                <div class="info-item">
-                    <label>Nível</label>
-                    <p class="message-bubble">{{ current_user.level.name if current_user.level else 'N/A' }}</p>
-                </div>
-                <div class="info-item">
-                    <label>Pontos</label>
-                    <p class="message-bubble">{{ current_user.points }}</p>
-                </div>
-                <div class="info-item">
-                    <label>Time</label>
-                    <p class="message-bubble">
-                        {% if current_user.team %}
-                            {{ current_user.team.name }}
-                        {% else %}
-                            Nenhum. <a href="{{ url_for('teams') }}">Junte-se a um!</a>
-                        {% endif %}
-                    </p>
-                </div>
-            </div>
-            <button type="submit" class="chat-button">Guardar Alterações</button>
-        </form>
-    </section>
+    <h1 class="text-2xl font-bold mb-4">Perfil de {{ current_user.name }}</h1>
+    <form method="POST" class="max-w-md">
+        <div class="mb-4">
+            <label class="block text-sm font-medium">Nome</label>
+            <p class="p-2 bg-gray-200 dark:bg-gray-700 rounded">{{ current_user.name }}</p>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium">Email</label>
+            <p class="p-2 bg-gray-200 dark:bg-gray-700 rounded">{{ current_user.email }}</p>
+        </div>
+        <div class="mb-4">
+            <label for="phone" class="block text-sm font-medium">Telefone</label>
+            <input type="text" id="phone" name="phone" value="{{ current_user.phone or '' }}" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium">Pontos</label>
+            <p class="p-2 bg-gray-200 dark:bg-gray-700 rounded">{{ current_user.points }}</p>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium">Nível</label>
+            <p class="p-2 bg-gray-200 dark:bg-gray-700 rounded">{{ current_user.level.name }} {{ user_level_insignia }}</p>
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Atualizar Perfil</button>
+    </form>
 {% endblock %}

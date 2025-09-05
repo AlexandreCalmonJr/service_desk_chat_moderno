@@ -38,18 +38,35 @@
         return gk_fileData[filename] || "";
         }
         </script>{% extends "base.html" %}
-{% block title %}Login - Service Desk{% endblock %}
+{% block title %}Admin - Times - Service Desk{% endblock %}
 {% block content %}
-    <h1 class="text-2xl font-bold mb-4">Login</h1>
-    <form method="POST" class="max-w-md">
-        <div class="mb-4">
-            <label for="email" class="block text-sm font-medium">Email</label>
-            <input type="email" id="email" name="email" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
-        </div>
-        <div class="mb-4">
-            <label for="password" class="block text-sm font-medium">Senha</label>
-            <input type="password" id="password" name="password" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
-        </div>
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Entrar</button>
-    </form>
+    <h1 class="text-2xl font-bold mb-4">Gerenciar Times</h1>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="p-2 text-left">Nome</th>
+                    <th class="p-2 text-left">Dono</th>
+                    <th class="p-2 text-left">Membros</th>
+                    <th class="p-2 text-left">Pontos Totais</th>
+                    <th class="p-2 text-left">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in teams %}
+                    <tr class="{% if loop.index % 2 == 0 %}bg-gray-50 dark:bg-gray-800{% else %}bg-white dark:bg-gray-900{% endif %}">
+                        <td class="p-2">{{ team.name }}</td>
+                        <td class="p-2">{{ team.owner.name }}</td>
+                        <td class="p-2">{{ team.members.count() }}</td>
+                        <td class="p-2">{{ team.total_points }}</td>
+                        <td class="p-2">
+                            <form method="POST" action="{{ url_for('admin_delete_team', team_id=team.id) }}">
+                                <button type="submit" class="text-red-600 hover:underline">Dissolver</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 {% endblock %}

@@ -1,50 +1,63 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ServiceDesk RPG - Criar Conta</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-</head>
-<body class="bg-gray-900 flex items-center justify-center min-h-screen py-12">
-    <div class="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
-        <div class="text-center">
-            <i class="fas fa-dungeon text-5xl text-green-400"></i>
-            <h2 class="mt-4 text-3xl font-extrabold text-white">Junte-se à Aventura!</h2>
-            <p class="mt-2 text-gray-400">Crie a sua conta para começar a jogar.</p>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+{% block title %}Registrar - Service Desk{% endblock %}
+{% block content %}
+    <h1 class="text-2xl font-bold mb-4">Registrar</h1>
+    <form method="POST" class="max-w-md">
+        <div class="mb-4">
+            <label for="name" class="block text-sm font-medium">Nome</label>
+            <input type="text" id="name" name="name" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                     <div class="p-4 rounded-md text-sm {% if category == 'error' %}bg-red-500/20 text-red-300{% else %}bg-green-500/20 text-green-300{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <form method="POST" action="{{ url_for('register') }}" class="space-y-6">
-             <div>
-                <label for="name" class="block text-sm font-medium text-gray-300">Nome de Utilizador</label>
-                <input type="text" id="name" name="name" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
-            </div>
-            <div>
-                <label for="email" class="block text-sm font-medium text-gray-300">Email</label>
-                <input type="email" id="email" name="email" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
-            </div>
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-300">Senha</label>
-                <input type="password" id="password" name="password" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
-            </div>
-            <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800">Criar Conta</button>
-        </form>
-        <p class="text-center text-sm text-gray-400">
-            Já tem uma conta? <a href="{{ url_for('login') }}" class="font-medium text-green-400 hover:text-green-300">Faça login</a>
-        </p>
-    </div>
-</body>
-</html>
-
+        <div class="mb-4">
+            <label for="email" class="block text-sm font-medium">Email</label>
+            <input type="email" id="email" name="email" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+        </div>
+        <div class="mb-4">
+            <label for="password" class="block text-sm font-medium">Senha</label>
+            <input type="password" id="password" name="password" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+        </div>
+        <div class="mb-4">
+            <label for="phone" class="block text-sm font-medium">Telefone (opcional)</label>
+            <input type="text" id="phone" name="phone" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Registrar</button>
+    </form>
+{% endblock %}

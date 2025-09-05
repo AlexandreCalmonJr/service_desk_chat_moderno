@@ -1,82 +1,108 @@
-{% extends "base_layout.html" %}
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
 
-{% block title %}Gerir Desafios{% endblock %}
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
 
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script>{% extends "base.html" %}
+{% block title %}Admin - Desafios - Service Desk{% endblock %}
 {% block content %}
-<div class="w-full max-w-4xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Gestão de Desafios</h2>
-
-    <!-- Formulário para Adicionar Novo Desafio -->
-    <div class="mb-10 p-6 border rounded-lg border-gray-700 bg-gray-800/50">
-        <h3 class="text-xl font-semibold mb-4 text-yellow-400">Adicionar Novo Desafio</h3>
-        <form action="{{ url_for('admin_challenges') }}" method="POST" class="space-y-4">
-            <div>
-                <label for="title" class="block text-sm font-medium">Título</label>
-                <input type="text" id="title" name="title" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
-            </div>
-            <div>
-                <label for="description" class="block text-sm font-medium">Descrição (Enunciado)</label>
-                <textarea id="description" name="description" rows="3" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md"></textarea>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label for="level_required" class="block text-sm font-medium">Nível Mínimo</label>
-                    <select id="level_required" name="level_required" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
-                        {% for level in levels %}
-                        <option value="{{ level.name }}">{{ level.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="points_reward" class="block text-sm font-medium">Recompensa (Pontos)</label>
-                    <input type="number" id="points_reward" name="points_reward" value="10" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
-                </div>
-            </div>
-            <div>
-                <label for="expected_answer" class="block text-sm font-medium">Resposta Esperada</label>
-                <input type="text" id="expected_answer" name="expected_answer" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md" placeholder="A resposta exata que o utilizador deve submeter">
-            </div>
-            <div>
-                <label for="unlocks_faq_id" class="block text-sm font-medium">FAQ que este desafio desbloqueia (Opcional)</label>
-                <select id="unlocks_faq_id" name="unlocks_faq_id" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
-                    <option value="">Nenhuma</option>
-                    {% for faq in faqs %}
+    <h1 class="text-2xl font-bold mb-4">Gerenciar Desafios</h1>
+    <h2 class="text-xl font-semibold mb-2">Adicionar Desafio</h2>
+    <form method="POST" class="max-w-md mb-6">
+        <div class="mb-4">
+            <label for="title" class="block text-sm font-medium">Título</label>
+            <input type="text" id="title" name="title" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+        </div>
+        <div class="mb-4">
+            <label for="description" class="block text-sm font-medium">Descrição</label>
+            <textarea id="description" name="description" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required></textarea>
+        </div>
+        <div class="mb-4">
+            <label for="level_required" class="block text-sm font-medium">Nível Requerido</label>
+            <select id="level_required" name="level_required" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+                {% for level_name in LEVELS %}
+                    <option value="{{ level_name }}">{{ level_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-4">
+            <label for="points_reward" class="block text-sm font-medium">Pontos</label>
+            <input type="number" id="points_reward" name="points_reward" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+        </div>
+        <div class="mb-4">
+            <label for="expected_answer" class="block text-sm font-medium">Resposta Esperada</label>
+            <input type="text" id="expected_answer" name="expected_answer" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+        </div>
+        <div class="mb-4">
+            <label for="unlocks_faq_id" class="block text-sm font-medium">Desbloqueia FAQ (opcional)</label>
+            <select id="unlocks_faq_id" name="unlocks_faq_id" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
+                <option value="">Nenhuma</option>
+                {% for faq in faqs %}
                     <option value="{{ faq.id }}">{{ faq.question }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="w-full py-2 px-4 rounded-md font-medium text-white bg-green-600 hover:bg-green-700">Adicionar Desafio</button>
-        </form>
-    </div>
-
-    <!-- Lista de Desafios Existentes -->
-    <h3 class="text-xl font-semibold text-yellow-400 mb-4">Desafios Existentes</h3>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left">
-             <thead>
-                <tr class="bg-gray-800 border-b border-gray-700">
-                    <th class="p-3">Título</th>
-                    <th class="p-3">Nível</th>
-                    <th class="p-3">Pontos</th>
-                    <th class="p-3">Ação</th>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Adicionar Desafio</button>
+    </form>
+    <h2 class="text-xl font-semibold mb-2">Lista de Desafios</h2>
+    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-gray-200 dark:bg-gray-700">
+                    <th class="p-2 text-left">Título</th>
+                    <th class="p-2 text-left">Nível</th>
+                    <th class="p-2 text-left">Pontos</th>
+                    <th class="p-2 text-left">Ações</th>
                 </tr>
             </thead>
             <tbody>
                 {% for challenge in challenges %}
-                <tr class="border-b border-gray-700">
-                    <td class="p-3">{{ challenge.title }}</td>
-                    <td class="p-3">{{ challenge.level_required }}</td>
-                    <td class="p-3">{{ challenge.points_reward }}</td>
-                    <td class="p-3">
-                        <form action="{{ url_for('delete_challenge', challenge_id=challenge.id) }}" method="POST" onsubmit="return confirm('Tem a certeza que quer apagar este desafio?');">
-                            <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm transition">Apagar</button>
-                        </form>
-                    </td>
-                </tr>
+                    <tr class="{% if loop.index % 2 == 0 %}bg-gray-50 dark:bg-gray-800{% else %}bg-white dark:bg-gray-900{% endif %}">
+                        <td class="p-2">{{ challenge.title }}</td>
+                        <td class="p-2">{{ challenge.level_required }}</td>
+                        <td class="p-2">{{ challenge.points_reward }}</td>
+                        <td class="p-2">
+                            <form method="POST" action="{{ url_for('delete_challenge', challenge_id=challenge.id) }}">
+                                <button type="submit" class="text-red-600 hover:underline">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-</div>
 {% endblock %}
-
