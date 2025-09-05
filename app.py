@@ -73,7 +73,7 @@ class User(UserMixin, db.Model):
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     points = db.Column(db.Integer, default=0)
-    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=False)
+    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=True) # Alterado para True temporariamente
     level = db.relationship('Level', backref='users')
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
 
@@ -152,31 +152,9 @@ LEVELS = {
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Inicialização do banco de dados
-def initialize_app():
-    with app.app_context():
-        try:
-            db.create_all()
-            categories = ['Hardware', 'Software', 'Rede', 'Outros', 'Mobile', 'Automation']
-            for category_name in categories:
-                if not Category.query.filter_by(name=category_name).first():
-                    category = Category(name=category_name)
-                    db.session.add(category)
-            if Level.query.count() == 0:
-                logging.info("A semear os níveis iniciais na base de dados...")
-                levels_to_seed = [
-                    Level(name='Iniciante', min_points=0, insignia_image_url='beginner.svg'),
-                    Level(name='Dados de Prata', min_points=50, insignia_image_url='silver.svg'),
-                    Level(name='Dados de Ouro', min_points=150, insignia_image_url='gold.svg'),
-                    Level(name='Mestre dos Dados', min_points=300, insignia_image_url='master.svg')
-                ]
-                db.session.bulk_save_objects(levels_to_seed)
-            db.session.commit()
-        except Exception as e:
-            logging.error(f"Erro na inicialização do banco de dados: {str(e)}", exc_info=True)
-            raise
-
 # Funções de utilidade
+# ... (todas as suas funções de utilidade como process_ticket_command, etc. permanecem aqui) ...
+
 def process_ticket_command(message):
     match = re.match(r"Encerrar chamado (\d+)", message)
     if match:
@@ -334,7 +312,10 @@ def update_user_level(user):
         db.session.commit()
         flash(f'Subiu de nível! Você agora é {new_level.name}!', 'success')
 
+
 # Rotas
+# ... (todas as suas rotas como @app.route('/'), etc. permanecem aqui) ...
+
 @app.context_processor
 def inject_user_gamification_data():
     if current_user.is_authenticated and current_user.level:
@@ -493,12 +474,12 @@ def profile():
 def faqs():
     try:
         categories = Category.query.all()
-        faqs = FAQ.query.all()
+        faqs_list = FAQ.query.all()
         faq_to_edit = None
         if request.args.get('edit'):
             faq_id = request.args.get('edit')
             faq_to_edit = FAQ.query.get_or_404(faq_id)
-        return render_template('faqs.html', faqs=faqs, categories=categories, faq_to_edit=faq_to_edit)
+        return render_template('faqs.html', faqs=faqs_list, categories=categories, faq_to_edit=faq_to_edit)
     except Exception as e:
         logging.error(f"Erro na rota /faqs: {str(e)}", exc_info=True)
         return "Erro interno do servidor", 500
@@ -612,8 +593,12 @@ def register():
             phone = request.form.get('phone')
             initial_level = Level.query.filter_by(name='Iniciante').first()
             if not initial_level:
-                flash('Erro crítico de configuração: Nível "Iniciante" não encontrado.', 'error')
+                # Se o nível não existir, o init-db ainda não foi executado.
+                # Não podemos criar um utilizador sem um nível válido.
+                flash('Erro de configuração do servidor. Por favor, tente mais tarde.', 'error')
+                logging.error("Tentativa de registo falhou: Nível 'Iniciante' não encontrado na base de dados.")
                 return redirect(url_for('register'))
+            
             if User.query.filter_by(email=email).first():
                 flash('Email já registrado.', 'error')
             else:
@@ -655,7 +640,7 @@ def setup_first_admin():
             return f"<h1>Erro</h1><p>O administrador com o email {ADMIN_EMAIL} já existe.</p>"
         initial_level = Level.query.filter_by(name='Iniciante').first()
         if not initial_level:
-            return "<h1>Erro</h1><p>Nível 'Iniciante' não encontrado. Configure os níveis primeiro.</p>"
+            return "<h1>Erro</h1><p>Nível 'Iniciante' não encontrado. Execute 'flask init-db' primeiro.</p>"
         hashed_password = generate_password_hash(ADMIN_PASSWORD)
         admin_user = User(
             name=ADMIN_NAME,
@@ -1091,8 +1076,6 @@ def create_admin(name, email, password):
 def init_db_command():
     """Cria as tabelas do banco de dados e semeia os dados iniciais."""
     db.create_all()
-    # Adicionar a lógica de semear categorias e níveis aqui também
-    # para garantir que seja executada
     try:
         categories = ['Hardware', 'Software', 'Rede', 'Outros', 'Mobile', 'Automation']
         for category_name in categories:
@@ -1117,6 +1100,4 @@ def init_db_command():
         print(f"Erro ao semear dados: {e}")
 
 app.cli.add_command(create_admin)
-if __name__ == '__main__':
-    initialize_app()
-    app.run(debug=True)
+app.cli.add_command(init_db_command)

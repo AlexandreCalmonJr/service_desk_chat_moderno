@@ -8,87 +8,58 @@
     <link href="/static/styles.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <!-- Link para o Syntax Highlighting (se estiver a usar a funcionalidade de código) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+<body class="bg-gray-900 flex flex-col min-h-screen">
 
-    <!-- CABEÇALHO RESPONSIVO COMPLETO -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <!-- Título e Nome do Utilizador -->
+    <header class="bg-gray-800 shadow-md p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10 border-b border-gray-700">
         <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-            <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
+            <h1 class="text-xl font-bold text-white">Assistente de Service Desk</h1>
+            <span class="text-sm text-gray-400 hidden sm:block">
                 {{ user_level_insignia }} Olá, {{ current_user.name }}!
             </span>
         </div>
 
-        <!-- Menu para Ecrãs Grandes -->
         <div class="hidden md:flex items-center space-x-3">
-            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
+            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Ranking</a>
             {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
-                <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
-                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Gerir Desafios</a>
+                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Gerir FAQs</a>
+                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Gerir Desafios</a>
             {% endif %}
-            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Ver FAQs</a>
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Sair</a>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-            </button>
+            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Sair</a>
         </div>
 
-        <!-- Botão de Menu Hambúrguer para Ecrãs Pequenos -->
         <div class="md:hidden flex items-center">
-            <button id="menu-button" class="text-gray-900 dark:text-gray-100 focus:outline-none">
+            <button id="menu-button" class="text-gray-300 focus:outline-none">
                 <i class="fas fa-bars fa-lg"></i>
             </button>
         </div>
     </header>
 
-    <!-- Menu Dropdown para Ecrãs Pequenos -->
-    <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48">
+    <div id="mobile-menu" class="hidden md:hidden bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48 border border-gray-700">
         <div class="flex flex-col space-y-3">
-            <a href="{{ url_for('list_challenges') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ranking</a>
+            <a href="{{ url_for('list_challenges') }}" class="text-gray-300 hover:text-white">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-gray-300 hover:text-white">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-gray-300 hover:text-white">Ranking</a>
              {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_users') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir Utilizadores</a>
-                <a href="{{ url_for('admin_faq') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir FAQs</a>
+                <a href="{{ url_for('admin_users') }}" class="text-gray-300 hover:text-white">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faq') }}" class="text-gray-300 hover:text-white">Gerir FAQs</a>
             {% endif %}
-            <a href="{{ url_for('faqs') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ver FAQs</a>
-            <a href="{{ url_for('profile') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-600">Sair</a>
-            <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
-                <button class="theme-toggle w-full text-left text-gray-800 dark:text-gray-200" onclick="toggleTheme()" title="Alternar tema">
-                    <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i> Alternar Tema
-                </button>
-            </div>
+            <a href="{{ url_for('profile') }}" class="text-gray-300 hover:text-white">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-red-400 hover:text-red-300">Sair</a>
         </div>
     </div>
     
-    <!-- CONTEÚDO PRINCIPAL (CHAT) -->
     <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
         {% include 'chat.html' %}
     </main>
 
-    <!-- SCRIPTS GLOBAIS -->
     <script>
-        // Função para alternar o tema claro/escuro
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            const themeIcons = document.querySelectorAll('.theme-toggle i');
-            themeIcons.forEach(icon => {
-                icon.classList.toggle('fa-moon');
-                icon.classList.toggle('fa-sun');
-            });
-        }
-
-        // Script para o menu hambúrguer
         const menuButton = document.getElementById('menu-button');
         const mobileMenu = document.getElementById('mobile-menu');
         if (menuButton) {
