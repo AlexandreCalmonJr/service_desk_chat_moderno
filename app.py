@@ -303,26 +303,19 @@ def find_faqs_by_keywords(message):
 def find_faq_by_nlp(message):
     """Usa o spaCy para extrair palavras-chave e encontrar FAQs relevantes."""
     doc = nlp(message.lower())
-
     keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ in ['NOUN', 'PROPN', 'VERB']}
-
     if not keywords:
         return []
-
     faqs = FAQ.query.all()
     matches = []
-
     for faq in faqs:
         question_doc = nlp(faq.question.lower())
         answer_doc = nlp(faq.answer.lower())
-
         faq_keywords = {token.lemma_ for token in question_doc if not token.is_stop and not token.is_punct}
         faq_keywords.update({token.lemma_ for token in answer_doc if not token.is_stop and not token.is_punct})
-
         score = len(keywords.intersection(faq_keywords))
         if score > 0:
             matches.append((faq, score))
-
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches]
 
