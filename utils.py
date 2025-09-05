@@ -14,8 +14,12 @@ try:
     nlp = spacy.load('pt_core_news_sm')
 except OSError:
     print("Modelo pt_core_news_sm não encontrado. A fazer o download...")
-    download('pt_core_news_sm')
-    nlp = spacy.load('pt_core_news_sm')
+    try:
+        download('pt_core_news_sm')
+        nlp = spacy.load('pt_core_news_sm')
+    except Exception as e:
+        print(f"Erro ao carregar ou baixar o modelo spacy: {str(e)}")
+        nlp = None  # Fallback para evitar falhas
 
 def process_ticket_command(message):
     """Processa comandos relacionados a tickets, como 'Encerrar chamado'."""
