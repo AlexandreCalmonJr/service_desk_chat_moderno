@@ -1,113 +1,118 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - Service Desk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <nav class="bg-blue-600 dark:bg-blue-800 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="{{ url_for('index') }}" class="text-white text-2xl font-bold">Service Desk</a>
+            <div class="space-x-4">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('index') }}" class="text-white hover:text-gray-200">Início</a>
+                    <a href="{{ url_for('faqs') }}" class="text-white hover:text-gray-200">FAQs</a>
+                    <a href="{{ url_for('chat_page') }}" class="text-white hover:text-gray-200">Chat</a>
+                    <a href="{{ url_for('challenges') }}" class="text-white hover:text-gray-200">Desafios</a>
+                    <a href="{{ url_for('ranking') }}" class="text-white hover:text-gray-200">Ranking</a>
+                    <a href="{{ url_for('teams_list') }}" class="text-white hover:text-gray-200">Times</a>
+                    {% if current_user.team and current_user.team.owner_id == current_user.id %}
+                        <a href="{{ url_for('manage_team') }}" class="text-white hover:text-gray-200">Gerenciar Time</a>
+                    {% endif %}
+                    {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="text-white hover:text-gray-200">Admin</a>
+                    {% endif %}
+                    <a href="{{ url_for('profile') }}" class="text-white hover:text-gray-200">Perfil ({{ user_level_insignia }})</a>
+                    <a href="{{ url_for('logout') }}" class="text-white hover:text-gray-200">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="text-white hover:text-gray-200">Login</a>
+                    <a href="{{ url_for('register') }}" class="text-white hover:text-gray-200">Registrar</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <div class="container mx-auto p-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="bg-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-100 border-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-500 text-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-700 px-4 py-3 rounded mb-4">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <h1 class="text-2xl font-bold mb-4">Chat de Suporte</h1>
+        <div id="chat-container" class="bg-white dark:bg-gray-800 p-4 rounded shadow-md h-96 overflow-y-auto mb-4">
+            <!-- Mensagens do chat serão inseridas aqui -->
+        </div>
+        <div class="flex">
+            <input type="text" id="message-input" class="flex-grow p-2 border rounded dark:bg-gray-800 dark:border-gray-700" placeholder="Digite sua mensagem...">
+            <button id="send-message" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ml-2">Enviar</button>
+        </div>
+        <script>
+            const chatContainer = document.getElementById('chat-container');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-message');
 
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
+            sendButton.addEventListener('click', async () => {
+                const message = messageInput.value.trim();
+                if (!message) return;
 
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
+                // Adicionar mensagem do usuário
+                const userMessage = document.createElement('div');
+                userMessage.className = 'bg-blue-100 dark:bg-blue-900 p-2 rounded mb-2';
+                userMessage.innerHTML = `<strong>Você:</strong> ${message}`;
+                chatContainer.appendChild(userMessage);
+                messageInput.value = '';
 
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script>{% extends "base.html" %}
-{% block title %}Chat - Service Desk{% endblock %}
-{% block content %}
-    <h1 class="text-2xl font-bold mb-4">Chat de Suporte</h1>
-    <div id="chat-container" class="bg-white dark:bg-gray-800 p-4 rounded shadow-md h-96 overflow-y-auto mb-4">
-        <!-- Mensagens do chat serão inseridas aqui -->
-    </div>
-    <div class="flex">
-        <input type="text" id="message-input" class="flex-grow p-2 border rounded dark:bg-gray-800 dark:border-gray-700" placeholder="Digite sua mensagem...">
-        <button id="send-message" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ml-2">Enviar</button>
-    </div>
-    <script>
-        const chatContainer = document.getElementById('chat-container');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-message');
-
-        sendButton.addEventListener('click', async () => {
-            const message = messageInput.value.trim();
-            if (!message) return;
-
-            // Adicionar mensagem do usuário
-            const userMessage = document.createElement('div');
-            userMessage.className = 'bg-blue-100 dark:bg-blue-900 p-2 rounded mb-2';
-            userMessage.innerHTML = `<strong>Você:</strong> ${message}`;
-            chatContainer.appendChild(userMessage);
-            messageInput.value = '';
-
-            // Enviar mensagem para o servidor
-            const response = await fetch('{{ url_for("chat") }}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mensagem: message })
-            });
-            const data = await response.json();
-
-            // Adicionar resposta do bot
-            const botMessage = document.createElement('div');
-            botMessage.className = 'bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2';
-            if (data.html) {
-                botMessage.innerHTML = data.text;
-            } else {
-                botMessage.innerHTML = `<strong>Bot:</strong> ${data.text}`;
-            }
-            chatContainer.appendChild(botMessage);
-
-            // Adicionar opções de FAQs, se disponíveis
-            if (data.state === 'faq_selection') {
-                const optionsContainer = document.createElement('div');
-                optionsContainer.className = 'mt-2';
-                data.options.forEach(option => {
-                    const button = document.createElement('button');
-                    button.className = 'bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2 mb-2';
-                    button.textContent = option.question;
-                    button.onclick = async () => {
-                        const faqResponse = await fetch('{{ url_for("chat") }}', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ mensagem: `Selecionar FAQ ${option.id}` })
-                        });
-                        const faqData = await faqResponse.json();
-                        const faqMessage = document.createElement('div');
-                        faqMessage.className = 'bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2';
-                        faqMessage.innerHTML = faqData.text;
-                        chatContainer.appendChild(faqMessage);
-                        optionsContainer.remove();
-                    };
-                    optionsContainer.appendChild(button);
+                // Enviar mensagem para o servidor
+                const response = await fetch('{{ url_for("chat") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensagem: message })
                 });
-                chatContainer.appendChild(optionsContainer);
-            }
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        });
-    </script>
-{% endblock %}
+                const data = await response.json();
+
+                // Adicionar resposta do bot
+                const botMessage = document.createElement('div');
+                botMessage.className = 'bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2';
+                if (data.html) {
+                    botMessage.innerHTML = data.text;
+                } else {
+                    botMessage.innerHTML = `<strong>Bot:</strong> ${data.text}`;
+                }
+                chatContainer.appendChild(botMessage);
+
+                // Adicionar opções de FAQs, se disponíveis
+                if (data.state === 'faq_selection') {
+                    const optionsContainer = document.createElement('div');
+                    optionsContainer.className = 'mt-2';
+                    data.options.forEach(option => {
+                        const button = document.createElement('button');
+                        button.className = 'bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-2 mb-2';
+                        button.textContent = option.question;
+                        button.onclick = async () => {
+                            const faqResponse = await fetch('{{ url_for("chat") }}', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ mensagem: `Selecionar FAQ ${option.id}` })
+                            });
+                            const faqData = await faqResponse.json();
+                            const faqMessage = document.createElement('div');
+                            faqMessage.className = 'bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2';
+                            faqMessage.innerHTML = faqData.text;
+                            chatContainer.appendChild(faqMessage);
+                            optionsContainer.remove();
+                        };
+                        optionsContainer.appendChild(button);
+                    });
+                    chatContainer.appendChild(optionsContainer);
+                }
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            });
+        </script>
+    </div>
+</body>
+</html>

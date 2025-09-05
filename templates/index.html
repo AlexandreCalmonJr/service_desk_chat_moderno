@@ -1,50 +1,55 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script>{% extends "base.html" %}
-{% block title %}Início - Service Desk{% endblock %}
-{% block content %}
-    <h1 class="text-3xl font-bold mb-4">Bem-vindo ao Service Desk</h1>
-    <p class="text-lg">Aqui você pode encontrar soluções para problemas técnicos, participar de desafios e interagir com sua equipe.</p>
-    <div class="mt-6">
-        <a href="{{ url_for('chat_page') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Iniciar Chat</a>
-        <a href="{{ url_for('faqs') }}" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-4">Ver FAQs</a>
-        <a href="{{ url_for('challenges') }}" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 ml-4">Desafios</a>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Início - Service Desk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <nav class="bg-blue-600 dark:bg-blue-800 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="{{ url_for('index') }}" class="text-white text-2xl font-bold">Service Desk</a>
+            <div class="space-x-4">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('index') }}" class="text-white hover:text-gray-200">Início</a>
+                    <a href="{{ url_for('faqs') }}" class="text-white hover:text-gray-200">FAQs</a>
+                    <a href="{{ url_for('chat_page') }}" class="text-white hover:text-gray-200">Chat</a>
+                    <a href="{{ url_for('challenges') }}" class="text-white hover:text-gray-200">Desafios</a>
+                    <a href="{{ url_for('ranking') }}" class="text-white hover:text-gray-200">Ranking</a>
+                    <a href="{{ url_for('teams_list') }}" class="text-white hover:text-gray-200">Times</a>
+                    {% if current_user.team and current_user.team.owner_id == current_user.id %}
+                        <a href="{{ url_for('manage_team') }}" class="text-white hover:text-gray-200">Gerenciar Time</a>
+                    {% endif %}
+                    {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="text-white hover:text-gray-200">Admin</a>
+                    {% endif %}
+                    <a href="{{ url_for('profile') }}" class="text-white hover:text-gray-200">Perfil ({{ user_level_insignia }})</a>
+                    <a href="{{ url_for('logout') }}" class="text-white hover:text-gray-200">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="text-white hover:text-gray-200">Login</a>
+                    <a href="{{ url_for('register') }}" class="text-white hover:text-gray-200">Registrar</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <div class="container mx-auto p-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="bg-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-100 border-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-500 text-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-700 px-4 py-3 rounded mb-4">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <h1 class="text-3xl font-bold mb-4">Bem-vindo ao Service Desk</h1>
+        <p class="text-lg">Aqui você pode encontrar soluções para problemas técnicos, participar de desafios e interagir com sua equipe.</p>
+        <div class="mt-6">
+            <a href="{{ url_for('chat_page') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Iniciar Chat</a>
+            <a href="{{ url_for('faqs') }}" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-4">Ver FAQs</a>
+            <a href="{{ url_for('challenges') }}" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 ml-4">Desafios</a>
+        </div>
     </div>
-{% endblock %}
+</body>
+</html>

@@ -3,7 +3,6 @@ import logging
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for, session, send_file, send_from_directory
 import io
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -24,7 +23,7 @@ logging.basicConfig(filename='app.log', level=logging.DEBUG, format='%(asctime)s
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost:5432/servicedesk')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'Uploads'
 app.config['INSIGNIA_FOLDER'] = 'static/insignias'
@@ -41,7 +40,6 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
 
 db = SQLAlchemy(app)
-migrate = Migrate(app, db)  # Inicializar Flask-Migrate
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 cache = Cache(app)

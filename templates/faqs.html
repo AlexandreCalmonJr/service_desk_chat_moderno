@@ -1,102 +1,107 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script>{% extends "base.html" %}
-{% block title %}FAQs - Service Desk{% endblock %}
-{% block content %}
-    <h1 class="text-2xl font-bold mb-4">FAQs</h1>
-    {% if faq_to_edit %}
-        <h2 class="text-xl font-semibold mb-2">Editar FAQ</h2>
-        <form method="POST" action="{{ url_for('edit_faq', faq_id=faq_to_edit.id) }}" enctype="multipart/form-data" class="max-w-md mb-6">
-            <div class="mb-4">
-                <label for="edit_category" class="block text-sm font-medium">Categoria</label>
-                <select id="edit_category" name="edit_category" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
-                    {% for category in categories %}
-                        <option value="{{ category.id }}" {% if category.id == faq_to_edit.category_id %}selected{% endif %}>{{ category.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="mb-4">
-                <label for="edit_question" class="block text-sm font-medium">Pergunta</label>
-                <input type="text" id="edit_question" name="edit_question" value="{{ faq_to_edit.question }}" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
-            </div>
-            <div class="mb-4">
-                <label for="edit_answer" class="block text-sm font-medium">Resposta</label>
-                <textarea id="edit_answer" name="edit_answer" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>{{ faq_to_edit.answer }}</textarea>
-            </div>
-            <div class="mb-4">
-                <label for="edit_image_url" class="block text-sm font-medium">URL da Imagem</label>
-                <input type="text" id="edit_image_url" name="edit_image_url" value="{{ faq_to_edit.image_url or '' }}" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
-            </div>
-            <div class="mb-4">
-                <label for="edit_video_url" class="block text-sm font-medium">URL do Vídeo</label>
-                <input type="text" id="edit_video_url" name="edit_video_url" value="{{ faq_to_edit.video_url or '' }}" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
-            </div>
-            <div class="mb-4">
-                <label for="edit_file" class="block text-sm font-medium">Arquivo</label>
-                <input type="file" id="edit_file" name="edit_file" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
-            </div>
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Salvar Alterações</button>
-        </form>
-    {% endif %}
-    <h2 class="text-xl font-semibold mb-2">Lista de FAQs</h2>
-    <form method="POST" action="{{ url_for('delete_multiple_faqs') }}" class="mb-4">
-        <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Excluir Selecionadas</button>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {% for faq in faqs %}
-                <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
-                    <input type="checkbox" name="faq_ids" value="{{ faq.id }}" class="mr-2">
-                    <h3 class="text-lg font-semibold">{{ faq.question }}</h3>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">{{ faq.category.name }}</p>
-                    <div class="mt-2" x-data="{ open: false }">
-                        <button @click="open = !open" class="text-blue-600 hover:underline">Ver Resposta</button>
-                        <div x-show="open" class="mt-2">{{ faq.formatted_answer | safe }}</div>
-                    </div>
-                    {% if current_user.is_admin %}
-                        <a href="{{ url_for('faqs', edit=faq.id) }}" class="text-blue-600 hover:underline">Editar</a>
-                        <form method="POST" action="{{ url_for('delete_faq', faq_id=faq.id) }}" class="inline">
-                            <button type="submit" class="text-red-600 hover:underline ml-2">Excluir</button>
-                        </form>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQs - Service Desk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <nav class="bg-blue-600 dark:bg-blue-800 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="{{ url_for('index') }}" class="text-white text-2xl font-bold">Service Desk</a>
+            <div class="space-x-4">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('index') }}" class="text-white hover:text-gray-200">Início</a>
+                    <a href="{{ url_for('faqs') }}" class="text-white hover:text-gray-200">FAQs</a>
+                    <a href="{{ url_for('chat_page') }}" class="text-white hover:text-gray-200">Chat</a>
+                    <a href="{{ url_for('challenges') }}" class="text-white hover:text-gray-200">Desafios</a>
+                    <a href="{{ url_for('ranking') }}" class="text-white hover:text-gray-200">Ranking</a>
+                    <a href="{{ url_for('teams_list') }}" class="text-white hover:text-gray-200">Times</a>
+                    {% if current_user.team and current_user.team.owner_id == current_user.id %}
+                        <a href="{{ url_for('manage_team') }}" class="text-white hover:text-gray-200">Gerenciar Time</a>
                     {% endif %}
-                </div>
-            {% endfor %}
+                    {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_dashboard') }}" class="text-white hover:text-gray-200">Admin</a>
+                    {% endif %}
+                    <a href="{{ url_for('profile') }}" class="text-white hover:text-gray-200">Perfil ({{ user_level_insignia }})</a>
+                    <a href="{{ url_for('logout') }}" class="text-white hover:text-gray-200">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="text-white hover:text-gray-200">Login</a>
+                    <a href="{{ url_for('register') }}" class="text-white hover:text-gray-200">Registrar</a>
+                {% endif %}
+            </div>
         </div>
-    </form>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@2.8.2/dist/alpine.min.js" defer></script>
-{% endblock %}
+    </nav>
+    <div class="container mx-auto p-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="bg-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-100 border-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-500 text-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-700 px-4 py-3 rounded mb-4">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <h1 class="text-2xl font-bold mb-4">FAQs</h1>
+        {% if faq_to_edit %}
+            <h2 class="text-xl font-semibold mb-2">Editar FAQ</h2>
+            <form method="POST" action="{{ url_for('edit_faq', faq_id=faq_to_edit.id) }}" enctype="multipart/form-data" class="max-w-md mb-6">
+                <div class="mb-4">
+                    <label for="edit_category" class="block text-sm font-medium">Categoria</label>
+                    <select id="edit_category" name="edit_category" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+                        {% for category in categories %}
+                            <option value="{{ category.id }}" {% if category.id == faq_to_edit.category_id %}selected{% endif %}>{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label for="edit_question" class="block text-sm font-medium">Pergunta</label>
+                    <input type="text" id="edit_question" name="edit_question" value="{{ faq_to_edit.question }}" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>
+                </div>
+                <div class="mb-4">
+                    <label for="edit_answer" class="block text-sm font-medium">Resposta</label>
+                    <textarea id="edit_answer" name="edit_answer" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700" required>{{ faq_to_edit.answer }}</textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="edit_image_url" class="block text-sm font-medium">URL da Imagem</label>
+                    <input type="text" id="edit_image_url" name="edit_image_url" value="{{ faq_to_edit.image_url or '' }}" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
+                </div>
+                <div class="mb-4">
+                    <label for="edit_video_url" class="block text-sm font-medium">URL do Vídeo</label>
+                    <input type="text" id="edit_video_url" name="edit_video_url" value="{{ faq_to_edit.video_url or '' }}" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
+                </div>
+                <div class="mb-4">
+                    <label for="edit_file" class="block text-sm font-medium">Arquivo</label>
+                    <input type="file" id="edit_file" name="edit_file" class="w-full p-2 border rounded dark:bg-gray-800 dark:border-gray-700">
+                </div>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Salvar Alterações</button>
+            </form>
+        {% endif %}
+        <h2 class="text-xl font-semibold mb-2">Lista de FAQs</h2>
+        <form method="POST" action="{{ url_for('delete_multiple_faqs') }}" class="mb-4">
+            <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Excluir Selecionadas</button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                {% for faq in faqs %}
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
+                        <input type="checkbox" name="faq_ids" value="{{ faq.id }}" class="mr-2">
+                        <h3 class="text-lg font-semibold">{{ faq.question }}</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">{{ faq.category.name }}</p>
+                        <div class="mt-2" x-data="{ open: false }">
+                            <button @click="open = !open" class="text-blue-600 hover:underline">Ver Resposta</button>
+                            <div x-show="open" class="mt-2">{{ faq.formatted_answer | safe }}</div>
+                        </div>
+                        {% if current_user.is_admin %}
+                            <a href="{{ url_for('faqs', edit=faq.id) }}" class="text-blue-600 hover:underline">Editar</a>
+                            <form method="POST" action="{{ url_for('delete_faq', faq_id=faq.id) }}" class="inline">
+                                <button type="submit" class="text-red-600 hover:underline ml-2">Excluir</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </form>
+        <script src="https://cdn.jsdelivr.net/npm/alpinejs@2.8.2/dist/alpine.min.js" defer></script>
+    </div>
+</body>
+</html>
