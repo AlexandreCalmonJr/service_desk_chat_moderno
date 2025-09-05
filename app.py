@@ -22,7 +22,9 @@ from PIL import Image
 logging.basicConfig(filename='app.log', level=logging.DEBUG, format='%(asctime)s %(levelname)s: %(message)s')
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'c0ddba11f7bf54608a96059d558c479d')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+if not app.config['SECRET_KEY']:
+    raise RuntimeError("A variável de ambiente SECRET_KEY deve ser definida.")
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'Uploads'
@@ -32,9 +34,16 @@ app.config['CACHE_REDIS_URL'] = os.getenv('REDIS_URL', 'redis://localhost:6379/0
 
 # Criar diretórios
 for folder in [app.config['UPLOAD_FOLDER'], app.config['INSIGNIA_FOLDER']]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-        os.chmod(folder, 0o755)
+    try:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+            try:
+                os.chmod(folder, 0o755)  # Tenta alterar permissões apenas se necessário
+            except OSError as e:
+                logging.warning(f"Não foi possível alterar permissões do diretório {folder}: {str(e)}")
+    except OSError as e:
+        logging.error(f"Erro ao criar diretório {folder}: {str(e)}")
+        raise
 
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
@@ -48,13 +57,16 @@ cache = Cache(app)
 try:
     nlp = spacy.load('pt_core_news_sm')
 except OSError:
-    logging.info("Modelo pt_core_news_sm não encontrado. A fazer o download...")
+    logging.info("Modelo pt_core_news_sm não encontrado. Tentando fazer o download...")
     try:
         spacy.cli.download('pt_core_news_sm')
         nlp = spacy.load('pt_core_news_sm')
+        logging.info("Modelo pt_core_news_sm carregado com sucesso após download.")
     except Exception as e:
-        logging.error(f"Erro ao carregar ou baixar o modelo spacy: {str(e)}")
+        logging.error(f"Erro ao carregar ou baixar o modelo spaCy: {str(e)}")
         nlp = None
+        # Opcional: Levante uma exceção se o spaCy for crítico
+        # raise RuntimeError("Modelo spaCy não pôde ser carregado. A aplicação não pode continuar.")
 
 # Modelos
 class Level(db.Model):
@@ -66,14 +78,14 @@ class Level(db.Model):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False, index=True)
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     phone = db.Column(db.String(20))
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     points = db.Column(db.Integer, default=0)
-    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=True) # Alterado para True temporariamente
+    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=True)
     level = db.relationship('Level', backref='users')
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
 
@@ -104,7 +116,7 @@ class FAQ(db.Model):
     answer = db.Column(db.Text, nullable=False)
     image_url = db.Column(db.String(500), nullable=True)
     video_url = db.Column(db.String(500), nullable=True)
-    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False, index=True)
     category = db.relationship('Category', backref=db.backref('faqs', lazy=True))
     file_name = db.Column(db.String(255), nullable=True)
     file_data = db.Column(db.LargeBinary, nullable=True)
@@ -153,8 +165,6 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 # Funções de utilidade
-# ... (todas as suas funções de utilidade como process_ticket_command, etc. permanecem aqui) ...
-
 def process_ticket_command(message):
     match = re.match(r"Encerrar chamado (\d+)", message)
     if match:
@@ -283,7 +293,7 @@ def find_faqs_by_keywords(message):
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches]
 
-@cache.cached(timeout=600, key_prefix='faq_search')
+@cache.cached(timeout=3600, key_prefix='faq_search')
 def find_faq_by_nlp(message):
     if not nlp:
         return find_faqs_by_keywords(message)
@@ -291,7 +301,7 @@ def find_faq_by_nlp(message):
     keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ in ['NOUN', 'PROPN', 'VERB']}
     if not keywords:
         return []
-    faqs = FAQ.query.all()
+    faqs = FAQ.query.with_entities(FAQ.id, FAQ.question, FAQ.answer).all()
     matches = []
     for faq in faqs:
         question_doc = nlp(faq.question.lower())
@@ -300,7 +310,7 @@ def find_faq_by_nlp(message):
         faq_keywords.update({token.lemma_ for token in answer_doc if not token.is_stop and not token.is_punct})
         score = len(keywords.intersection(faq_keywords))
         if score > 0:
-            matches.append((faq, score))
+            matches.append((FAQ.query.get(faq.id), score))
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches]
 
@@ -312,10 +322,7 @@ def update_user_level(user):
         db.session.commit()
         flash(f'Subiu de nível! Você agora é {new_level.name}!', 'success')
 
-
 # Rotas
-# ... (todas as suas rotas como @app.route('/'), etc. permanecem aqui) ...
-
 @app.context_processor
 def inject_user_gamification_data():
     if current_user.is_authenticated and current_user.level:
@@ -593,8 +600,6 @@ def register():
             phone = request.form.get('phone')
             initial_level = Level.query.filter_by(name='Iniciante').first()
             if not initial_level:
-                # Se o nível não existir, o init-db ainda não foi executado.
-                # Não podemos criar um utilizador sem um nível válido.
                 flash('Erro de configuração do servidor. Por favor, tente mais tarde.', 'error')
                 logging.error("Tentativa de registo falhou: Nível 'Iniciante' não encontrado na base de dados.")
                 return redirect(url_for('register'))
@@ -632,10 +637,15 @@ def logout():
 
 @app.route('/setup-first-admin-a1b2c3d4e5')
 def setup_first_admin():
+    # ATENÇÃO: Esta rota deve ser desativada ou protegida após a configuração inicial do administrador!
+    if not os.getenv('ENABLE_ADMIN_SETUP', 'False').lower() == 'true':
+        return "<h1>Erro</h1><p>Rota desativada. Configure ENABLE_ADMIN_SETUP para ativar.</p>", 403
     try:
-        ADMIN_EMAIL = "admin@d3vb4.com"
-        ADMIN_PASSWORD = "d3vb4_admin!"
-        ADMIN_NAME = "Administrador"
+        ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@d3vb4.com')
+        ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
+        ADMIN_NAME = os.getenv('ADMIN_NAME', 'Administrador')
+        if not ADMIN_PASSWORD:
+            return "<h1>Erro</h1><p>A variável de ambiente ADMIN_PASSWORD deve ser definida.</p>", 500
         if User.query.filter_by(email=ADMIN_EMAIL).first():
             return f"<h1>Erro</h1><p>O administrador com o email {ADMIN_EMAIL} já existe.</p>"
         initial_level = Level.query.filter_by(name='Iniciante').first()
@@ -651,7 +661,7 @@ def setup_first_admin():
         )
         db.session.add(admin_user)
         db.session.commit()
-        return f"<h1>Sucesso</h1><p>Administrador criado com o email {ADMIN_EMAIL}. Por favor, exclua ou proteja esta rota imediatamente.</p>"
+        return f"<h1>Sucesso</h1><p>Administrador criado com o email {ADMIN_EMAIL}. Por favor, desative esta rota imediatamente definindo ENABLE_ADMIN_SETUP=False.</p>"
     except Exception as e:
         logging.error(f"Erro na rota /setup-first-admin-a1b2c3d4e5: {str(e)}", exc_info=True)
         return "Erro interno do servidor", 500
@@ -702,6 +712,18 @@ def admin_faq():
             elif 'import_faqs' in request.form:
                 file = request.files['faq_file']
                 if file and file.filename.endswith(('.json', '.csv', '.pdf')):
+                    allowed_mimes = {
+                        '.json': 'application/json',
+                        '.csv': 'text/csv',
+                        '.pdf': 'application/pdf'
+                    }
+                    max_file_size = 10 * 1024 * 1024  # 10 MB
+                    if file.content_type not in allowed_mimes.values():
+                        flash(f'Tipo de arquivo inválido. Use apenas {", ".join(allowed_mimes.keys())}.', 'error')
+                        return redirect(url_for('admin_faq'))
+                    if file.content_length > max_file_size:
+                        flash('Arquivo muito grande. O limite é 10 MB.', 'error')
+                        return redirect(url_for('admin_faq'))
                     filename = secure_filename(file.filename)
                     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                     file.save(file_path)
@@ -869,7 +891,11 @@ def list_challenges():
 def submit_challenge(challenge_id):
     try:
         challenge = Challenge.query.get_or_404(challenge_id)
-        submitted_answer = request.form.get('answer').strip()
+        submitted_answer = request.form.get('answer')
+        if not submitted_answer:
+            flash('Por favor, envie uma resposta.', 'error')
+            return redirect(url_for('list_challenges'))
+        submitted_answer = submitted_answer.strip()
         if submitted_answer == challenge.expected_answer:
             existing_completion = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=challenge_id).first()
             if not existing_completion:
