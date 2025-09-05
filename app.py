@@ -50,6 +50,10 @@ class Level(db.Model):
     min_points = db.Column(db.Integer, unique=True, nullable=False, index=True)
     insignia = db.Column(db.String(10), nullable=False, default='🌱')
 
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -60,7 +64,7 @@ class User(UserMixin, db.Model):
     registered_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     points = db.Column(db.Integer, default=0)
-    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=True) # Alterado para nullable=True
+    level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=True)
     level = db.relationship('Level', backref='users')
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
 
@@ -75,18 +79,88 @@ class Team(db.Model):
     def total_points(self):
         return sum(member.points for member in self.members)
 
+class FAQ(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    answer = db.Column(db.Text, nullable=False)
+    image_url = db.Column(db.String(500))
+    video_url = db.Column(db.String(500))
+    file_name = db.Column(db.String(255))
+    file_data = db.Column(db.LargeBinary)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    category = db.relationship('Category', backref='faqs')
+
+class Ticket(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String(20), unique=True, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), default='Aberto')
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Challenge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    expected_answer = db.Column(db.String(500), nullable=False)
+    points_reward = db.Column(db.Integer, default=10)
+    level_required = db.Column(db.String(50), default='Iniciante')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class UserChallenge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), nullable=False)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user = db.relationship('User', backref='completed_challenges')
+    challenge = db.relationship('Challenge')
+
+class ChatMessage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    response = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    feedback = db.Column(db.String(20))  # 'helpful', 'unhelpful'
+
+# Constante de níveis
+LEVELS = {
+    'Iniciante': {'min_points': 0, 'insignia': '🌱'},
+    'Básico': {'min_points': 50, 'insignia': '🌿'},
+    'Intermediário': {'min_points': 150, 'insignia': '🌳'},
+    'Avançado': {'min_points': 350, 'insignia': '🏆'},
+    'Expert': {'min_points': 600, 'insignia': '⭐'},
+    'Master': {'min_points': 1000, 'insignia': '👑'}
+}
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Inicialização do banco de dados e categorias padrão
-with app.app_context():
+def initialize_database():
+    """Inicializa o banco de dados com dados padrão"""
     db.create_all()
+    
+    # Inicializar níveis
+    for level_name, level_data in LEVELS.items():
+        if not Level.query.filter_by(name=level_name).first():
+            level = Level(
+                name=level_name,
+                min_points=level_data['min_points'],
+                insignia=level_data['insignia']
+            )
+            db.session.add(level)
+    
+    # Inicializar categorias
     categories = ['Hardware', 'Software', 'Rede', 'Outros', 'Mobile', 'Automation']
     for category_name in categories:
         if not Category.query.filter_by(name=category_name).first():
             category = Category(name=category_name)
             db.session.add(category)
+    
     db.session.commit()
 
 # Funções de utilidade
@@ -190,7 +264,6 @@ def format_faq_response(faq_id, question, answer, image_url=None, video_url=None
         else:
             formatted_response += f'<video width="560" height="315" controls style="margin-top: 10px;"><source src="{video_url}" type="video/mp4">Seu navegador não suporta o vídeo.</video><br>'
     
-    # Adicionar link de download do arquivo, se disponível
     if file_name:
         formatted_response += f'<br><a href="/download/{faq_id}" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank">📎 Baixar arquivo: {file_name}</a>'
 
@@ -219,14 +292,12 @@ def find_faqs_by_keywords(message):
         question_words = set(faq.question.lower().split())
         answer_words = set(faq.answer.lower().split())
 
-        # Conta quantas palavras da busca aparecem na FAQ
         score = len(search_words.intersection(question_words)) * 2
         score += len(search_words.intersection(answer_words))
 
         if score > 0:
             matches.append((faq, score))
 
-    # Ordena os resultados pelo score (mais relevante primeiro)
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches]
 
@@ -235,7 +306,6 @@ def find_faq_by_nlp(message):
     """Usa o spaCy para extrair palavras-chave e encontrar FAQs relevantes."""
     doc = nlp(message.lower())
 
-    # Extrai substantivos, verbos e nomes próprios como palavras-chave
     keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ in ['NOUN', 'PROPN', 'VERB']}
 
     if not keywords:
@@ -265,6 +335,19 @@ def update_user_level(user):
         user.level_id = new_level.id
         flash(f'Subiu de nível! Você agora é {new_level.name}!', 'success')
 
+# Context processors
+@app.context_processor
+def inject_user_gamification_data():
+    if current_user.is_authenticated and current_user.level:
+        return dict(user_level_insignia=current_user.level.insignia)
+    return dict(user_level_insignia='')
+
+# --- ROTAS ---
+@app.route('/')
+@login_required
+def index():
+    return render_template('index.html')
+
 @app.route('/admin/users')
 @login_required
 def admin_users():
@@ -275,32 +358,13 @@ def admin_users():
     all_users = User.query.order_by(User.name).all()
     return render_template('admin_users.html', users=all_users)
 
-@app.context_processor
-@app.context_processor
-def inject_user_gamification_data():
-    # Verifica se o utilizador está autenticado E se tem um nível associado
-    if current_user.is_authenticated and current_user.level:
-        return dict(user_level_insignia=current_user.level.insignia)
-    # Se não, fornece um valor padrão para evitar erros
-    return dict(user_level_insignia='')
-
 @app.route('/ranking')
 @login_required
 def ranking():
-    # Ranking individual (como antes)
     ranked_users = User.query.order_by(User.points.desc()).all()
-
-    # Ranking de times
     all_teams = Team.query.all()
-    # Ordena os times pela pontuação total (calculada na propriedade do modelo)
     ranked_teams = sorted(all_teams, key=lambda t: t.total_points, reverse=True)
-
     return render_template('ranking.html', ranked_users=ranked_users, ranked_teams=ranked_teams)
-# Rotas
-@app.route('/')
-@login_required
-def index():
-    return render_template('index.html')
 
 @app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
 @login_required
@@ -310,7 +374,6 @@ def toggle_admin(user_id):
 
     user_to_modify = User.query.get_or_404(user_id)
 
-    # Proteção para não remover a sua própria permissão de admin
     if user_to_modify.id == current_user.id:
         flash('Você não pode remover a sua própria permissão de administrador.', 'error')
         return redirect(url_for('admin_users'))
@@ -436,7 +499,6 @@ def register():
             flash('Email já registado.', 'error')
             return redirect(url_for('register'))
 
-        # Define o nível inicial para novos utilizadores
         initial_level = Level.query.order_by(Level.min_points).first()
         if not initial_level:
             flash('Erro de sistema: Nenhum nível inicial encontrado. Contacte o administrador.', 'error')
@@ -447,7 +509,7 @@ def register():
             email=email,
             password=password,
             is_admin=False,
-            level_id=initial_level.id # Garante que o nível é definido no registo
+            level_id=initial_level.id
         )
         db.session.add(user)
         db.session.commit()
@@ -494,19 +556,18 @@ def chat():
                     resposta['state'] = 'faq_selection'
                     resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
                     resposta['html'] = True
-                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5] # Limita a 5 opções
+                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5]
             else:
                 resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
 
     return jsonify(resposta)
-
 
 @app.route('/chat/feedback', methods=['POST'])
 @login_required
 def chat_feedback():
     data = request.get_json()
     message_id = data.get('message_id')
-    feedback_type = data.get('feedback') # 'helpful' or 'unhelpful'
+    feedback_type = data.get('feedback')
 
     message = ChatMessage.query.get(message_id)
     if message and message.user_id == current_user.id:
@@ -631,22 +692,21 @@ def export_faqs():
 @app.route('/challenges')
 @login_required
 def list_challenges():
-    # Encontra os IDs dos desafios que o utilizador já completou
     completed_challenges_ids = [uc.challenge_id for uc in current_user.completed_challenges]
+    
+    if current_user.level:
+        user_level_min_points = current_user.level.min_points
+    else:
+        user_level_min_points = 0
 
-    # Encontra o nível atual e os pontos mínimos para esse nível
-    user_current_level_name = current_user.level
-    user_level_min_points = LEVELS.get(user_current_level_name, {}).get('min_points', 0)
-
-    # Busca desafios que o utilizador ainda não completou
     available_challenges_query = Challenge.query.filter(Challenge.id.notin_(completed_challenges_ids))
 
-    # Filtra os desafios por nível
     unlocked_challenges = []
     locked_challenges = []
 
     for challenge in available_challenges_query.all():
-        challenge_level_min_points = LEVELS.get(challenge.level_required, {}).get('min_points', float('inf'))
+        challenge_level_data = LEVELS.get(challenge.level_required, {})
+        challenge_level_min_points = challenge_level_data.get('min_points', float('inf'))
         if user_level_min_points >= challenge_level_min_points:
             unlocked_challenges.append(challenge)
         else:
@@ -662,24 +722,12 @@ def submit_challenge(challenge_id):
     challenge = Challenge.query.get_or_404(challenge_id)
     submitted_answer = request.form.get('answer').strip()
 
-    # Verificação simples (compara a resposta enviada com a resposta esperada)
     if submitted_answer == challenge.expected_answer:
-        # Verifica se o utilizador já não completou este desafio antes
         existing_completion = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=challenge_id).first()
         if not existing_completion:
-            # Dá os pontos ao utilizador
             current_user.points += challenge.points_reward
-
-            # Chama a função para verificar se o utilizador subiu de nível
             update_user_level(current_user)
-
-            # Regista que o desafio foi completo
-            completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
-            db.session.add(completion)
-            db.session.commit()# Dá os pontos ao utilizador
-            current_user.points += challenge.points_reward
             
-            # Regista que o desafio foi completo
             completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
             db.session.add(completion)
             db.session.commit()
@@ -696,7 +744,6 @@ def submit_challenge(challenge_id):
 @login_required
 def teams_list():
     if request.method == 'POST':
-        # Lógica para criar um novo time
         if current_user.team_id:
             flash('Você já pertence a um time. Saia do seu time atual para criar um novo.', 'error')
             return redirect(url_for('teams_list'))
@@ -707,7 +754,6 @@ def teams_list():
         else:
             new_team = Team(name=team_name, owner_id=current_user.id)
             db.session.add(new_team)
-            # Adiciona o criador como o primeiro membro
             current_user.team = new_team
             db.session.commit()
             flash(f'Time "{team_name}" criado com sucesso!', 'success')
@@ -737,9 +783,6 @@ def leave_team():
         return redirect(url_for('teams_list'))
 
     team = current_user.team
-    # Lógica adicional: se o dono sair, o que acontece?
-    # Versão simples: o time continua a existir.
-    # Versão complexa: transferir posse ou apagar o time se for o último membro.
     if team.owner_id == current_user.id:
         flash('Você é o dono do time e não pode sair. (Implementar lógica de transferência de posse ou apagar o time).', 'warning')
         return redirect(url_for('teams_list'))
@@ -749,16 +792,47 @@ def leave_team():
     flash(f'Você saiu do time "{team.name}".', 'success')
     return redirect(url_for('teams_list'))
 
-if __name__ == '__main__':
-    app.run(debug=True)
-    
-    
+# Comando CLI para criar administrador
 @click.command(name='create-admin')
 @with_appcontext
 @click.option('--name', required=True, help='O nome do administrador.')
 @click.option('--email', required=True, help='O email do administrador.')
 @click.option('--password', required=True, help='A senha do administrador.')
 def create_admin(name, email, password):
-    print(f"Administrador '{name}' criado com sucesso!")
+    """Cria um usuário administrador."""
+    # Verifica se já existe um usuário com esse email
+    if User.query.filter_by(email=email).first():
+        click.echo(f"Erro: Já existe um usuário com o email '{email}'.")
+        return
+    
+    # Inicializa o banco de dados se necessário
+    initialize_database()
+    
+    # Pega o nível inicial
+    initial_level = Level.query.order_by(Level.min_points).first()
+    if not initial_level:
+        click.echo("Erro: Nenhum nível encontrado no sistema.")
+        return
+    
+    # Cria o usuário administrador
+    admin_user = User(
+        name=name,
+        email=email,
+        password=generate_password_hash(password),
+        is_admin=True,
+        level_id=initial_level.id
+    )
+    
+    db.session.add(admin_user)
+    db.session.commit()
+    
+    click.echo(f"Administrador '{name}' criado com sucesso!")
 
-app.cli.add_command(create_admin)    
+app.cli.add_command(create_admin)
+
+# Inicialização do contexto da aplicação
+with app.app_context():
+    initialize_database()
+
+if __name__ == '__main__':
+    app.run(debug=True)
