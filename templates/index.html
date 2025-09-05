@@ -28,7 +28,8 @@
             {% if current_user.is_admin %}
                 <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Gerir Utilizadores</a>
                 <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Gerir FAQs</a>
-                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Gerir Desafios</a>
+                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Admin_Bot</a>
+                <a href="{{ url_for('admin_dashboard') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Gerir Desafios</a>
             {% endif %}
             <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition">Perfil</a>
             <a href="{{ url_for('logout') }}" class="text-sm px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Sair</a>
