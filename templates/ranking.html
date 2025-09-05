@@ -90,7 +90,7 @@
                                 <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 {% if user.id == current_user.id %} bg-blue-100 dark:bg-blue-900/50 font-bold {% endif %}">
                                     <td class="p-3">{{ loop.index }}</td>
                                     <td class="p-3">
-                                        <span>{{ LEVELS.get(user.level, {}).get('insignia', '') }}</span>
+                                        <span>{{ user.level.insignia if user.level else '' }}</span>
                                         {{ user.name }}
                                     </td>
                                     <td class="p-3">{{ user.level }}</td>
