@@ -210,77 +210,74 @@ def extract_faqs_from_pdf(file_path):
         flash(f"Erro ao processar o PDF: {str(e)}", 'error')
         return []
 
-def format_faq_response(faq_id, question, answer, image_url=None, video_url=None, file_name=None):
-    formatted_response = f"<strong>Pergunta:</strong> {question}<br><br>"
+def is_image_url(url):
+    """Verifica se uma URL termina com uma extensão de imagem comum."""
+    if not url: return False
+    image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp')
+    return url.lower().endswith(image_extensions)
 
+def is_video_url(url):
+    """Verifica se uma URL é de um vídeo (YouTube ou extensão de vídeo comum)."""
+    if not url: return False
+    video_extensions = ('.mp4', '.webm', '.ogg')
+    return any(url.lower().endswith(ext) for ext in video_extensions) or 'youtube.com' in url.lower() or 'youtu.be' in url.lower()
+
+# >>>>>>>>> AQUI ESTÁ A FUNÇÃO UNIFICADA E CORRIGIDA <<<<<<<<<<<
+def format_faq_response(faq_id, question, answer, image_url=None, video_url=None, file_name=None):
+    """
+    Formata a resposta da FAQ para HTML, combinando a lógica de secções
+    com a incorporação de imagens, vídeos e ficheiros.
+    """
+    # Inicia a resposta com a pergunta
+    formatted_response = f"<strong>{question}</strong><br><br>"
+    
+    # Lógica para formatar o texto com secções (Pré-requisitos, Etapas, etc.)
     has_sections = any(section in answer for section in ["Pré-requisitos:", "Etapa", "Atenção:", "Finalizar:", "Pós-instalação:"])
     
     if has_sections:
-        sections = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
-        current_section = None
-        for i in range(0, len(sections), 2):
-            header = sections[i].strip() if i + 1 < len(sections) else ""
-            content = sections[i + 1].strip() if i + 1 < len(sections) else ""
+        # Divide a resposta com base nas palavras-chave das secções
+        parts = re.split(r'(Pré-requisitos:|Etapa \d+:|Atenção:|Finalizar:|Pós-instalação:)', answer)
+        # Processa a primeira parte do texto que vem antes de qualquer secção
+        formatted_response += parts[0].replace('\n', '<br>')
 
-            if header:
-                if header.startswith("Pré-requisitos:"):
-                    current_section = "Pré-requisitos"
-                    formatted_response += "<strong>✅ Pré-requisitos</strong><br>"
-                elif header.startswith("Etapa"):
-                    current_section = "Etapa"
-                    formatted_response += f"<strong>🔧 {header}</strong><br>"
-                elif header.startswith("Atenção:"):
-                    current_section = "Atenção"
-                    formatted_response += "<strong>⚠️ Atenção</strong><br>"
-                elif header.startswith("Finalizar:"):
-                    current_section = "Finalizar"
-                    formatted_response += "<strong>⏳ Finalizar</strong><br>"
-                elif header.startswith("Pós-instalação:"):
-                    current_section = "Pós-instalação"
-                    formatted_response += "<strong>✅ Pós-instalação</strong><br>"
+        # Processa as secções formatadas
+        for i in range(1, len(parts), 2):
+            header = parts[i]
+            content = parts[i+1].replace('\n', '<br>').strip()
             
-            if content and current_section:
-                items = re.split(r'(?<=[.!?])\s+(?=[A-Z])', content)
-                for item in items:
-                    item = item.strip()
-                    if item:
-                        formatted_response += f"{item}<br>"
-                formatted_response += "<br>" if i + 2 < len(sections) else ""
+            if "Pré-requisitos:" in header:
+                formatted_response += f"<strong>✅ {header}</strong><br>{content}<br>"
+            elif "Etapa" in header:
+                formatted_response += f"<strong>🔧 {header}</strong><br>{content}<br>"
+            elif "Atenção:" in header:
+                formatted_response += f"<strong>⚠️ {header}</strong><br>{content}<br>"
+            elif "Finalizar:" in header:
+                formatted_response += f"<strong>⏳ {header}</strong><br>{content}<br>"
+            elif "Pós-instalação:" in header:
+                formatted_response += f"<strong>✅ {header}</strong><br>{content}<br>"
     else:
-        lines = [line.strip() for line in answer.split('\n') if line.strip()]
-        for line in lines:
-            formatted_response += f"{line}<br>"
-    
+        # Se não houver secções, apenas formata o texto com quebras de linha
+        formatted_response += answer.replace('\n', '<br>')
+
+    # Adiciona a imagem, se existir
     if image_url and is_image_url(image_url):
-        formatted_response += f'<img src="{image_url}" alt="Imagem da FAQ" style="max-width: 100%; height: auto; margin-top: 10px;"><br>'
+        formatted_response += f'<br><img src="{image_url}" alt="Imagem de suporte" style="max-width: 100%; border-radius: 8px; margin-top: 10px;">'
     
+    # Adiciona o vídeo, se existir
     if video_url and is_video_url(video_url):
         if 'youtube.com' in video_url or 'youtu.be' in video_url:
-            video_id = re.search(r'(?:v=|\/)([a-zA-Z0-9_-]{11})', video_url)
-            if video_id:
-                video_id = video_id.group(1)
-                formatted_response += f'<iframe width="560" height="315" src="https://www.youtube.com/embed/{video_id}" frameborder="0" allowfullscreen style="margin-top: 10px;"></iframe><br>'
-            else:
-                formatted_response += f'<p>URL do YouTube inválida: {video_url}</p><br>'
+            video_id_match = re.search(r'(?:v=|\/)([a-zA-Z0-9_-]{11})', video_url)
+            if video_id_match:
+                video_id = video_id_match.group(1)
+                formatted_response += f'<div style="position: relative; padding-bottom: 56.25%; margin-top: 10px; height: 0; overflow: hidden; max-width: 100%;"><iframe src="https://www.youtube.com/embed/{video_id}" frameborder="0" allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe></div>'
         else:
-            formatted_response += f'<video width="560" height="315" controls style="margin-top: 10px;"><source src="{video_url}" type="video/mp4">Seu navegador não suporta o vídeo.</video><br>'
+            formatted_response += f'<br><video controls style="max-width: 100%; border-radius: 8px; margin-top: 10px;"><source src="{video_url}" type="video/mp4">O seu navegador não suporta o vídeo.</video>'
     
+    # Adiciona o link de download do ficheiro, se existir
     if file_name:
-        formatted_response += f'<br><a href="/download/{faq_id}" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank">📎 Baixar arquivo: {file_name}</a>'
-
-    if formatted_response.endswith("<br>") and (image_url or video_url or file_name):
-        formatted_response = formatted_response[:-4]
+        formatted_response += f'<br><br><a href="/download/{faq_id}" class="text-blue-400 hover:underline" target="_blank">📎 Baixar ficheiro: {file_name}</a>'
     
     return formatted_response
-
-def is_image_url(url):
-    image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp')
-    return url and url.lower().endswith(image_extensions)
-
-def is_video_url(url):
-    video_extensions = ('.mp4', '.webm', '.ogg')
-    return url and (any(url.lower().endswith(ext) for ext in video_extensions) or 'youtube.com' in url.lower() or 'youtu.be' in url.lower())
-
 def find_faqs_by_keywords(message):
     search_words = set(message.lower().split())
     if not search_words:
