@@ -3,53 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema de Service Desk com assistente inteligente para suporte técnico">
+    <meta name="keywords" content="service desk, suporte técnico, chatbot, assistente virtual">
+    <meta name="author" content="Service Desk Team">
     <title>{% block title %}Service Desk{% endblock %}</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome for icons -->
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='styles.css') }}" as="style">
+    
+    <!-- Stylesheets -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
 <body>
-    <header class="chat-header">
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+    
+    <header class="site-header" role="banner">
         <div class="header-container">
-            <h1>Assistente de Service Desk</h1>
-            <p>{{ user_level_insignia | safe }} Olá, {{ current_user.name }}!</p>
-            <button class="theme-toggle" onclick="toggleTheme()">
-                <i class="fas fa-adjust"></i>
+            <div class="header-brand">
+                <h1 class="site-title">
+                    <i class="fas fa-robot" aria-hidden="true"></i>
+                    Assistente de Service Desk
+                </h1>
+                <div class="user-info">
+                    <span class="user-level" aria-label="Nível do usuário">{{ user_level_insignia | safe }}</span>
+                    <span class="user-greeting">Olá, {{ current_user.name }}!</span>
+                </div>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Alternar tema escuro/claro" title="Alternar tema">
+                <i class="fas fa-adjust" aria-hidden="true"></i>
+                <span class="sr-only">Alternar tema</span>
             </button>
         </div>
     </header>
 
-    <nav class="top-nav">
-        <ul>
-            <li><a href="{{ url_for('challenges') }}">Desafios</a></li>
-            <li><a href="{{ url_for('teams') }}">Times</a></li>
-            <li><a href="{{ url_for('ranking') }}">Ranking</a></li>
+    <nav class="main-nav" role="navigation" aria-label="Navegação principal">
+        <ul class="nav-list">
+            <li class="nav-item">
+                <a href="{{ url_for('index') }}" class="nav-link" aria-current="{% if request.endpoint == 'index' %}page{% endif %}">
+                    <i class="fas fa-home" aria-hidden="true"></i>
+                    <span>Início</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('list_challenges') }}" class="nav-link" aria-current="{% if request.endpoint == 'list_challenges' %}page{% endif %}">
+                    <i class="fas fa-trophy" aria-hidden="true"></i>
+                    <span>Desafios</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('teams') }}" class="nav-link" aria-current="{% if request.endpoint == 'teams' %}page{% endif %}">
+                    <i class="fas fa-users" aria-hidden="true"></i>
+                    <span>Times</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('ranking') }}" class="nav-link" aria-current="{% if request.endpoint == 'ranking' %}page{% endif %}">
+                    <i class="fas fa-medal" aria-hidden="true"></i>
+                    <span>Ranking</span>
+                </a>
+            </li>
             {% if current_user.is_admin %}
-                <li><a href="{{ url_for('admin') }}">Admin</a></li>
+            <li class="nav-item">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link" aria-current="{% if 'admin' in request.endpoint %}page{% endif %}">
+                    <i class="fas fa-cog" aria-hidden="true"></i>
+                    <span>Admin</span>
+                </a>
+            </li>
             {% endif %}
-            <li><a href="{{ url_for('profile') }}">Perfil</a></li>
-            <li><a href="{{ url_for('logout') }}">Sair</a></li>
+            <li class="nav-item">
+                <a href="{{ url_for('profile') }}" class="nav-link" aria-current="{% if request.endpoint == 'profile' %}page{% endif %}">
+                    <i class="fas fa-user" aria-hidden="true"></i>
+                    <span>Perfil</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('logout') }}" class="nav-link">
+                    <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+                    <span>Sair</span>
+                </a>
+            </li>
         </ul>
     </nav>
 
-    <main>
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages" role="alert" aria-live="polite">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        <i class="fas fa-{% if category == 'error' %}exclamation-triangle{% elif category == 'success' %}check-circle{% else %}info-circle{% endif %}" aria-hidden="true"></i>
+                        <span>{{ message }}</span>
+                        <button class="flash-close" onclick="this.parentElement.remove()" aria-label="Fechar mensagem">
+                            <i class="fas fa-times" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <main id="main-content" class="main-content" role="main">
         {% block content %}
         {% endblock %}
     </main>
 
-    <footer>
-        <p>&copy; 2025 Service Desk. Todos os direitos reservados.</p>
+    <footer class="site-footer" role="contentinfo">
+        <div class="footer-content">
+            <p>&copy; 2025 Service Desk. Todos os direitos reservados.</p>
+            <p class="footer-links">
+                <a href="#" class="footer-link">Política de Privacidade</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Termos de Uso</a>
+                <span class="separator">|</span>
+                <a href="#" class="footer-link">Suporte</a>
+            </p>
+        </div>
     </footer>
 
+    <!-- Scripts -->
     <script>
+        // Theme toggle functionality
         function toggleTheme() {
-            document.body.classList.toggle('dark');
-            localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+            const body = document.body;
+            const isDark = body.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            
+            // Update button aria-label
+            const themeButton = document.querySelector('.theme-toggle');
+            themeButton.setAttribute('aria-label', isDark ? 'Alternar para tema claro' : 'Alternar para tema escuro');
         }
-        if (localStorage.getItem('theme') === 'dark') {
-            document.body.classList.add('dark');
+
+        // Initialize theme from localStorage
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.body.classList.add('dark');
+            }
         }
+
+        // Auto-hide flash messages
+        function initFlashMessages() {
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    if (message.parentElement) {
+                        message.style.opacity = '0';
+                        setTimeout(() => message.remove(), 300);
+                    }
+                }, 5000);
+            });
+        }
+
+        // Initialize on DOM load
+        document.addEventListener('DOMContentLoaded', function() {
+            initTheme();
+            initFlashMessages();
+        });
+
+        // Handle system theme changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+            if (!localStorage.getItem('theme')) {
+                document.body.classList.toggle('dark', e.matches);
+            }
+        });
     </script>
 </body>
 </html>
