@@ -681,16 +681,6 @@ def export_faqs():
     return response
 
 
-@app.route('/admin/challenges')
-@login_required
-def admin_challenges():
-    if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
-    
-    # Busca todos os desafios para exibi-los
-    all_challenges = Challenge.query.order_by(Challenge.level_required).all()
-    return render_template('admin_challenges.html', challenges=all_challenges)
 
 @app.route('/challenges')
 @login_required
@@ -790,6 +780,84 @@ def leave_team():
     flash(f'Você saiu do time "{team.name}".', 'success')
     return redirect(url_for('teams_list'))
 
+@app.route('/admin/dashboard')
+@login_required
+def admin_dashboard():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    # Recolher estatísticas para o dashboard
+    stats = {
+        'total_users': User.query.count(),
+        'total_faqs': FAQ.query.count(),
+        'total_teams': Team.query.count(),
+        'total_challenges_completed': UserChallenge.query.count(),
+    }
+    return render_template('admin_dashboard.html', stats=stats)
+
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    all_users = User.query.order_by(User.name).all()
+    return render_template('admin_users.html', users=all_users)
+
+@app.route('/admin/teams')
+@login_required
+def admin_teams():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    all_teams = Team.query.all()
+    return render_template('admin_teams.html', teams=all_teams)
+
+@app.route('/admin/faqs')
+@login_required
+def admin_faqs():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    # Supondo que admin_faq.html é a sua página de gestão de FAQs
+    categories = Category.query.all()
+    return render_template('admin_faq.html', categories=categories)
+
+@app.route('/admin/levels', methods=['GET', 'POST'])
+@login_required
+def admin_levels():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        # Lógica para adicionar um novo nível
+        name = request.form.get('name')
+        min_points = request.form.get('min_points')
+        insignia = request.form.get('insignia')
+        if name and min_points and insignia:
+            new_level = Level(name=name, min_points=int(min_points), insignia=insignia)
+            db.session.add(new_level)
+            db.session.commit()
+            flash('Nível adicionado com sucesso!', 'success')
+        else:
+            flash('Todos os campos são obrigatórios.', 'error')
+        return redirect(url_for('admin_levels'))
+
+    levels = Level.query.order_by(Level.min_points).all()
+    return render_template('admin_levels.html', levels=levels)
+
+
+@app.route('/admin/challenges')
+@login_required
+def admin_challenges():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    all_challenges = Challenge.query.order_by(Challenge.level_required).all()
+    return render_template('admin_challenges.html', challenges=all_challenges)
 # Comando CLI para criar administrador
 @click.command(name='create-admin')
 @with_appcontext
