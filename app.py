@@ -1086,8 +1086,37 @@ def create_admin(name, email, password):
         logging.error(f"Erro ao criar administrador: {str(e)}", exc_info=True)
         print(f"Erro ao criar administrador: {str(e)}")
 
-app.cli.add_command(create_admin)
+@app.cli.command("init-db")
+@with_appcontext
+def init_db_command():
+    """Cria as tabelas do banco de dados e semeia os dados iniciais."""
+    db.create_all()
+    # Adicionar a lógica de semear categorias e níveis aqui também
+    # para garantir que seja executada
+    try:
+        categories = ['Hardware', 'Software', 'Rede', 'Outros', 'Mobile', 'Automation']
+        for category_name in categories:
+            if not Category.query.filter_by(name=category_name).first():
+                category = Category(name=category_name)
+                db.session.add(category)
+        
+        if Level.query.count() == 0:
+            logging.info("A semear os níveis iniciais na base de dados...")
+            levels_to_seed = [
+                Level(name='Iniciante', min_points=0, insignia_image_url='beginner.svg'),
+                Level(name='Dados de Prata', min_points=50, insignia_image_url='silver.svg'),
+                Level(name='Dados de Ouro', min_points=150, insignia_image_url='gold.svg'),
+                Level(name='Mestre dos Dados', min_points=300, insignia_image_url='master.svg')
+            ]
+            db.session.bulk_save_objects(levels_to_seed)
+        
+        db.session.commit()
+        print("Banco de dados inicializado e dados semeados com sucesso!")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao semear dados: {e}")
 
+app.cli.add_command(create_admin)
 if __name__ == '__main__':
     initialize_app()
     app.run(debug=True)
