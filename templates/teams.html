@@ -1,60 +1,156 @@
-{% extends "base_layout.html" %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente de Service Desk - Times</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/styles.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+    
+    <!-- CABEÇALHO RESPONSIVO COMPLETO -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
+        <!-- Título e Nome do Utilizador -->
+        <div class="flex items-center space-x-3">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
+            <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
+                {{ user_level_insignia }} Olá, {{ current_user.name }}!
+            </span>
+        </div>
 
-{% block title %}Times{% endblock %}
+        <!-- Menu para Ecrãs Grandes -->
+        <div class="hidden md:flex items-center space-x-3">
+            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
+            {% if current_user.is_admin %}
+                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faq') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
+                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-1 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Gerir Desafios</a>
+            {% endif %}
+            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Ver FAQs</a>
+            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Sair</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
+            </button>
+        </div>
 
-{% block content %}
-    <section class="teams">
-        <h2>Times e Clãs</h2>
-        {% if current_user.team %}
-            <div class="current-team message-bubble">
-                <p>Você pertence ao time "<strong>{{ current_user.team.name }}</strong>"</p>
-                <div class="team-actions">
-                    {% if current_user.id == current_user.team.owner_id %}
-                        <a href="{{ url_for('manage_team') }}" class="chat-button">Gerir Time</a>
-                    {% endif %}
-                    <form method="POST" action="{{ url_for('leave_team') }}">
-                        <button type="submit" class="chat-button btn-danger">Sair do Time</button>
+        <!-- Botão de Menu Hambúrguer para Ecrãs Pequenos -->
+        <div class="md:hidden flex items-center">
+            <button id="menu-button" class="text-gray-900 dark:text-gray-100 focus:outline-none">
+                <i class="fas fa-bars fa-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Menu Dropdown para Ecrãs Pequenos -->
+    <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48">
+        <div class="flex flex-col space-y-3">
+            <a href="{{ url_for('list_challenges') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ranking</a>
+             {% if current_user.is_admin %}
+                <a href="{{ url_for('admin_users') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faq') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Gerir FAQs</a>
+            {% endif %}
+            <a href="{{ url_for('faqs') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ver FAQs</a>
+            <a href="{{ url_for('profile') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-600">Sair</a>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-3">
+                <button class="theme-toggle w-full text-left text-gray-800 dark:text-gray-200" onclick="toggleTheme()" title="Alternar tema">
+                    <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i> Alternar Tema
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 flex flex-col items-center pt-24 px-4 w-full">
+        <div class="w-full max-w-4xl p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">👥 Times e Clãs 👥</h2>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Criar ou Sair de um Time -->
+            <div class="mb-8 p-4 border rounded-lg dark:border-gray-700">
+                {% if current_user.team %}
+                    <h3 class="text-lg font-semibold">Você pertence ao time "{{ current_user.team.name }}"</h3>
+                    <form action="{{ url_for('leave_team') }}" method="POST" class="mt-4">
+                        <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Sair do Time</button>
                     </form>
-                </div>
+                {% else %}
+                    <h3 class="text-lg font-semibold">Crie o seu próprio time!</h3>
+                    <form action="{{ url_for('teams_list') }}" method="POST" class="mt-4 flex flex-col sm:flex-row gap-2">
+                        <input type="text" name="team_name" required class="chat-input flex-grow" placeholder="Nome do time">
+                        <button type="submit" class="chat-button">Criar Time</button>
+                    </form>
+                {% endif %}
             </div>
-        {% else %}
-            <div class="create-team">
-                <h3>Crie o seu próprio time!</h3>
-                <form method="POST" action="{{ url_for('create_team') }}" class="team-form">
-                    <input type="text" name="team_name" placeholder="Nome do Time" required class="chat-input">
-                    <button type="submit" class="chat-button">Criar Time</button>
-                </form>
-            </div>
-        {% endif %}
 
-        <h3>Lista de Times</h3>
-        <table class="teams-table">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Membros</th>
-                    <th>Pontos Totais</th>
-                    <th>Ação</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for team in teams %}
-                    <tr>
-                        <td>{{ team.name }}</td>
-                        <td>{{ team.members.count() }}</td>
-                        <td>{{ team.total_points }}</td>
-                        <td>
-                            {% if not current_user.team %}
-                                <form method="POST" action="{{ url_for('join_team', team_id=team.id) }}">
-                                    <button type="submit" class="chat-button">Entrar</button>
-                                </form>
-                            {% elif current_user.team_id == team.id %}
-                                <span class="message-bubble">Seu Time</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
-{% endblock %}
+            <!-- Lista de Times Existentes -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="bg-gray-200 dark:bg-gray-700">
+                            <th class="p-3">Time</th>
+                            <th class="p-3">Membros</th>
+                            <th class="p-3">Pontos Totais</th>
+                            <th class="p-3">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for team in teams %}
+                            <tr class="border-b dark:border-gray-700">
+                                <td class="p-3 font-semibold">{{ team.name }}</td>
+                                <td class="p-3">{{ team.members.count() }}</td>
+                                <td class="p-3">{{ team.total_points }}</td>
+                                <td class="p-3">
+                                    {% if not current_user.team %}
+                                        <form action="{{ url_for('join_team', team_id=team.id) }}" method="POST">
+                                            <button type="submit" class="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm transition">Entrar</button>
+                                        </form>
+                                    {% elif current_user.team_id == team.id %}
+                                        <span class="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm cursor-default">Seu Time</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    
+    <script>
+        // Função para alternar o tema claro/escuro
+        function toggleTheme() {
+            document.body.classList.toggle('dark');
+            const themeIcons = document.querySelectorAll('.theme-toggle i');
+            themeIcons.forEach(icon => {
+                icon.classList.toggle('fa-moon');
+                icon.classList.toggle('fa-sun');
+            });
+        }
+
+        // Script para o menu hambúrguer
+        const menuButton = document.getElementById('menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (menuButton) {
+            menuButton.onclick = function() {
+                mobileMenu.classList.toggle('hidden');
+            };
+        }
+    </script>
+</body>
+</html>

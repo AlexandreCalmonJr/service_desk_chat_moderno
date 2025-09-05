@@ -1,106 +1,159 @@
-{% extends "base_layout.html" %}
-
-{% block title %}Ver FAQs{% endblock %}
-
-{% block content %}
-<div class="w-full max-w-6xl mx-auto p-6 bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold text-green-400 mb-6 text-center">Perguntas Frequentes (FAQs)</h2>
-
-    <!-- Formulário de Edição (só aparece quando se está a editar) -->
-    {% if faq_to_edit and current_user.is_admin %}
-    <div class="mb-10 p-6 border rounded-lg border-gray-700 bg-gray-800/50">
-        <h3 class="text-xl font-semibold mb-4 text-yellow-400">A Editar FAQ: "{{ faq_to_edit.question }}"</h3>
-        <form method="POST" action="{{ url_for('edit_faq', faq_id=faq_to_edit.id) }}" enctype="multipart/form-data" class="space-y-4">
-            <div>
-                <label for="edit_category" class="block text-sm font-medium text-gray-300">Categoria</label>
-                <select name="edit_category" id="edit_category" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
-                    {% for category in categories %}
-                        <option value="{{ category.id }}" {% if category.id == faq_to_edit.category_id %}selected{% endif %}>{{ category.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="edit_question" class="block text-sm font-medium text-gray-300">Pergunta</label>
-                <input type="text" id="edit_question" name="edit_question" value="{{ faq_to_edit.question }}" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">
-            </div>
-            <div>
-                <label for="edit_answer" class="block text-sm font-medium text-gray-300">Resposta</label>
-                <textarea id="edit_answer" name="edit_answer" rows="4" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md">{{ faq_to_edit.answer }}</textarea>
-            </div>
-            <!-- Outros campos de edição (imagem, vídeo, ficheiro) aqui -->
-            <div class="flex gap-4">
-                 <a href="{{ url_for('faqs') }}" class="w-full text-center py-2 px-4 rounded-md font-medium text-white bg-gray-600 hover:bg-gray-700">Cancelar</a>
-                <button type="submit" name="edit_faq" class="w-full py-2 px-4 rounded-md font-medium text-white bg-green-600 hover:bg-green-700">Guardar Alterações</button>
-            </div>
-        </form>
-    </div>
-    {% endif %}
-
-    <!-- Tabela de FAQs -->
-    <form method="POST" action="{{ url_for('delete_multiple_faqs') }}" id="faq-form">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead>
-                    <tr class="bg-gray-800 border-b border-gray-700">
-                        {% if current_user.is_admin %}
-                        <th class="p-3"><input type="checkbox" id="select-all" class="bg-gray-700 border-gray-600"></th>
-                        {% endif %}
-                        <th class="p-3">Pergunta</th>
-                        <th class="p-3">Categoria</th>
-                        <th class="p-3">Média</th>
-                        {% if current_user.is_admin %}
-                        <th class="p-3">Ações</th>
-                        {% endif %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for faq in faqs %}
-                    <tr class="border-b border-gray-700 hover:bg-gray-800/50">
-                        {% if current_user.is_admin %}
-                        <td class="p-3"><input type="checkbox" name="faq_ids" value="{{ faq.id }}" class="bg-gray-700 border-gray-600"></td>
-                        {% endif %}
-                        <td class="p-3 text-white font-semibold">{{ faq.question }}</td>
-                        <td class="p-3">{{ faq.category.name }}</td>
-                        <td class="p-3">
-                            {% if faq.image_url or faq.video_url or faq.file_name %}
-                                <div class="flex gap-3 text-gray-400">
-                                    {% if faq.image_url %}<a href="{{ faq.image_url }}" target="_blank" title="Ver Imagem"><i class="fas fa-image"></i></a>{% endif %}
-                                    {% if faq.video_url %}<a href="{{ faq.video_url }}" target="_blank" title="Ver Vídeo"><i class="fas fa-video"></i></a>{% endif %}
-                                    {% if faq.file_name %}<a href="{{ url_for('download', faq_id=faq.id) }}" title="Baixar Ficheiro"><i class="fas fa-file-download"></i></a>{% endif %}
-                                </div>
-                            {% endif %}
-                        </td>
-                        {% if current_user.is_admin %}
-                        <td class="p-3 flex gap-2">
-                             <a href="{{ url_for('faqs', edit=faq.id) }}" class="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition" title="Editar"><i class="fas fa-edit"></i></a>
-                            <form method="POST" action="{{ url_for('delete_faq', faq_id=faq.id) }}" onsubmit="return confirm('Tem a certeza?');" class="inline-block">
-                                <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm transition" title="Apagar"><i class="fas fa-trash"></i></button>
-                            </form>
-                        </td>
-                        {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistente de Service Desk - FAQs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/static/styles.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
+        <div class="flex items-center space-x-3">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
+            <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
         </div>
-        {% if current_user.is_admin %}
-        <div class="flex justify-end mt-4">
-            <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition" onclick="return confirm('Tem a certeza que quer apagar as FAQs selecionadas?');">
-                <i class="fas fa-trash"></i> Apagar Selecionados
+        <div class="flex items-center space-x-3">
+            <a href="/" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Voltar para o Chat</a>
+            <a href="/logout" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
+                <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
             </button>
         </div>
-        {% endif %}
-    </form>
-</div>
-<script>
-    // Script para selecionar todos os checkboxes
-    const selectAll = document.getElementById('select-all');
-    if (selectAll) {
-        selectAll.addEventListener('change', (event) => {
-            document.querySelectorAll('input[name="faq_ids"]').forEach(checkbox => {
-                checkbox.checked = event.target.checked;
-            });
-        });
-    }
-</script>
-{% endblock %}
+    </header>
+    <main class="flex-1 flex flex-col items-center justify-center pt-20 px-4">
+        <div class="w-full max-w-4xl p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">FAQs</h2>
+
+            <!-- Formulário de Edição de FAQ -->
+            {% if faq_to_edit %}
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Editar FAQ</h3>
+                <form method="POST" action="/faqs/edit/{{ faq_to_edit.id }}" enctype="multipart/form-data" class="space-y-4 mb-6">
+                    <input type="hidden" name="faq_id" value="{{ faq_to_edit.id }}">
+                    <div>
+                        <label for="edit_category" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
+                        <select name="edit_category" id="edit_category" required class="chat-input w-full">
+                            {% for category in categories %}
+                                <option value="{{ category.id }}" {% if category.id == faq_to_edit.category_id %}selected{% endif %}>{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit_question" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pergunta</label>
+                        <input type="text" id="edit_question" name="edit_question" value="{{ faq_to_edit.question }}" required class="chat-input w-full">
+                    </div>
+                    <div>
+                        <label for="edit_answer" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resposta</label>
+                        <textarea id="edit_answer" name="edit_answer" rows="3" required class="chat-input w-full">{{ faq_to_edit.answer }}</textarea>
+                    </div>
+                    <div>
+                        <label for="edit_image_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL da Imagem (opcional)</label>
+                        <input type="url" id="edit_image_url" name="edit_image_url" value="{{ faq_to_edit.image_url or '' }}" class="chat-input w-full">
+                    </div>
+                    <div>
+                        <label for="edit_video_url" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL do Vídeo (opcional)</label>
+                        <input type="url" id="edit_video_url" name="edit_video_url" value="{{ faq_to_edit.video_url or '' }}" class="chat-input w-full">
+                    </div>
+                    <div>
+                        <label for="edit_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Arquivo (PDF, BAT ou EXE) (opcional)</label>
+                        <input type="file" name="edit_file" id="edit_file" accept=".pdf,.bat,.exe" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600">
+                        <p class="text-sm text-gray-500 mt-1">Atual: {{ faq_to_edit.file_name or 'Nenhum' }}</p>
+                    </div>
+                    <button type="submit" name="edit_faq" class="chat-button w-full">Salvar Alterações</button>
+                    <a href="/faqs" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition mt-2 inline-block">Cancelar</a>
+                </form>
+            {% endif %}
+
+            <!-- Tabela de FAQs com Opção de Exclusão -->
+            <form method="POST" action="/faqs/delete-multiple" id="faq-form">
+                <div class="overflow-x-auto mb-4">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-200 dark:bg-gray-700">
+                                <th class="p-3 border-b dark:border-gray-600"><input type="checkbox" id="select-all" onclick="toggleSelectAll(this)"></th>
+                                <th class="p-3 border-b dark:border-gray-600">Pergunta</th>
+                                <th class="p-3 border-b dark:border-gray-600">Resposta</th>
+                                <th class="p-3 border-b dark:border-gray-600">Categoria</th>
+                                <th class="p-3 border-b dark:border-gray-600">Imagem</th>
+                                <th class="p-3 border-b dark:border-gray-600">Vídeo</th>
+                                <th class="p-3 border-b dark:border-gray-600">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if faqs %}
+                                {% for faq in faqs %}
+                                    <tr class="hover:bg-gray-100 dark:hover:bg-gray-800">
+                                        <td class="p-3 border-b dark:border-gray-600"><input type="checkbox" name="faq_ids" value="{{ faq.id }}"></td>
+                                        <td class="p-3 border-b dark:border-gray-600 text-gray-900 dark:text-gray-100">{{ faq.question }}</td>
+                                        <td class="p-3 border-b dark:border-gray-600 text-gray-700 dark:text-gray-300">{{ faq.formatted_answer | safe }}</td>
+                                        <td class="p-3 border-b dark:border-gray-600 text-gray-700 dark:text-gray-300">{{ faq.category.name }}</td>
+                                        <td class="p-3 border-b dark:border-gray-600">
+                                            {% if faq.image_url %}
+                                                <a href="{{ faq.image_url }}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">Ver Imagem</a>
+                                            {% else %}
+                                                <span class="text-gray-500 dark:text-gray-400">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="p-3 border-b dark:border-gray-600">
+                                            {% if faq.video_url %}
+                                                <a href="{{ faq.video_url }}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">Ver Vídeo</a>
+                                            {% else %}
+                                                <span class="text-gray-500 dark:text-gray-400">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="p-3 border-b dark:border-gray-600">
+                                            <a href="/faqs/edit/{{ faq.id }}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-600 mr-2">
+                                                <i class="fas fa-edit"></i> Editar
+                                            </a>
+                                            <form method="POST" action="/faqs/delete/{{ faq.id }}" class="inline-block" onsubmit="return confirm('Tem certeza que deseja excluir esta FAQ?');">
+                                                <button type="submit" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-600">
+                                                    <i class="fas fa-trash"></i> Excluir
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="p-3 text-center text-gray-600 dark:text-gray-400">Nenhuma FAQ cadastrada.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition" onclick="return confirm('Tem certeza que deseja excluir as FAQs selecionadas?');">
+                        <i class="fas fa-trash"></i> Excluir Selecionados
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('dark');
+            const themeToggle = document.querySelector('.theme-toggle i');
+            themeToggle.classList.toggle('fa-moon');
+            themeToggle.classList.toggle('fa-sun');
+        }
+
+        function toggleSelectAll(checkbox) {
+            const checkboxes = document.querySelectorAll('input[name="faq_ids"]');
+            checkboxes.forEach(cb => cb.checked = checkbox.checked);
+        }
+    </script>
+</body>
+</html>

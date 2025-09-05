@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div class="chat-container" role="application" aria-label="Chat do assistente de service desk">
     <div class="chat-header">
         <h2 class="chat-title">
@@ -26,6 +27,22 @@
                 <span></span>
             </div>
             <span class="typing-text">O assistente está digitando...</span>
+=======
+<div class="chat-container w-full max-w-3xl flex flex-col h-[calc(100vh-8rem)] bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
+    <div class="chat-body flex-1 overflow-y-auto p-4" id="chat-body">
+        <div class="chat-message bot">
+            <div class="avatar"><i class="fas fa-robot text-green-400"></i></div>
+            <div class="message-bubble text-white">Sou seu assistente de Service Desk. Como posso ajudar hoje? Faça uma pergunta ou explore os desafios!</div>
+        </div>
+    </div>
+    <div class="chat-footer p-4 bg-gray-800 border-t border-gray-700">
+        <div class="typing-indicator" id="typing-indicator" style="display: none;">
+            <span class="text-gray-400">A digitar...</span>
+        </div>
+        <div class="flex items-center space-x-2">
+            <textarea id="chat-input" class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm text-white placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500" rows="1" placeholder="Digite sua mensagem..."></textarea>
+            <button onclick="enviarMensagem()" class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800">Enviar</button>
+>>>>>>> b586e80094ba1b6dcc941796c2f1cbe053e2ec2e
         </div>
         
         <form class="chat-form" onsubmit="return false;" role="form" aria-label="Formulário de envio de mensagem">
@@ -70,6 +87,7 @@
 </div>
 
 <script>
+<<<<<<< HEAD
 document.addEventListener('DOMContentLoaded', function() {
     const chatBox = document.getElementById('chatBox');
     const chatInput = document.getElementById('chatInput');
@@ -100,6 +118,90 @@ document.addEventListener('DOMContentLoaded', function() {
         const bubbleDiv = document.createElement('div');
         bubbleDiv.className = 'message-bubble';
         
+=======
+    const chatBody = document.getElementById('chat-body');
+    const chatInput = document.getElementById('chat-input');
+    const typingIndicator = document.getElementById('typing-indicator');
+    let chatState = 'normal';
+    let lastOptions = [];
+
+    async function enviarMensagem() {
+        const mensagem = chatInput.value.trim();
+        if (!mensagem) return;
+
+        adicionarMensagem(mensagem, 'user');
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        chatBody.scrollTop = chatBody.scrollHeight;
+
+        typingIndicator.style.display = 'flex';
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensagem: mensagem })
+            });
+            const data = await response.json();
+            adicionarMensagem(data.text, 'bot', data.html, data.options);
+            chatState = data.state || 'normal';
+            chatInput.placeholder = chatState === 'faq_selection' ? 'Clique numa FAQ acima ou digite uma nova mensagem...' : 'Digite sua mensagem...';
+        } catch (error) {
+            adicionarMensagem('Erro ao processar a solicitação.', 'bot');
+            console.error('Erro no chat:', error);
+        } finally {
+            typingIndicator.style.display = 'none';
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+    }
+
+    async function selecionarFAQ(faqId) {
+        typingIndicator.style.display = 'flex';
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mensagem: `faq_${faqId}` })
+            });
+            const data = await response.json();
+            adicionarMensagem(data.text, 'bot', data.html, data.options);
+            chatState = data.state || 'normal';
+            chatInput.placeholder = chatState === 'faq_selection' ? 'Clique numa FAQ acima ou digite uma nova mensagem...' : 'Digite sua mensagem...';
+        } catch (error) {
+            adicionarMensagem('Erro ao processar a solicitação.', 'bot');
+        } finally {
+            typingIndicator.style.display = 'none';
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+    }
+    
+    function addCopyButtons(block) {
+        let pre = block.parentElement;
+        if (!pre || pre.tagName.toLowerCase() !== 'pre') return;
+        let button = document.createElement('button');
+        button.className = 'copy-code-button';
+        button.innerHTML = '<i class="fas fa-copy"></i> Copiar';
+        pre.appendChild(button);
+        button.addEventListener('click', () => {
+            navigator.clipboard.writeText(block.innerText).then(() => {
+                button.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                setTimeout(() => {
+                    button.innerHTML = '<i class="fas fa-copy"></i> Copiar';
+                }, 2000);
+            }).catch(err => console.error('Erro ao copiar:', err));
+        });
+    }
+
+    function adicionarMensagem(texto, tipo, isHtml = false, options = []) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message ${tipo} mb-4 flex items-start`;
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'avatar mr-3';
+        avatarDiv.innerHTML = tipo === 'user' ? '<i class="fas fa-user text-gray-300"></i>' : '<i class="fas fa-robot text-green-400"></i>';
+        const bubbleDiv = document.createElement('div');
+        bubbleDiv.className = tipo === 'user' ? 'message-bubble bg-green-600/30 p-3 rounded-lg w-full text-white' : 'message-bubble bg-gray-700 p-3 rounded-lg w-full text-gray-300';
+
+>>>>>>> b586e80094ba1b6dcc941796c2f1cbe053e2ec2e
         if (isHtml) {
             bubbleDiv.innerHTML = message;
             // Add copy buttons to code blocks
@@ -120,12 +222,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const button = document.createElement('button');
                 button.className = 'faq-option-button';
                 button.textContent = option.question;
+<<<<<<< HEAD
                 button.setAttribute('aria-label', `FAQ opção ${index + 1}: ${option.question}`);
                 button.onclick = () => sendMessage(`faq_${option.id}`);
+=======
+                button.onclick = () => selecionarFAQ(option.id);
+>>>>>>> b586e80094ba1b6dcc941796c2f1cbe053e2ec2e
                 optionsDiv.appendChild(button);
             });
             bubbleDiv.appendChild(optionsDiv);
         }
+<<<<<<< HEAD
         
         if (isUser) {
             messageDiv.appendChild(bubbleDiv);
@@ -286,3 +393,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+=======
+
+        messageDiv.appendChild(tipo === 'user' ? bubbleDiv : avatarDiv);
+        messageDiv.appendChild(tipo === 'user' ? avatarDiv : bubbleDiv);
+        chatBody.appendChild(messageDiv);
+        return messageDiv;
+    }
+
+    chatInput.addEventListener('input', () => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = (chatInput.scrollHeight) + 'px';
+    });
+
+    chatInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            enviarMensagem();
+        }
+    });
+
+    window.addEventListener('load', () => chatBody.scrollTop = chatBody.scrollHeight);
+</script>
+>>>>>>> b586e80094ba1b6dcc941796c2f1cbe053e2ec2e
