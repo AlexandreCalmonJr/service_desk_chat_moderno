@@ -15,6 +15,7 @@ import spacy.cli
 import click
 from flask.cli import with_appcontext
 from flask_caching import Cache
+from sqlalchemy.orm import aliased
 
 app = Flask(__name__)
 
@@ -692,30 +693,19 @@ def export_faqs():
 @app.route('/challenges')
 @login_required
 def list_challenges():
-    # Garante que o utilizador tem um nível antes de continuar
     if not current_user.level:
         flash('Não foi possível determinar o seu nível. Por favor, contacte o suporte.', 'error')
         return redirect(url_for('index'))
 
-    # IDs dos desafios já completos
     completed_challenges_ids = [uc.challenge_id for uc in current_user.completed_challenges]
-    
-    # Pontos mínimos do nível atual do utilizador
     user_min_points = current_user.level.min_points
-
-    # Alias para a tabela Level para a junção
+    
     RequiredLevel = aliased(Level)
 
-    # Busca todos os desafios que o utilizador AINDA NÃO completou
     all_challenges_query = db.session.query(Challenge).filter(Challenge.id.notin_(completed_challenges_ids))
-    
-    # Junta a tabela de desafios com a tabela de níveis para obter os pontos mínimos de cada desafio
     all_challenges_query = all_challenges_query.join(RequiredLevel, Challenge.level_required == RequiredLevel.name)
 
-    # Filtra para desafios desbloqueados (o nível do desafio tem menos ou os mesmos pontos que o nível do utilizador)
     unlocked_challenges = all_challenges_query.filter(RequiredLevel.min_points <= user_min_points).all()
-    
-    # Filtra para desafios bloqueados
     locked_challenges = all_challenges_query.filter(RequiredLevel.min_points > user_min_points).all()
 
     return render_template('challenges.html', 
