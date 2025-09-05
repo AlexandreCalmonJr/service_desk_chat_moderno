@@ -3,75 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Painel de Administração{% endblock %} - Assistente de Service Desk</title>
+    <title>{% block title %}Painel de Administração{% endblock %} - Service Desk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
-<body class="bg-gray-100 dark:bg-gray-900">
-    <div class="flex h-screen">
-        <!-- Sidebar (Menu Lateral) -->
-        <aside class="w-64 bg-white dark:bg-gray-800 shadow-md flex-shrink-0 hidden md:block">
-            <div class="p-4 border-b dark:border-gray-700">
-                <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Admin Dashboard</h1>
-            </div>
-            <nav class="p-4 space-y-2">
-                <a href="{{ url_for('admin_dashboard') }}" class="flex items-center p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg">
-                    <i class="fas fa-tachometer-alt mr-3"></i> Resumo
-                </a>
-                <a href="{{ url_for('admin_users') }}" class="flex items-center p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg">
-                    <i class="fas fa-users mr-3"></i> Gerir Utilizadores
-                </a>
-                <a href="{{ url_for('admin_faq') }}" class="flex items-center p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg">
-                    <i class="fas fa-question-circle mr-3"></i> Gerir FAQs
-                </a>
-                <a href="#" class="flex items-center p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"> <!-- Adicionar link para admin_levels quando a rota for criada -->
-                    <i class="fas fa-layer-group mr-3"></i> Gerir Níveis
-                </a>
-                 <a href="#" class="flex items-center p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"> <!-- Adicionar link para admin_challenges quando a rota for criada -->
-                    <i class="fas fa-gamepad mr-3"></i> Gerir Desafios
-                </a>
-                <div class="border-t dark:border-gray-700 pt-4 mt-4">
-                     <a href="{{ url_for('index') }}" class="flex items-center p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg">
-                        <i class="fas fa-arrow-left mr-3"></i> Voltar ao Site
-                    </a>
-                </div>
-            </nav>
-        </aside>
-
-        <!-- Conteúdo Principal -->
-        <div class="flex-1 flex flex-col">
-            <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center">
-                <div class="flex items-center">
-                    <button id="menu-button" class="md:hidden mr-4 text-gray-600 dark:text-gray-300">
-                        <i class="fas fa-bars fa-lg"></i>
-                    </button>
-                    <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">{% block page_title %}Bem-vindo{% endblock %}</h2>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">
-                        <i class="fas fa-moon text-gray-600 dark:text-gray-300"></i>
-                    </button>
-                    <span class="text-sm text-gray-500 dark:text-gray-400">Olá, {{ current_user.name }}!</span>
-                </div>
-            </header>
-            <main class="flex-1 p-6 overflow-y-auto">
-                {% block content %}{% endblock %}
-            </main>
+<body class="bg-gray-100 dark:bg-gray-900 flex">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-800 dark:bg-gray-900 text-white flex-shrink-0 flex flex-col">
+        <div class="h-16 flex items-center justify-center text-xl font-bold border-b border-gray-700">
+            <i class="fas fa-shield-alt mr-2"></i> Admin Panel
         </div>
-    </div>
+        <nav class="flex-1 px-4 py-6 space-y-2">
+            <a href="{{ url_for('admin_dashboard') }}" class="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition"><i class="fas fa-tachometer-alt w-6 mr-2"></i> Dashboard</a>
+            <a href="{{ url_for('admin_users') }}" class="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition"><i class="fas fa-users w-6 mr-2"></i> Utilizadores</a>
+            <a href="{{ url_for('admin_teams') }}" class="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition"><i class="fas fa-users-cog w-6 mr-2"></i> Times</a>
+            <a href="{{ url_for('admin_faqs') }}" class="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition"><i class="fas fa-question-circle w-6 mr-2"></i> FAQs</a>
+            <a href="{{ url_for('admin_levels') }}" class="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition"><i class="fas fa-layer-group w-6 mr-2"></i> Níveis</a>
+            <a href="{{ url_for('admin_challenges') }}" class="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition"><i class="fas fa-gamepad w-6 mr-2"></i> Desafios</a>
+            <a href="{{ url_for('index') }}" class="flex items-center px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition mt-6 border-t border-gray-700 pt-4"><i class="fas fa-arrow-left w-6 mr-2"></i> Voltar ao Site</a>
+        </nav>
+    </aside>
 
-    <script>
-        function toggleTheme() {
-            document.body.classList.toggle('dark');
-            const themeIcons = document.querySelectorAll('.theme-toggle i');
-            themeIcons.forEach(icon => {
-                icon.classList.toggle('fa-moon');
-                icon.classList.toggle('fa-sun');
-            });
-        }
-        // Adicionar script para o menu móvel se necessário
-    </script>
+    <!-- Conteúdo Principal -->
+    <div class="flex-1 flex flex-col">
+        <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">{% block page_title %}Dashboard{% endblock %}</h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ user_level_insignia }} Olá, {{ current_user.name }}!
+                </span>
+                <a href="{{ url_for('logout') }}" class="text-sm text-gray-600 dark:text-gray-400 hover:underline">Sair</a>
+            </div>
+        </header>
+        <main class="flex-1 p-6">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
 </body>
 </html>
+
