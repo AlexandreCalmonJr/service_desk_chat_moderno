@@ -1,40 +1,41 @@
-<div class="chat-container" role="application" aria-label="Chat do assistente de service desk">
-    <div class="chat-header">
-        <h2 class="chat-title">
-            <i class="fas fa-robot" aria-hidden="true"></i>
-            Sou seu assistente de Service Desk
-        </h2>
-        <p class="chat-subtitle">Como posso ajudar hoje?</p>
-    </div>
-    
-    <div class="chat-body" id="chatBox" role="log" aria-live="polite" aria-label="Histórico de conversas">
-        <div class="chat-message bot" role="article">
-            <div class="avatar" aria-hidden="true">
-                <i class="fas fa-robot"></i>
-            </div>
-            <div class="message-bubble">
-                <p>Olá! Como posso ajudar você hoje? Tente "Encerrar chamado &lt;ID&gt;", "Sugerir solução para &lt;problema&gt;", ou faça uma pergunta!</p>
-            </div>
+<div class="chat-container-modern" role="application" aria-label="Chat do assistente de service desk">
+    <div class="chat-header-modern">
+        <div class="avatar-modern bot-avatar">
+            <i class="fas fa-robot"></i>
+        </div>
+        <div class="chat-header-info">
+            <h2 class="chat-title-modern">Assistente de Service Desk</h2>
+            <p class="chat-status-modern">
+                <span class="status-indicator-modern"></span>
+                Online
+            </p>
         </div>
     </div>
     
-    <div class="chat-footer p-4 bg-gray-800 border-t border-gray-700">
-        <div class="typing-indicator" id="typing-indicator" style="display: none;">
-            <span class="text-gray-400">Digitando...</span>
+    <div class="chat-body-modern" id="chatBox" role="log" aria-live="polite">
         </div>
-        <div class="flex items-center space-x-2">
+
+    <div class="typing-indicator-modern" id="typingIndicator" style="display: none;">
+        <div class="typing-dots-modern">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+    
+    <div class="chat-footer-modern">
+        <form class="chat-form-modern" id="chat-form" action="javascript:void(0);">
             <textarea 
-                id="chat-input" 
-                class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm text-white placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500" 
+                id="chatInput" 
+                class="chat-input-modern" 
                 rows="1" 
                 placeholder="Digite sua mensagem..."></textarea>
-            <button 
-                onclick="enviarMensagem()" 
-                class="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800">
-                Enviar
+            <button type="submit" id="sendButton" class="send-button-modern" aria-label="Enviar mensagem">
+                <i class="fas fa-paper-plane"></i>
             </button>
-        </div>
+        </form>
     </div>
+</div>
     
     <script>
         // >>>>>>>>> AQUI ESTÃO AS CORREÇÕES <<<<<<<<<<<

@@ -846,14 +846,169 @@ function sendMessage(message) {
 }
 
 // Initialize chat when DOM is ready
+/**
+ * Service Desk Chat Application - Modern UI/UX
+ */
 document.addEventListener('DOMContentLoaded', function() {
-    chatInstance = new ServiceDeskChat();
     
-    // Make functions globally available
-    window.clearChat = clearChat;
-    window.exportChat = exportChat;
-    window.sendMessage = sendMessage;
-    window.chatInstance = chatInstance;
+    class ServiceDeskChat {
+        constructor() {
+            this.chatBox = document.getElementById('chatBox');
+            this.chatInput = document.getElementById('chatInput');
+            this.sendButton = document.getElementById('sendButton');
+            this.typingIndicator = document.getElementById('typingIndicator');
+            this.chatForm = document.getElementById('chat-form');
+
+            if (!this.chatBox || !this.chatInput || !this.sendButton || !this.chatForm) {
+                console.error('Elementos essenciais do chat não foram encontrados. Abortando inicialização.');
+                return;
+            }
+
+            this.isTyping = false;
+            this.init();
+        }
+
+        init() {
+            this.setupEventListeners();
+            this.addWelcomeMessage();
+            this.updateSendButtonState();
+            console.log('Service Desk Chat (Modern) inicializado com sucesso.');
+        }
+
+        setupEventListeners() {
+            this.chatForm.addEventListener('submit', (e) => this.handleSendMessage(e));
+            this.chatInput.addEventListener('input', () => {
+                this.autoResizeInput();
+                this.updateSendButtonState();
+            });
+            this.chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.handleSendMessage(e);
+                }
+            });
+        }
+
+        addWelcomeMessage() {
+            const welcomeText = "Olá! Sou seu assistente de Service Desk. Como posso te ajudar hoje?";
+            this.addMessage(welcomeText, 'bot');
+        }
+
+        async handleSendMessage(e) {
+            e.preventDefault();
+            const message = this.chatInput.value.trim();
+
+            if (!message || this.isTyping) return;
+
+            this.addMessage(message, 'user');
+            this.chatInput.value = '';
+            this.autoResizeInput();
+            this.updateSendButtonState();
+
+            this.showTypingIndicator();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensagem: message })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                this.addMessage(data.text, 'bot', data.html, data.options);
+
+            } catch (error) {
+                console.error('Erro ao enviar mensagem:', error);
+                this.addMessage('Desculpe, ocorreu um erro ao tentar me comunicar com o servidor. Tente novamente.', 'bot');
+            } finally {
+                this.hideTypingIndicator();
+            }
+        }
+        
+        addMessage(text, type, isHtml = false, options = []) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message-modern ${type}`;
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = `message-bubble-modern ${type}`;
+
+            if (isHtml) {
+                bubbleDiv.innerHTML = text;
+            } else {
+                bubbleDiv.textContent = text;
+            }
+
+            // Adicionar avatar
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = `avatar-modern ${type}-avatar`;
+            avatarDiv.innerHTML = type === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
+            
+            if (type === 'user') {
+                messageDiv.appendChild(bubbleDiv);
+                messageDiv.appendChild(avatarDiv);
+            } else {
+                messageDiv.appendChild(avatarDiv);
+                messageDiv.appendChild(bubbleDiv);
+            }
+
+            // Adicionar opções de FAQ se existirem
+            if (options && options.length > 0) {
+                const optionsDiv = document.createElement('div');
+                optionsDiv.className = 'faq-options-modern mt-3 space-y-2';
+                options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'w-full text-left p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900 transition';
+                    button.textContent = option.question;
+                    button.onclick = () => {
+                        this.chatInput.value = `faq_${option.id}`;
+                        this.handleSendMessage(new Event('submit'));
+                    };
+                    optionsDiv.appendChild(button);
+                });
+                bubbleDiv.appendChild(optionsDiv);
+            }
+            
+            this.chatBox.appendChild(messageDiv);
+            this.scrollToBottom();
+        }
+
+        showTypingIndicator() {
+            this.isTyping = true;
+            this.sendButton.disabled = true;
+            this.typingIndicator.style.display = 'flex';
+            this.scrollToBottom();
+        }
+
+        hideTypingIndicator() {
+            this.isTyping = false;
+            this.updateSendButtonState();
+            this.typingIndicator.style.display = 'none';
+        }
+
+        updateSendButtonState() {
+            this.sendButton.disabled = this.chatInput.value.trim().length === 0 || this.isTyping;
+        }
+        
+        autoResizeInput() {
+            this.chatInput.style.height = 'auto';
+            const newHeight = Math.min(this.chatInput.scrollHeight, 120);
+            this.chatInput.style.height = newHeight + 'px';
+        }
+
+        scrollToBottom() {
+            this.chatBox.scrollTo({
+                top: this.chatBox.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+    }
+
+    // Inicializa o chat
+    new ServiceDeskChat();
 });
 
 // Handle page visibility changes

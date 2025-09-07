@@ -1,48 +1,109 @@
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Service Desk{% endblock %}</title>
+    <title>{% block title %}Assistente de Service Desk{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-    <nav class="bg-blue-600 dark:bg-blue-800 p-4">
-        <div class="container mx-auto flex justify-between items-center">
-            <a href="{{ url_for('index') }}" class="text-white text-2xl font-bold">Service Desk</a>
-            <div class="space-x-4">
-                {% if current_user.is_authenticated %}
-                    <a href="{{ url_for('index') }}" class="text-white hover:text-gray-200">Início</a>
-                    <a href="{{ url_for('faqs') }}" class="text-white hover:text-gray-200">FAQs</a>
-                    <a href="{{ url_for('chat_page') }}" class="text-white hover:text-gray-200">Chat</a>
-                    <a href="{{ url_for('list_challenges') }}" class="text-white hover:text-gray-200">Desafios</a>
-                    <a href="{{ url_for('ranking') }}" class="text-white hover:text-gray-200">Ranking</a>
-                    <a href="{{ url_for('teams_list') }}" class="text-white hover:text-gray-200">Times</a>
-                    {% if current_user.team and current_user.team.owner_id == current_user.id %}
-                        <a href="{{ url_for('manage_team') }}" class="text-white hover:text-gray-200">Gerenciar Time</a>
-                    {% endif %}
-                    {% if current_user.is_admin %}
-                        <a href="{{ url_for('admin_dashboard') }}" class="text-white hover:text-gray-200">Admin</a>
-                    {% endif %}
-                    <a href="{{ url_for('profile') }}" class="text-white hover:text-gray-200">Perfil ({{ user_level_insignia }})</a>
-                    <a href="{{ url_for('logout') }}" class="text-white hover:text-gray-200">Sair</a>
-                {% else %}
-                    <a href="{{ url_for('login') }}" class="text-white hover:text-gray-200">Login</a>
-                    <a href="{{ url_for('register') }}" class="text-white hover:text-gray-200">Registrar</a>
-                {% endif %}
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col min-h-screen">
+
+    <header class="bg-gray-800 shadow-lg p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10 text-white">
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('index') }}" class="text-xl font-bold">Assistente de Service Desk</a>
+            <span class="text-sm text-gray-300 hidden sm:block">
+                {{ user_level_insignia }} Olá, {{ current_user.name }}!
+            </span>
+        </div>
+
+        <div class="hidden md:flex items-center space-x-2">
+            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
+            
+            {% if current_user.is_admin %}
+                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faqs') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
+                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Gerir Desafios</a>
+            {% endif %}
+
+            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">Ver FAQs</a>
+            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Sair</a>
+            <button id="theme-toggle" title="Alternar tema" class="w-10 h-10 flex items-center justify-center bg-gray-700 rounded-lg hover:bg-gray-600 transition">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+
+        <div class="md:hidden flex items-center">
+            <button id="menu-button" class="text-white focus:outline-none"><i class="fas fa-bars fa-lg"></i></button>
+        </div>
+    </header>
+    
+    <div id="mobile-menu" class="hidden md:hidden bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48 text-white">
+        <div class="flex flex-col space-y-3">
+            <a href="{{ url_for('list_challenges') }}" class="hover:text-blue-400">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="hover:text-blue-400">Times</a>
+            <a href="{{ url_for('ranking') }}" class="hover:text-blue-400">Ranking</a>
+            {% if current_user.is_admin %}
+                <div class="border-t border-gray-700 pt-3 mt-2">
+                    <a href="{{ url_for('admin_users') }}" class="hover:text-purple-400">Gerir Utilizadores</a>
+                    <a href="{{ url_for('admin_faqs') }}" class="hover:text-purple-400 mt-2 block">Gerir FAQs</a>
+                    <a href="{{ url_for('admin_challenges') }}" class="hover:text-yellow-400 mt-2 block">Gerir Desafios</a>
+                </div>
+            {% endif %}
+            <div class="border-t border-gray-700 pt-3 mt-2">
+                <a href="{{ url_for('faqs') }}" class="hover:text-gray-400">Ver FAQs</a>
+                <a href="{{ url_for('profile') }}" class="hover:text-gray-400 mt-2 block">Perfil</a>
+                <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-400 mt-2 block">Sair</a>
             </div>
         </div>
-    </nav>
-    <div class="container mx-auto p-6">
+    </div>
+    
+    <main class="flex-1 flex flex-col items-center pt-24 pb-4 px-4 w-full">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
+                <div class="w-full max-w-4xl">
                 {% for category, message in messages %}
-                    <div class="bg-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-100 border-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-500 text-{{ 'green' if category == 'success' else 'red' if category == 'error' else 'yellow' }}-700 px-4 py-3 rounded mb-4">
+                    <div class="p-4 rounded-lg mb-4 {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}
+                </div>
             {% endif %}
         {% endwith %}
+
         {% block content %}{% endblock %}
-    </div>
+    </main>
+
+    <script>
+        // Script para o menu mobile
+        const menuButton = document.getElementById('menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (menuButton) {
+            menuButton.onclick = function() {
+                mobileMenu.classList.toggle('hidden');
+            };
+        }
+
+        // Script para alternar o tema
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = themeToggle.querySelector('i');
+
+        themeToggle.onclick = function() {
+            document.body.classList.toggle('dark');
+            const isDarkMode = document.body.classList.contains('dark');
+            if (isDarkMode) {
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            } else {
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            }
+        }
+    </script>
 </body>
 </html>
