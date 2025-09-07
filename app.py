@@ -74,6 +74,10 @@ class Team(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # ADICIONE ESTA LINHA PARA CRIAR O RELACIONAMENTO COM O DONO
+    owner = db.relationship('User', foreign_keys=[owner_id])
+    
     members = db.relationship('User', foreign_keys='User.team_id', backref='team', lazy='dynamic')
     
     @property
