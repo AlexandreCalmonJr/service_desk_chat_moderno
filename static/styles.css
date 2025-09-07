@@ -940,9 +940,9 @@ section {
 
 .chat-container-modern {
     width: 100%;
-    max-width: 600px;
-    height: 75vh;
-    max-height: 800px;
+    max-width: 800px;  /* Aumentado de 600px para 800px */
+    height: 85vh;     /* Aumentado de 75vh para 85vh */
+    max-height: 950px; /* Aumentado para corresponder à nova altura */
     background: var(--chat-bg);
     border-radius: 1.5rem;
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
@@ -952,7 +952,6 @@ section {
     border: 1px solid var(--border-primary);
     transition: background-color 0.3s;
 }
-
 body.dark .chat-container-modern {
     background: var(--chat-bg-dark);
 }
