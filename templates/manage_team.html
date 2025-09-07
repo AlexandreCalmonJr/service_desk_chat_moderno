@@ -15,7 +15,7 @@
                     <a href="{{ url_for('index') }}" class="text-white hover:text-gray-200">Início</a>
                     <a href="{{ url_for('faqs') }}" class="text-white hover:text-gray-200">FAQs</a>
                     <a href="{{ url_for('chat_page') }}" class="text-white hover:text-gray-200">Chat</a>
-                    <a href="{{ url_for('challenges') }}" class="text-white hover:text-gray-200">Desafios</a>
+                    <a href="{{ url_for('list_challenges') }}" class="text-white hover:text-gray-200">Desafios</a>
                     <a href="{{ url_for('ranking') }}" class="text-white hover:text-gray-200">Ranking</a>
                     <a href="{{ url_for('teams_list') }}" class="text-white hover:text-gray-200">Times</a>
                     {% if current_user.team and current_user.team.owner_id == current_user.id %}
