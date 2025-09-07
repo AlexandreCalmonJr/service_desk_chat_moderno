@@ -3,5 +3,8 @@
 {% block title %}Assistente de Service Desk - Chat{% endblock %}
 
 {% block content %}
-    {% include 'chat.html' %}
+    {# Este container usa Tailwind para restaurar o alinhamento centralizado que você preferia #}
+    <div class="flex flex-1 items-center justify-center w-full">
+        {% include 'chat.html' %}
+    </div>
 {% endblock %}
