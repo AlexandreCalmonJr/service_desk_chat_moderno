@@ -784,6 +784,27 @@ def leave_team():
     flash(f'Você saiu do time "{team.name}".', 'success')
     return redirect(url_for('teams_list'))
 
+# Adicione este novo bloco de código no seu app.py
+
+@app.route('/admin/teams/delete/<int:team_id>', methods=['POST'])
+@login_required
+def admin_delete_team(team_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    team_to_delete = Team.query.get_or_404(team_id)
+
+    # Remove todos os membros do time antes de deletar
+    for member in team_to_delete.members:
+        member.team_id = None
+    
+    db.session.delete(team_to_delete)
+    db.session.commit()
+    
+    flash(f'O time "{team_to_delete.name}" foi dissolvido com sucesso!', 'success')
+    return redirect(url_for('admin_teams'))
+
 @app.route('/admin/dashboard')
 @login_required
 def admin_dashboard():
