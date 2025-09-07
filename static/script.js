@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentMessageIndex = -1;
 
     // --- Funções de Lógica do Chat ---
-
+    // (O restante do código permanece o mesmo da versão anterior que eu enviei)
     const handleSendMessage = async (event) => {
         if (event) event.preventDefault();
         
@@ -63,6 +63,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message-modern ${type}`;
         messageDiv.setAttribute('data-message-id', messageId);
+        
+        // Adiciona classe especial para a mensagem de boas-vindas
+        if (type === 'welcome') {
+            messageDiv.classList.add('welcome-message-modern');
+            type = 'bot'; // Trata como bot para alinhamento e avatar
+        }
 
         const bubbleDiv = document.createElement('div');
         bubbleDiv.className = `message-bubble-modern ${type}`;
@@ -89,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
             bubbleDiv.appendChild(createFAQOptions(options));
         }
         
-        if (type === 'bot') {
+        if (type === 'bot' && !messageDiv.classList.contains('welcome-message-modern')) {
             bubbleDiv.appendChild(createMessageActions(messageId));
         }
 
@@ -97,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
         scrollToBottom();
     };
     
+    // ... (O resto das funções como createFAQOptions, createMessageActions, etc., continuam iguais)
     const createFAQOptions = (options) => {
         const optionsDiv = document.createElement('div');
         optionsDiv.className = 'faq-options-modern mt-3 space-y-2';
@@ -195,9 +202,9 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // --- Inicialização e Event Listeners ---
-
     if (chatBox.children.length === 0) {
-        addMessageToUI("Olá! Sou seu assistente de Service Desk. Como posso te ajudar hoje?", 'bot');
+        // Agora usamos o tipo 'welcome' para a primeira mensagem
+        addMessageToUI("Olá! Sou seu assistente de Service Desk. Como posso te ajudar hoje?", 'welcome');
     }
 
     chatForm.addEventListener('submit', handleSendMessage);

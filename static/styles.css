@@ -923,7 +923,7 @@ section {
     }
 }
 
-/* ===== ESTILOS DO CHAT MODERNO ===== */
+/* ===== ESTILOS DO CHAT MODERNO (VERSÃO ATUALIZADA) ===== */
 
 :root {
     --chat-bg: #ffffff;
@@ -940,9 +940,9 @@ section {
 
 .chat-container-modern {
     width: 100%;
-    max-width: 800px;  /* Aumentado de 600px para 800px */
-    height: 85vh;     /* Aumentado de 75vh para 85vh */
-    max-height: 950px; /* Aumentado para corresponder à nova altura */
+    max-width: 800px;
+    height: 85vh;
+    max-height: 950px;
     background: var(--chat-bg);
     border-radius: 1.5rem;
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
@@ -952,15 +952,17 @@ section {
     border: 1px solid var(--border-primary);
     transition: background-color 0.3s;
 }
+
 body.dark .chat-container-modern {
     background: var(--chat-bg-dark);
 }
 
+/* 1. CABEÇALHO MAIOR E CORRIGIDO */
 .chat-header-modern {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1.25rem;
+    padding: 1.5rem; /* Aumentado */
     border-bottom: 1px solid var(--border-primary);
     background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(10px);
@@ -971,13 +973,13 @@ body.dark .chat-header-modern {
 }
 
 .avatar-modern {
-    width: 48px;
-    height: 48px;
+    width: 56px; /* Aumentado */
+    height: 56px; /* Aumentado */
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.25rem;
+    font-size: 1.5rem; /* Aumentado */
     flex-shrink: 0;
     color: white;
 }
@@ -992,7 +994,12 @@ body.dark .chat-header-modern {
 
 .chat-title-modern {
     font-weight: 600;
-    font-size: 1.125rem;
+    font-size: 1.25rem; /* Aumentado */
+    color: var(--chat-text); /* CORRIGIDO: Cor explícita para modo claro */
+}
+
+body.dark .chat-title-modern {
+    color: var(--chat-text-dark); /* CORRIGIDO: Cor explícita para modo escuro */
 }
 
 .chat-status-modern {
@@ -1026,6 +1033,7 @@ body.dark .chat-status-modern {
     align-items: flex-start;
     gap: 1rem;
     animation: slideInUp 0.4s ease-out;
+    position: relative; /* Necessário para os botões de ação */
 }
 
 .chat-message-modern.user {
@@ -1038,6 +1046,7 @@ body.dark .chat-status-modern {
     border-radius: 1.25rem;
     line-height: 1.6;
     font-size: 0.95rem;
+    position: relative; /* Necessário para os botões de ação */
 }
 
 .message-bubble-modern.user {
@@ -1057,91 +1066,72 @@ body.dark .message-bubble-modern.bot {
     background: var(--bot-bubble-bg-dark);
 }
 
-.typing-indicator-modern {
+/* 2. BOTÕES DE AÇÃO REDESENHADOS */
+.message-actions-modern {
+    position: absolute;
+    bottom: -15px;
+    right: 10px;
     display: flex;
-    align-items: center;
-    padding: 0 1.5rem 0.5rem;
-}
-
-.typing-dots-modern {
-    display: flex;
-    gap: 0.25rem;
-    padding: 0.75rem 1rem;
-    background: var(--bot-bubble-bg);
-    border-radius: 1.25rem;
+    gap: 0.3rem;
+    background-color: var(--chat-bg);
     border: 1px solid var(--border-primary);
+    border-radius: 20px;
+    padding: 4px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    opacity: 0; /* Escondido por padrão */
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    transform: translateY(10px);
 }
 
-body.dark .typing-dots-modern {
-    background: var(--bot-bubble-bg-dark);
+body.dark .message-actions-modern {
+    background-color: var(--bot-bubble-bg-dark);
 }
 
-.typing-dots-modern span {
-    width: 8px;
-    height: 8px;
-    background: #9ca3af;
-    border-radius: 50%;
-    animation: typingDots 1.4s infinite ease-in-out both;
+.chat-message-modern:hover .message-actions-modern {
+    opacity: 1; /* Aparece no hover */
+    transform: translateY(0);
 }
 
-.typing-dots-modern span:nth-child(1) { animation-delay: -0.32s; }
-.typing-dots-modern span:nth-child(2) { animation-delay: -0.16s; }
-
-.chat-footer-modern {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--border-primary);
-}
-
-.chat-form-modern {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    background: var(--input-bg);
-    border-radius: 1.25rem;
-    padding: 0.25rem;
-    border: 1px solid var(--border-primary);
-}
-
-body.dark .chat-form-modern {
-    background: var(--input-bg-dark);
-    border-color: var(--input-border-dark);
-}
-
-.chat-input-modern {
-    flex: 1;
+.message-actions-modern button {
+    background: none;
     border: none;
-    background: transparent;
-    padding: 0.75rem 1rem;
-    resize: none;
-    font-size: 1rem;
-    font-family: inherit;
-    color: var(--text-primary);
-    outline: none;
-}
-
-.send-button-modern {
-    background: var(--user-bubble-bg);
-    color: white;
-    border: none;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
     cursor: pointer;
-    font-size: 1rem;
-    transition: all 0.2s ease;
+    color: #6b7280;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
 }
 
-.send-button-modern:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+body.dark .message-actions-modern button {
+    color: #9ca3af;
 }
 
-.send-button-modern:disabled {
+.message-actions-modern button:hover {
+    background-color: #e5e7eb;
+    color: #1f2937;
+}
+
+body.dark .message-actions-modern button:hover {
+    background-color: #4b5563;
+    color: white;
+}
+
+.message-actions-modern button:disabled {
+    cursor: default;
     opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
+}
+
+/* 3. MENSAGEM DE BOAS-VINDAS ESTILIZADA */
+.welcome-message-modern .message-bubble-modern.bot {
+    background: #eef2ff; /* Um fundo diferente para a primeira mensagem */
+    border-color: #c7d2fe;
+}
+
+body.dark .welcome-message-modern .message-bubble-modern.bot {
+    background: #312e81;
+    border-color: #4338ca;
 }
