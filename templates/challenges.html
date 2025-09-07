@@ -9,7 +9,7 @@
     <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">Desafios Disponíveis</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {% for challenge in unlocked_challenges %}
-            <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md border dark:border-gray-700">
+            <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded shadow-md border dark:border-gray-700">
                 <h3 class="text-lg font-semibold">{{ challenge.title }}</h3>
                 <p class="text-sm text-gray-600 dark:text-gray-400 my-2">{{ challenge.description }}</p>
                 <p class="text-sm font-mono bg-gray-100 dark:bg-gray-700 p-1 rounded inline-block">Nível: {{ challenge.level_required }} | Pontos: {{ challenge.points_reward }}</p>
