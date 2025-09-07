@@ -46,11 +46,18 @@ cloudinary.config(
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-cache_config = {
-    "CACHE_TYPE": "RedisCache",
-    "CACHE_REDIS_URL": os.getenv('REDIS_URL')
-}
-cache = Cache(app, config=cache_config)
+
+# --- CONFIGURAÇÃO DA CACHE COM REDIS (VERSÃO CORRIGIDA PARA O RAILWAY) ---
+# Esta configuração usa a variável de ambiente REDIS_URL que o Railway fornece
+redis_url = os.getenv('REDIS_URL')
+if redis_url:
+    cache = Cache(app, config={
+        'CACHE_TYPE': 'RedisCache',
+        'CACHE_REDIS_URL': redis_url
+    })
+else:
+    # Se não encontrar a REDIS_URL, usa uma cache simples (para desenvolvimento local)
+    cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 # Configuração do spaCy
 try:
@@ -870,13 +877,23 @@ def admin_levels():
         name = request.form.get('name')
         min_points = request.form.get('min_points')
         file = request.files.get('insignia_image')
-        
+
+        # --- VERIFICAÇÃO DE DUPLICADOS ---
+        existing_level_name = Level.query.filter_by(name=name).first()
+        if existing_level_name:
+            flash(f'Erro: Já existe um nível com o nome "{name}".', 'error')
+            return redirect(url_for('admin_levels'))
+
+        existing_level_points = Level.query.filter_by(min_points=int(min_points)).first()
+        if existing_level_points:
+            flash(f'Erro: Já existe um nível com {min_points} pontos mínimos (Nível: {existing_level_points.name}).', 'error')
+            return redirect(url_for('admin_levels'))
+        # --- FIM DA VERIFICAÇÃO ---
+
         insignia_url = None
         if file and file.filename:
             try:
-                # Faz o upload para o Cloudinary
                 upload_result = cloudinary.uploader.upload(file)
-                # Pega a URL segura do resultado
                 insignia_url = upload_result['secure_url']
             except Exception as e:
                 flash(f'Erro ao fazer upload da imagem: {e}', 'error')
@@ -893,7 +910,6 @@ def admin_levels():
 
     levels = Level.query.order_by(Level.min_points).all()
     return render_template('admin_levels.html', levels=levels)
-
 
 @app.route('/admin/challenges')
 @login_required
