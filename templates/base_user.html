@@ -10,34 +10,33 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col min-h-screen">
-
-    <header class="bg-gray-800 shadow-lg p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10 text-white">
+    <header class="fixed top-0 left-0 right-0 z-10 bg-gray-900/50 backdrop-blur-lg border-b border-gray-700/50 p-4 flex justify-between items-center text-white">
         <div class="flex items-center space-x-4">
             <a href="{{ url_for('index') }}" class="text-xl font-bold">Assistente de Service Desk</a>
             <span class="text-sm text-gray-300 hidden sm:block">
                 {{ user_level_insignia }} Olá, {{ current_user.name }}!
             </span>
         </div>
-
+    
         <div class="hidden md:flex items-center space-x-2">
-            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
+            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Ranking</a>
             
             {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir Utilizadores</a>
-                <a href="{{ url_for('admin_faqs') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Gerir FAQs</a>
-                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">Gerir Desafios</a>
+                <a href="{{ url_for('admin_users') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition shadow-md">Gerir Utilizadores</a>
+                <a href="{{ url_for('admin_faqs') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition shadow-md">Gerir FAQs</a>
+                <a href="{{ url_for('admin_challenges') }}" class="text-sm px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-400 transition shadow-md">Gerir Desafios</a>
             {% endif %}
-
-            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">Ver FAQs</a>
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Sair</a>
-            <button id="theme-toggle" title="Alternar tema" class="w-10 h-10 flex items-center justify-center bg-gray-700 rounded-lg hover:bg-gray-600 transition">
+    
+            <a href="{{ url_for('faqs') }}" class="text-sm px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition shadow-md">Ver FAQs</a>
+            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition shadow-md">Perfil</a>
+            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition shadow-md">Sair</a>
+            <button id="theme-toggle" title="Alternar tema" class="w-10 h-10 flex items-center justify-center bg-gray-700 rounded-lg hover:bg-gray-600 transition shadow-md">
                 <i class="fas fa-moon"></i>
             </button>
         </div>
-
+    
         <div class="md:hidden flex items-center">
             <button id="menu-button" class="text-white focus:outline-none"><i class="fas fa-bars fa-lg"></i></button>
         </div>

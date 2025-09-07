@@ -1025,6 +1025,7 @@ body.dark .chat-status-modern {
     flex: 1;
     overflow-y: auto;
     padding: 1.5rem;
+    min-height: 0; /* <-- ADICIONE ESTA LINHA PARA CORRIGIR O BUG */
 }
 
 .chat-message-modern {
