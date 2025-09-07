@@ -15,7 +15,9 @@
         <div class="flex items-center space-x-4">
             <a href="{{ url_for('index') }}" class="text-xl font-bold">Assistente de Service Desk</a>
             <span class="text-sm text-gray-300 hidden sm:block">
-                {{ user_level_insignia }} Olá, {{ current_user.name }}!
+                {% if current_user.level and current_user.level.insignia %}
+    <img src="{{ url_for('static', filename='uploads/' + current_user.level.insignia) }}" alt="{{ current_user.level.name }}" class="w-6 h-6 inline-block rounded-full">
+{% endif %} Olá, {{ current_user.name }}!
             </span>
         </div>
 

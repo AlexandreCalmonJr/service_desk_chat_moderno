@@ -23,8 +23,9 @@
                         <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 {% if user.id == current_user.id %} bg-blue-100 dark:bg-blue-900/50 font-bold {% endif %}">
                             <td class="p-3">{{ loop.index }}</td>
                             <td class="p-3">
-                                <span>{{ user.level.insignia if user.level else '' }}</span>
-                                {{ user.name }}
+                                {% if user.level and user.level.insignia %}
+                                <img src="{{ url_for('static', filename='uploads/' + user.level.insignia) }}" alt="{{ user.level.name }}" class="w-6 h-6 inline-block mr-2 rounded-full">
+                            {% endif %}                                {{ user.name }}
                             </td>
                             <td class="p-3">{{ user.level.name if user.level else 'N/A' }}</td>
                             <td class="p-3 text-right">{{ user.points }}</td>

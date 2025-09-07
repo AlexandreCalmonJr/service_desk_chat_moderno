@@ -16,6 +16,9 @@ import click
 from flask.cli import with_appcontext
 from flask_caching import Cache
 from sqlalchemy.orm import aliased
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 app = Flask(__name__)
 
@@ -29,12 +32,25 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://')
+    
+
+# --- CONFIGURAÇÃO DO CLOUDINARY ---
+cloudinary.config(
+  cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME'),
+  api_key = os.getenv('CLOUDINARY_API_KEY'),
+  api_secret = os.getenv('CLOUDINARY_API_SECRET'),
+  secure = True
+)
 
 # --- INICIALIZAÇÃO DAS EXTENSÕES ---
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
+cache_config = {
+    "CACHE_TYPE": "RedisCache",
+    "CACHE_REDIS_URL": os.getenv('REDIS_URL')
+}
+cache = Cache(app, config=cache_config)
 
 # Configuração do spaCy
 try:
@@ -45,11 +61,14 @@ except OSError:
     nlp = spacy.load('pt_core_news_sm')
 
 # --- MODELOS DA BASE DE DADOS ---
+# Em app.py
 class Level(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
     min_points = db.Column(db.Integer, unique=True, nullable=False, index=True)
-    insignia = db.Column(db.String(10), nullable=False, default='🌱')
+    # ALTERE A LINHA ABAIXO
+    insignia = db.Column(db.String(255), nullable=True) # 255 caracteres para a URL
+
 
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -848,17 +867,28 @@ def admin_levels():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        # Lógica para adicionar um novo nível
         name = request.form.get('name')
         min_points = request.form.get('min_points')
-        insignia = request.form.get('insignia')
-        if name and min_points and insignia:
-            new_level = Level(name=name, min_points=int(min_points), insignia=insignia)
+        file = request.files.get('insignia_image')
+        
+        insignia_url = None
+        if file and file.filename:
+            try:
+                # Faz o upload para o Cloudinary
+                upload_result = cloudinary.uploader.upload(file)
+                # Pega a URL segura do resultado
+                insignia_url = upload_result['secure_url']
+            except Exception as e:
+                flash(f'Erro ao fazer upload da imagem: {e}', 'error')
+                return redirect(url_for('admin_levels'))
+
+        if name and min_points:
+            new_level = Level(name=name, min_points=int(min_points), insignia=insignia_url)
             db.session.add(new_level)
             db.session.commit()
             flash('Nível adicionado com sucesso!', 'success')
         else:
-            flash('Todos os campos são obrigatórios.', 'error')
+            flash('Nome e Pontos Mínimos são obrigatórios.', 'error')
         return redirect(url_for('admin_levels'))
 
     levels = Level.query.order_by(Level.min_points).all()
