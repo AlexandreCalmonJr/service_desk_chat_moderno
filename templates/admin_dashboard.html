@@ -5,6 +5,14 @@
 {% block page_title %}Dashboard de Administração{% endblock %}
 
 {% block content %}
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Visão Geral</h2>
+        <a href="{{ url_for('index') }}" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition inline-flex items-center">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Voltar para o Chat
+        </a>
+    </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md flex items-center space-x-4">
             <div class="bg-blue-500 text-white rounded-full p-3">

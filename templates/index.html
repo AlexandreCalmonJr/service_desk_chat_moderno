@@ -1,66 +1,7 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistente de Service Desk - Chat</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-</head>
-<body class="bg-gray-100 dark:bg-gray-900 flex flex-col min-h-screen">
+{% extends "base_user.html" %}
 
-    <!-- CABEÇALHO RESPONSIVO COMPLETO -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm p-4 flex justify-between items-center fixed top-0 left-0 right-0 z-10">
-        <div class="flex items-center space-x-3">
-            <h1 class="text-xl font-bold text-gray-900 dark:text-gray-100">Assistente de Service Desk</h1>
-            <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                {{ user_level_insignia }} Olá, {{ current_user.name }}!
-            </span>
-        </div>
-        <div class="hidden md:flex items-center space-x-3">
-            <!-- >>>>>>>>> AQUI ESTÁ A CORREÇÃO <<<<<<<<<<< -->
-            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Ranking</a>
-            {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_dashboard') }}" class="text-sm px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Painel Admin</a>
-            {% endif %}
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-sm px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition">Sair</a>
-        </div>
-        <div class="md:hidden flex items-center">
-            <button id="menu-button" class="text-gray-900 dark:text-gray-100 focus:outline-none"><i class="fas fa-bars fa-lg"></i></button>
-        </div>
-    </header>
-    <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48">
-        <div class="flex flex-col space-y-3">
-             <!-- >>>>>>>>> AQUI ESTÁ A CORREÇÃO <<<<<<<<<<< -->
-            <a href="{{ url_for('list_challenges') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Ranking</a>
-            {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_dashboard') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Painel Admin</a>
-            {% endif %}
-            <a href="{{ url_for('profile') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Perfil</a>
-            <a href="{{ url_for('logout') }}" class="text-gray-800 dark:text-gray-200 hover:text-blue-600">Sair</a>
-        </div>
-    </div>
-    
-    <main class="flex-1 flex flex-col items-center justify-center pt-20 pb-4 px-4">
-        {% include 'chat.html' %}
-    </main>
+{% block title %}Assistente de Service Desk - Chat{% endblock %}
 
-    <script>
-        const menuButton = document.getElementById('menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        if (menuButton) {
-            menuButton.onclick = function() {
-                mobileMenu.classList.toggle('hidden');
-            };
-        }
-    </script>
-</body>
-</html>
-
+{% block content %}
+    {% include 'chat.html' %}
+{% endblock %}
