@@ -18,7 +18,7 @@
                     <tr class="{% if loop.index % 2 == 0 %}bg-gray-50 dark:bg-gray-800{% else %}bg-white dark:bg-gray-900{% endif %}">
                         <td class="p-2">{{ user.name }}</td>
                         <td class="p-2">{{ user.email }}</td>
-                        <td class="p-2">{{ user.level.name }} {{ LEVELS[user.level.name].insignia }}</td>
+                        <td class="p-2">{{ user.level.insignia }} {{ user.level.name }}</td>
                         <td class="p-2">{{ 'Sim' if user.is_admin else 'Não' }}</td>
                         <td class="p-2">
                             <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}">
