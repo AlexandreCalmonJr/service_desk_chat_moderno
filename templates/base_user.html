@@ -34,6 +34,7 @@
             <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Desafios</a>
             <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Times</a>
             <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Ranking</a>
+            <a href="{{ url_for('list_paths') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-blue-500 transition">Trilhas</a>
             
             {% if current_user.is_admin %}
                 <a href="{{ url_for('admin_dashboard') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition shadow-md">Painel Admin</a>
