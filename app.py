@@ -1262,6 +1262,35 @@ def list_paths():
 
     return render_template('paths.html', paths_data=paths_with_progress)
 
+@app.route('/teams/manage')
+@login_required
+def manage_team():
+    if not current_user.team or current_user.id != current_user.team.owner_id:
+        flash('Você não é o dono de um time para poder gerenciá-lo.', 'error')
+        return redirect(url_for('teams_list'))
+    
+    team = current_user.team
+    return render_template('manage_team.html', team=team)
+
+# Adicione esta rota também, para expulsar membros
+@app.route('/teams/kick/<int:user_id>', methods=['POST'])
+@login_required
+def kick_from_team(user_id):
+    team = current_user.team
+    if not team or current_user.id != team.owner_id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('teams_list'))
+
+    user_to_kick = User.query.get_or_404(user_id)
+    if user_to_kick in team.members:
+        user_to_kick.team_id = None
+        db.session.commit()
+        flash(f'{user_to_kick.name} foi expulso do time.', 'success')
+    else:
+        flash('Este utilizador não faz parte do seu time.', 'error')
+        
+    return redirect(url_for('manage_team'))
+
 # Comando CLI para criar administrador
 @click.command(name='create-admin')
 @with_appcontext

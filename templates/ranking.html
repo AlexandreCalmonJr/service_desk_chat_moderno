@@ -17,17 +17,17 @@
 
         <div x-show="tab === 'geral'">
             <h3 class="text-xl font-semibold mb-4">Ranking de Pontos (Geral)</h3>
-            {% include 'ranking_table.html' with {'users': ranked_users} %}
+            {% include 'ranking_table.html' %}
         </div>
-
+        
         <div x-show="tab === 'mensal'" style="display: none;">
             <h3 class="text-xl font-semibold mb-4">Líderes do Mês</h3>
-            {% include 'ranking_table.html' with {'users': monthly_leaders, 'is_timed': True} %}
+            {% include 'ranking_table.html' with context %}
         </div>
-
+        
         <div x-show="tab === 'semanal'" style="display: none;">
             <h3 class="text-xl font-semibold mb-4">Líderes da Semana</h3>
-            {% include 'ranking_table.html' with {'users': weekly_leaders, 'is_timed': True} %}
+            {% include 'ranking_table.html' with context %}
         </div>
 
         <div x-show="tab === 'times'" style="display: none;">
