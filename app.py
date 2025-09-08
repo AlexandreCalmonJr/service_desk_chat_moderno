@@ -168,13 +168,15 @@ class ChatMessage(db.Model):
     feedback = db.Column(db.String(20))  # 'helpful', 'unhelpful'
     
     
+# Tabela de associação para os desafios numa trilha (com ordem)
 class PathChallenge(db.Model):
     path_id = db.Column(db.Integer, db.ForeignKey('learning_path.id'), primary_key=True)
     challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), primary_key=True)
     step = db.Column(db.Integer, nullable=False) # Ordem do desafio na trilha (1, 2, 3...)
 
     challenge = db.relationship('Challenge')
-    path = db.relationship('LearningPath')
+    # CORREÇÃO: Adicionado back_populates
+    path = db.relationship('LearningPath', back_populates='challenges')
 
 class LearningPath(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -184,10 +186,12 @@ class LearningPath(db.Model):
     is_active = db.Column(db.Boolean, default=True)
 
     # Relacionamento para aceder aos desafios de forma ordenada
+    # CORREÇÃO: Adicionado back_populates
     challenges = db.relationship(
         'PathChallenge',
         order_by='PathChallenge.step',
-        cascade='all, delete-orphan'
+        cascade='all, delete-orphan',
+        back_populates='path'
     )
 
 class UserPathProgress(db.Model):
