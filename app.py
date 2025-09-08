@@ -380,7 +380,8 @@ def inject_user_gamification_data():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    return render_template('dashboard.html')
+
 
 @app.route('/admin/users')
 @login_required
@@ -994,6 +995,26 @@ def admin_delete_challenge(challenge_id):
     
     flash(f'O desafio "{challenge_to_delete.title}" foi excluído com sucesso!', 'success')
     return redirect(url_for('admin_challenges'))
+
+@app.context_processor
+def inject_gamification_progress():
+    if not current_user.is_authenticated:
+        return {}
+
+    progress_data = { 'percentage': 0, 'next_level_points': None }
+    if current_user.level:
+        current_level = current_user.level
+        next_level = Level.query.filter(Level.min_points > current_level.min_points).order_by(Level.min_points.asc()).first()
+        
+        if next_level:
+            points_for_level = next_level.min_points - current_level.min_points
+            points_achieved = current_user.points - current_level.min_points
+            progress_data['percentage'] = max(0, min(100, (points_achieved / points_for_level) * 100 if points_for_level > 0 else 100))
+            progress_data['next_level_points'] = next_level.min_points
+        else: # Nível máximo
+            progress_data['percentage'] = 100
+            
+    return dict(progress=progress_data)
 
 # Comando CLI para criar administrador
 @click.command(name='create-admin')

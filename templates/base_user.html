@@ -13,18 +13,21 @@
 
     <header class="fixed top-0 left-0 right-0 z-10 bg-gray-900/50 backdrop-blur-lg border-b border-gray-700/50 p-4 flex justify-between items-center text-white">
         <div class="flex items-center space-x-4">
-            <a href="{{ url_for('index') }}" class="text-xl font-bold">Assistente de Service Desk</a>
-            <span class="text-sm text-gray-300 hidden sm:block">
-                | Olá,&nbsp;
+            <a href="{{ url_for('index') }}" class="text-xl font-bold hover:text-gray-300 transition">Assistente de Service Desk</a>
+            <div class="text-sm text-gray-400 hidden lg:flex items-center space-x-2">
+                <span>| Olá,</span>
                 {% if current_user.level and current_user.level.insignia %}
                     {% if 'cloudinary' in current_user.level.insignia %}
-                        <img src="{{ current_user.level.insignia }}" alt="{{ current_user.level.name }}" class="w-5 h-5 rounded-full inline-block mx-1">
+                        <img src="{{ current_user.level.insignia }}" alt="{{ current_user.level.name }}" class="w-5 h-5 rounded-full inline-block">
                     {% else %}
-                        <span class="mx-1">{{ current_user.level.insignia }}</span>
+                        <span>{{ current_user.level.insignia }}</span>
                     {% endif %}
                 {% endif %}
-                {{ current_user.name }}!
-            </span>
+                <span>{{ current_user.name }}!</span>
+                <div class="w-24 bg-gray-700 rounded-full h-2.5 ml-2">
+                    <div class="bg-blue-500 h-2.5 rounded-full" style="width: {{ progress.percentage }}%" title="{{ progress.percentage|round(1) }}%"></div>
+                </div>
+            </div>
         </div>
 
         <div class="hidden md:flex items-center space-x-2">
