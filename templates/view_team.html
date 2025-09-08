@@ -1,0 +1,61 @@
+{% extends "base_user.html" %}
+
+{% block title %}{{ team.name }} - Service Desk{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-6xl mx-auto space-y-8">
+
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl text-center">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">{{ team.name }}</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-2">Liderado por: {{ team.owner.name }}</p>
+        <div class="mt-4 text-2xl font-bold text-blue-500">{{ team.total_points }} Pontos Totais</div>
+        
+        <div class="mt-6">
+            {% if current_user.team_id == team.id %}
+                <form action="{{ url_for('leave_team') }}" method="POST">
+                    <button type="submit" class="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 transition">Sair deste Time</button>
+                </form>
+            {% elif not current_user.team %}
+                <form action="{{ url_for('join_team', team_id=team.id) }}" method="POST">
+                    <button type="submit" class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-500 transition">Entrar neste Time</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Membros da Equipa ({{ team.members.count() }})</h2>
+        <div class="space-y-3">
+            {% for member in team.members %}
+                <div class="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
+                    <div class="flex items-center">
+                        <img src="{{ member.avatar_url or url_for('static', filename='images/default_avatar.png') }}" alt="Avatar" class="w-10 h-10 rounded-full mr-3 object-cover">
+                        <div>
+                            <p class="font-semibold">{{ member.name }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ member.level.name if member.level }}</p>
+                        </div>
+                    </div>
+                    <div class="font-bold text-right">
+                        <p>{{ member.points }} Pontos</p>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">Desafios Colaborativos</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for challenge in team_challenges %}
+                <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border dark:border-gray-700">
+                    <h3 class="font-bold text-lg mb-2">{{ challenge.title }}</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">{{ challenge.description }}</p>
+                    <a href="{{ url_for('list_challenges') }}" class="mt-4 block w-full text-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                        Ir para a Central de Desafios
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

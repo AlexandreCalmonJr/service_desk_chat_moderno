@@ -3,58 +3,57 @@
 {% block title %}Times - Service Desk{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-4xl p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 text-center">👥 Times e Clãs 👥</h2>
+<div class="w-full max-w-6xl mx-auto space-y-12">
+    <div class="text-center">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">Central de Times</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-2">Encontre uma equipa para colaborar e competir!</p>
+    </div>
 
-    <div class="mb-8 p-4 border rounded-lg dark:border-gray-700">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
         {% if current_user.team %}
-            <h3 class="text-lg font-semibold">Você pertence ao time "{{ current_user.team.name }}"</h3>
-            <div class="mt-4 flex space-x-2">
-                <form action="{{ url_for('leave_team') }}" method="POST">
-                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition">Sair do Time</button>
-                </form>
-                {% if current_user.team.owner_id == current_user.id %}
-                    <a href="{{ url_for('manage_team') }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition">Gerenciar Time</a>
-                {% endif %}
+            <h3 class="text-xl font-semibold mb-2">Você faz parte do Time:</h3>
+            <div class="p-4 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg flex flex-col sm:flex-row justify-between items-center">
+                <div class="mb-4 sm:mb-0">
+                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ current_user.team.name }}</p>
+                </div>
+                <a href="{{ url_for('view_team', team_id=current_user.team_id) }}" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-500 transition">
+                    Ver Meu Time
+                </a>
             </div>
         {% else %}
-            <h3 class="text-lg font-semibold">Crie o seu próprio time!</h3>
-            <form action="{{ url_for('teams_list') }}" method="POST" class="mt-4 flex flex-col sm:flex-row gap-2">
-                <input type="text" name="team_name" required class="flex-grow p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="Nome do time">
-                <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 transition">Criar Time</button>
+            <h3 class="text-xl font-semibold mb-4">Crie o seu Próprio Time!</h3>
+            <form action="{{ url_for('teams_list') }}" method="POST" class="flex flex-col sm:flex-row gap-2">
+                <input type="text" name="team_name" required class="flex-grow p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600" placeholder="Digite o nome do novo time...">
+                <button type="submit" class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-500 transition">Criar Time</button>
             </form>
         {% endif %}
     </div>
 
-    <div class="overflow-x-auto">
-        <table class="w-full text-left">
-            <thead>
-                <tr class="bg-gray-200 dark:bg-gray-700">
-                    <th class="p-3">Time</th>
-                    <th class="p-3">Membros</th>
-                    <th class="p-3">Pontos Totais</th>
-                    <th class="p-3">Ação</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for team in teams %}
-                    <tr class="border-b dark:border-gray-700">
-                        <td class="p-3 font-semibold">{{ team.name }}</td>
-                        <td class="p-3">{{ team.members.count() }}</td>
-                        <td class="p-3">{{ team.total_points }}</td>
-                        <td class="p-3">
-                            {% if not current_user.team %}
-                                <form action="{{ url_for('join_team', team_id=team.id) }}" method="POST">
-                                    <button type="submit" class="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-500 text-sm transition">Entrar</button>
-                                </form>
-                            {% elif current_user.team_id == team.id %}
-                                <span class="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm cursor-default">Seu Time</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div>
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Times Disponíveis</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for team in teams %}
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md flex flex-col">
+                    <div class="flex-grow">
+                        <h3 class="font-bold text-lg">{{ team.name }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Dono: {{ team.owner.name }}</p>
+                        <div class="my-4 flex justify-around text-center">
+                            <div>
+                                <p class="font-bold text-xl">{{ team.members.count() }}</p>
+                                <p class="text-xs text-gray-400">Membros</p>
+                            </div>
+                            <div>
+                                <p class="font-bold text-xl">{{ team.total_points }}</p>
+                                <p class="text-xs text-gray-400">Pontos</p>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('view_team', team_id=team.id) }}" class="w-full mt-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 text-sm font-semibold transition text-center">
+                        Ver Detalhes
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -376,7 +376,6 @@ def find_faqs_by_keywords(message):
     return [match[0] for match in matches]
 
 # Substitua a sua função find_faq_by_nlp por esta
-@cache.cached(timeout=600, key_prefix='faq_search')
 def find_faq_by_nlp(message):
     """Usa o spaCy para extrair palavras-chave e encontrar FAQs relevantes (versão melhorada)."""
     doc = nlp(message.lower())
@@ -928,7 +927,17 @@ def teams_list():
             return redirect(url_for('teams_list'))
 
     all_teams = Team.query.all()
-    return render_template('teams.html', teams=all_teams)
+    team_challenges = Challenge.query.filter_by(is_team_challenge=True).all()
+
+    return render_template('teams.html', teams=all_teams, team_challenges=team_challenges)
+
+@app.route('/team/<int:team_id>')
+@login_required
+def view_team(team_id):
+    team = Team.query.get_or_404(team_id)
+    team_challenges = Challenge.query.filter_by(is_team_challenge=True).all()
+    
+    return render_template('view_team.html', team=team, team_challenges=team_challenges)
 
 @app.route('/teams/join/<int:team_id>', methods=['POST'])
 @login_required
