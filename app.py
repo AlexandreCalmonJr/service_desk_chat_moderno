@@ -1061,6 +1061,58 @@ def inject_gamification_progress():
             
     return dict(progress=progress_data)
 
+@app.route('/admin/paths', methods=['GET', 'POST'])
+@login_required
+def admin_paths():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'create_path':
+            name = request.form.get('name')
+            description = request.form.get('description')
+            reward_points = request.form.get('reward_points', 100, type=int)
+            
+            if name and not LearningPath.query.filter_by(name=name).first():
+                new_path = LearningPath(name=name, description=description, reward_points=reward_points)
+                db.session.add(new_path)
+                db.session.commit()
+                flash('Trilha de aprendizagem criada com sucesso!', 'success')
+            else:
+                flash('Erro: Nome da trilha inválido ou já existente.', 'error')
+
+        elif action == 'add_challenge':
+            path_id = request.form.get('path_id', type=int)
+            challenge_id = request.form.get('challenge_id', type=int)
+            step = request.form.get('step', type=int)
+            
+            path = LearningPath.query.get(path_id)
+            if path and challenge_id and step:
+                # Verifica se o desafio ou o passo já existem na trilha
+                exists = PathChallenge.query.filter_by(path_id=path_id, challenge_id=challenge_id).first()
+                step_exists = PathChallenge.query.filter_by(path_id=path_id, step=step).first()
+                
+                if exists:
+                    flash('Este desafio já foi adicionado a esta trilha.', 'warning')
+                elif step_exists:
+                    flash(f'O passo {step} já está ocupado nesta trilha.', 'warning')
+                else:
+                    path_challenge = PathChallenge(path_id=path_id, challenge_id=challenge_id, step=step)
+                    db.session.add(path_challenge)
+                    db.session.commit()
+                    flash('Desafio adicionado à trilha com sucesso!', 'success')
+            else:
+                flash('Erro ao adicionar desafio à trilha.', 'error')
+        
+        return redirect(url_for('admin_paths'))
+
+    all_paths = LearningPath.query.all()
+    all_challenges = Challenge.query.all()
+    return render_template('admin_paths.html', paths=all_paths, challenges=all_challenges)
+
 # Comando CLI para criar administrador
 @click.command(name='create-admin')
 @with_appcontext

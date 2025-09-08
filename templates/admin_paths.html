@@ -1,0 +1,73 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Admin - Trilhas - Service Desk{% endblock %}
+{% block page_title %}Gerenciar Trilhas de Aprendizagem{% endblock %}
+
+{% block content %}
+    <div class="mb-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-4">Criar Nova Trilha</h2>
+        <form method="POST" action="{{ url_for('admin_paths') }}">
+            <input type="hidden" name="action" value="create_path">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <label for="name" class="block text-sm font-medium">Nome da Trilha</label>
+                    <input type="text" id="name" name="name" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                </div>
+                <div>
+                    <label for="reward_points" class="block text-sm font-medium">Pontos de Recompensa</label>
+                    <input type="number" id="reward_points" name="reward_points" value="100" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                </div>
+            </div>
+            <div class="mt-4">
+                <label for="description" class="block text-sm font-medium">Descrição</label>
+                <textarea id="description" name="description" rows="2" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600"></textarea>
+            </div>
+            <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Criar Trilha</button>
+        </form>
+    </div>
+
+    <div>
+        <h2 class="text-xl font-semibold mb-4">Gerir Trilhas Existentes</h2>
+        <div class="space-y-6">
+            {% for path in paths %}
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                <h3 class="text-lg font-bold">{{ path.name }}</h3>
+                <p class="text-sm text-gray-500 mb-4">{{ path.description }}</p>
+
+                <h4 class="font-semibold mb-2">Desafios na Trilha:</h4>
+                {% if path.challenges %}
+                    <ul class="list-decimal list-inside space-y-2 mb-4">
+                        {% for pc in path.challenges %}
+                            <li><strong>Passo {{ pc.step }}:</strong> {{ pc.challenge.title }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-sm text-gray-400 mb-4">Nenhum desafio nesta trilha ainda.</p>
+                {% endif %}
+                
+                <form method="POST" action="{{ url_for('admin_paths') }}" class="p-4 border-t dark:border-gray-700">
+                    <input type="hidden" name="action" value="add_challenge">
+                    <input type="hidden" name="path_id" value="{{ path.id }}">
+                    <h5 class="font-semibold mb-2 text-sm">Adicionar Desafio à Trilha:</h5>
+                    <div class="flex flex-col md:flex-row gap-4 items-end">
+                        <div class="flex-grow w-full">
+                            <label for="challenge_id_{{ path.id }}" class="block text-xs font-medium">Desafio</label>
+                            <select id="challenge_id_{{ path.id }}" name="challenge_id" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                                <option value="" disabled selected>Selecione um desafio</option>
+                                {% for challenge in challenges %}
+                                    <option value="{{ challenge.id }}">{{ challenge.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="w-full md:w-1/4">
+                            <label for="step_{{ path.id }}" class="block text-xs font-medium">Passo Nº</label>
+                            <input type="number" id="step_{{ path.id }}" name="step" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                        </div>
+                        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition w-full md:w-auto">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}
