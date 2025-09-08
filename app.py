@@ -19,6 +19,8 @@ from sqlalchemy.orm import aliased
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+from sqlalchemy import func
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -436,10 +438,31 @@ def admin_users():
 @app.route('/ranking')
 @login_required
 def ranking():
+    # --- Ranking Geral (já existente) ---
     ranked_users = User.query.order_by(User.points.desc()).all()
     all_teams = Team.query.all()
     ranked_teams = sorted(all_teams, key=lambda t: t.total_points, reverse=True)
-    return render_template('ranking.html', ranked_users=ranked_users, ranked_teams=ranked_teams)
+
+    # --- Cálculo do Ranking Mensal ---
+    start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_leaders = db.session.query(
+        User, func.sum(Challenge.points_reward).label('monthly_points')
+    ).join(UserChallenge, User.id == UserChallenge.user_id).join(Challenge, Challenge.id == UserChallenge.challenge_id).filter(UserChallenge.completed_at >= start_of_month).group_by(User).order_by(func.sum(Challenge.points_reward).desc()).limit(10).all()
+
+    # --- Cálculo do Ranking Semanal ---
+    start_of_week = datetime.utcnow() - timedelta(days=datetime.utcnow().weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    weekly_leaders = db.session.query(
+        User, func.sum(Challenge.points_reward).label('weekly_points')
+    ).join(UserChallenge, User.id == UserChallenge.user_id).join(Challenge, Challenge.id == UserChallenge.challenge_id).filter(UserChallenge.completed_at >= start_of_week).group_by(User).order_by(func.sum(Challenge.points_reward).desc()).limit(10).all()
+
+    return render_template(
+        'ranking.html', 
+        ranked_users=ranked_users, 
+        ranked_teams=ranked_teams,
+        monthly_leaders=monthly_leaders,
+        weekly_leaders=weekly_leaders
+    )
 
 @app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
 @login_required

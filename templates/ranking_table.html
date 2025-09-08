@@ -1,0 +1,42 @@
+<div class="overflow-x-auto">
+    <table class="w-full text-left">
+        <thead>
+            <tr class="bg-gray-200 dark:bg-gray-700">
+                <th class="p-3">Pos.</th>
+                <th class="p-3">Utilizador</th>
+                <th class="p-3">Nível</th>
+                <th class="p-3 text-right">Pontos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user_data in users %}
+                {% set user = user_data[0] if is_timed else user_data %}
+                <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 {% if user.id == current_user.id %} bg-blue-100 dark:bg-blue-900/50 font-bold {% endif %}">
+                    <td class="p-3">{{ loop.index }}</td>
+                    <td class="p-3 flex items-center">
+                        {% if user.level and user.level.insignia %}
+                            {% if 'cloudinary' in user.level.insignia %}
+                                <img src="{{ user.level.insignia }}" alt="{{ user.level.name }}" class="w-6 h-6 rounded-full object-cover mr-2">
+                            {% else %}
+                                <span class="text-xl mr-2">{{ user.level.insignia }}</span>
+                            {% endif %}
+                        {% endif %}
+                        <span>{{ user.name }}</span>
+                    </td>
+                    <td class="p-3">{{ user.level.name if user.level else 'N/A' }}</td>
+                    <td class="p-3 text-right font-bold">
+                        {% if is_timed %}
+                            {{ user_data.monthly_points or user_data.weekly_points }}
+                        {% else %}
+                            {{ user.points }}
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4" class="p-3 text-center text-gray-500">Ainda não há dados para este período.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
