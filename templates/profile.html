@@ -13,9 +13,16 @@
     <form method="POST" action="{{ url_for('profile') }}" class="space-y-6">
         <div>
             <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Nome</label>
-            <p class="mt-1">{% if current_user.level and current_user.level.insignia %}
-    <img src="{{ url_for('static', filename='uploads/' + current_user.level.insignia) }}" alt="{{ current_user.level.name }}" class="w-6 h-6 inline-block rounded-full">
-{% endif %} {{ current_user.name }}</p>
+            <p class="mt-1 flex items-center">
+                {% if current_user.level and current_user.level.insignia %}
+                    {% if 'cloudinary' in current_user.level.insignia %}
+                        <img src="{{ current_user.level.insignia }}" alt="{{ current_user.level.name }}" class="w-6 h-6 rounded-full object-cover mr-2">
+                    {% else %}
+                        <span class="text-xl mr-2">{{ current_user.level.insignia }}</span>
+                    {% endif %}
+                {% endif %}
+                <span>{{ current_user.name }}</span>
+            </p>
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
