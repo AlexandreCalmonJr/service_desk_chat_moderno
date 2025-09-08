@@ -159,6 +159,38 @@ class ChatMessage(db.Model):
     response = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     feedback = db.Column(db.String(20))  # 'helpful', 'unhelpful'
+    
+    
+class PathChallenge(db.Model):
+    path_id = db.Column(db.Integer, db.ForeignKey('learning_path.id'), primary_key=True)
+    challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), primary_key=True)
+    step = db.Column(db.Integer, nullable=False) # Ordem do desafio na trilha (1, 2, 3...)
+
+    challenge = db.relationship('Challenge')
+    path = db.relationship('LearningPath')
+
+class LearningPath(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    reward_points = db.Column(db.Integer, default=100) # Pontos extras por completar a trilha
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Relacionamento para aceder aos desafios de forma ordenada
+    challenges = db.relationship(
+        'PathChallenge',
+        order_by='PathChallenge.step',
+        cascade='all, delete-orphan'
+    )
+
+class UserPathProgress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    path_id = db.Column(db.Integer, db.ForeignKey('learning_path.id'), nullable=False)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User')
+    path = db.relationship('LearningPath')
 
 # Constante de níveis
 LEVELS = {
