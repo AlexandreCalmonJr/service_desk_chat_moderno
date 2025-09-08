@@ -329,23 +329,36 @@ def find_faqs_by_keywords(message):
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches]
 
+# Substitua a sua função find_faq_by_nlp por esta
 @cache.cached(timeout=600, key_prefix='faq_search')
 def find_faq_by_nlp(message):
-    """Usa o spaCy para extrair palavras-chave e encontrar FAQs relevantes."""
+    """Usa o spaCy para extrair palavras-chave e encontrar FAQs relevantes (versão melhorada)."""
     doc = nlp(message.lower())
-    keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ in ['NOUN', 'PROPN', 'VERB']}
+    # CORREÇÃO: Lógica de extração de palavras-chave mais abrangente
+    keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct}
+    
     if not keywords:
         return []
+
     faqs = FAQ.query.all()
     matches = []
+    
     for faq in faqs:
-        question_doc = nlp(faq.question.lower())
-        answer_doc = nlp(faq.answer.lower())
-        faq_keywords = {token.lemma_ for token in question_doc if not token.is_stop and not token.is_punct}
-        faq_keywords.update({token.lemma_ for token in answer_doc if not token.is_stop and not token.is_punct})
+        # Combina a pergunta e a resposta para uma busca mais completa
+        faq_text = f"{faq.question.lower()} {faq.answer.lower()}"
+        faq_doc = nlp(faq_text)
+        faq_keywords = {token.lemma_ for token in faq_doc if not token.is_stop and not token.is_punct}
+        
+        # Calcula a pontuação com base nas palavras-chave em comum
         score = len(keywords.intersection(faq_keywords))
+        
         if score > 0:
             matches.append((faq, score))
+
+    if not matches:
+        return []
+
+    # Ordena os resultados pela melhor pontuação
     matches.sort(key=lambda x: x[1], reverse=True)
     return [match[0] for match in matches]
 
@@ -731,8 +744,8 @@ def list_challenges():
     locked_challenges = all_challenges_query.filter(RequiredLevel.min_points > user_min_points).all()
 
     return render_template('challenges.html', 
-                           unlocked_challenges=unlocked_challenges, 
-                           locked_challenges=locked_challenges)
+                            unlocked_challenges=unlocked_challenges, 
+                            locked_challenges=locked_challenges)
 
 @app.route('/challenges/submit/<int:challenge_id>', methods=['POST'])
 @login_required
@@ -856,17 +869,6 @@ def admin_teams():
     all_teams = Team.query.all()
     return render_template('admin_teams.html', teams=all_teams)
 
-@app.route('/admin/faqs')
-@login_required
-def admin_faqs():
-    if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
-    # Supondo que admin_faq.html é a sua página de gestão de FAQs
-    categories = Category.query.all()
-    return render_template('admin_faq.html', categories=categories)
-
-
 @app.route('/admin/levels/delete/<int:level_id>', methods=['POST'])
 @login_required
 def admin_delete_level(level_id):
@@ -935,15 +937,64 @@ def admin_levels():
     levels = Level.query.order_by(Level.min_points).all()
     return render_template('admin_levels.html', levels=levels)
 
-@app.route('/admin/challenges')
+# Substitua a sua função admin_challenges por esta
+@app.route('/admin/challenges', methods=['GET', 'POST']) # Adicionado POST
 @login_required
 def admin_challenges():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
     
+    # CORREÇÃO: Busca todos os níveis para passar para o template
+    all_levels = Level.query.order_by(Level.min_points).all()
+    all_faqs = FAQ.query.order_by(FAQ.question).all()
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        level_required = request.form.get('level_required')
+        points_reward = request.form.get('points_reward')
+        expected_answer = request.form.get('expected_answer')
+        unlocks_faq_id = request.form.get('unlocks_faq_id')
+
+        if title and description and level_required and points_reward and expected_answer:
+            new_challenge = Challenge(
+                title=title,
+                description=description,
+                level_required=level_required,
+                points_reward=int(points_reward),
+                expected_answer=expected_answer
+                # A lógica para unlocks_faq_id precisa ser adicionada ao modelo se necessário
+            )
+            db.session.add(new_challenge)
+            db.session.commit()
+            flash('Desafio adicionado com sucesso!', 'success')
+            return redirect(url_for('admin_challenges'))
+        else:
+            flash('Todos os campos são obrigatórios.', 'error')
+
     all_challenges = Challenge.query.order_by(Challenge.level_required).all()
-    return render_template('admin_challenges.html', challenges=all_challenges)
+    # CORREÇÃO: Envia a variável 'levels' para o template
+    return render_template('admin_challenges.html', challenges=all_challenges, levels=all_levels, faqs=all_faqs)
+
+@app.route('/admin/challenges/delete/<int:challenge_id>', methods=['POST'])
+@login_required
+def admin_delete_challenge(challenge_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    challenge_to_delete = Challenge.query.get_or_404(challenge_id)
+    
+    # Remove as conclusões de desafios dos utilizadores antes de o excluir
+    UserChallenge.query.filter_by(challenge_id=challenge_id).delete()
+    
+    db.session.delete(challenge_to_delete)
+    db.session.commit()
+    
+    flash(f'O desafio "{challenge_to_delete.title}" foi excluído com sucesso!', 'success')
+    return redirect(url_for('admin_challenges'))
+
 # Comando CLI para criar administrador
 @click.command(name='create-admin')
 @with_appcontext
