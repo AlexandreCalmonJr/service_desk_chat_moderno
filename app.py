@@ -94,6 +94,9 @@ class User(UserMixin, db.Model):
     level_id = db.Column(db.Integer, db.ForeignKey('level.id'), nullable=True)
     level = db.relationship('Level', backref='users')
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    avatar_url = db.Column(db.String(255), nullable=True)
+    
+    
 
 class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -431,6 +434,16 @@ def chat_page():
 def profile():
     if request.method == 'POST':
         current_user.phone = request.form.get('phone')
+        
+        file = request.files.get('avatar')
+        if file and file.filename:
+            try:
+                # Faz o upload para o Cloudinary
+                upload_result = cloudinary.uploader.upload(file, folder="avatars")
+                current_user.avatar_url = upload_result['secure_url']
+            except Exception as e:
+                flash(f'Erro ao fazer upload do avatar: {e}', 'error')
+
         db.session.commit()
         flash('Perfil atualizado com sucesso!', 'success')
         return redirect(url_for('profile'))

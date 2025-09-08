@@ -3,56 +3,58 @@
 {% block title %}Meu Perfil - Service Desk{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg border dark:border-gray-700">
-    <div class="text-center">
-        <i class="fas fa-user-shield text-5xl text-green-400"></i>
-        <h2 class="mt-4 text-3xl font-extrabold text-gray-900 dark:text-white">Perfil do Aventureiro</h2>
-        <p class="mt-2 text-gray-500 dark:text-gray-400">Suas informações e progresso.</p>
-    </div>
+<div class="w-full max-w-lg p-8 space-y-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+    
+    <form method="POST" action="{{ url_for('profile') }}" enctype="multipart/form-data" class="space-y-6">
 
-    <form method="POST" action="{{ url_for('profile') }}" class="space-y-6">
-        <div>
-            <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Nome</label>
-            <p class="mt-1 flex items-center">
-                {% if current_user.level and current_user.level.insignia %}
-                    {% if 'cloudinary' in current_user.level.insignia %}
-                        <img src="{{ current_user.level.insignia }}" alt="{{ current_user.level.name }}" class="w-6 h-6 rounded-full object-cover mr-2">
-                    {% else %}
-                        <span class="text-xl mr-2">{{ current_user.level.insignia }}</span>
-                    {% endif %}
+        <div class="text-center">
+            <div class="relative w-32 h-32 mx-auto">
+                {% if current_user.avatar_url %}
+                    <img src="{{ current_user.avatar_url }}" alt="Avatar do Utilizador" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
+                {% else %}
+                    <div class="w-32 h-32 rounded-full bg-gray-700 flex items-center justify-center text-5xl text-white border-4 border-blue-500 shadow-md">
+                        {{ current_user.name[0]|upper }}
+                    </div>
                 {% endif %}
-                <span>{{ current_user.name }}</span>
-            </p>
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
-            <p class="mt-1">{{ current_user.email }}</p>
-        </div>
-        <div>
-            <label for="phone" class="block text-sm font-medium text-gray-500 dark:text-gray-400">Telefone</label>
-            <input type="text" id="phone" name="phone" value="{{ current_user.phone or '' }}" class="mt-1 block w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md" placeholder="Seu telefone">
+                <label for="avatar" class="absolute bottom-1 right-1 bg-gray-900 p-2 rounded-full cursor-pointer hover:bg-gray-700 transition" title="Mudar avatar">
+                    <i class="fas fa-camera text-white"></i>
+                    <input type="file" id="avatar" name="avatar" class="hidden" accept="image/*">
+                </label>
+            </div>
+            <h2 class="mt-4 text-3xl font-bold text-gray-900 dark:text-white">{{ current_user.name }}</h2>
+            <p class="text-gray-500 dark:text-gray-400">{{ current_user.email }}</p>
         </div>
 
-        <div class="border-t dark:border-gray-700 pt-6 mt-6 space-y-4">
-             <div>
+        <div class="space-y-4 pt-6 border-t dark:border-gray-700">
+            <div>
+                <label for="phone" class="block text-sm font-medium text-gray-500 dark:text-gray-400">Telefone</label>
+                <input type="text" id="phone" name="phone" value="{{ current_user.phone or '' }}" class="mt-1 block w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="O seu contacto telefónico">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t dark:border-gray-700 text-center">
+            <div>
                 <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Nível</label>
-                <p>{{ current_user.level.name if current_user.level else 'N/A' }}</p>
+                <p class="text-lg font-semibold">{{ current_user.level.name if current_user.level else 'N/A' }}</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Pontos</label>
-                <p>{{ current_user.points }}</p>
+                <p class="text-lg font-semibold">{{ current_user.points }}</p>
             </div>
-             <div>
+            <div>
                 <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Time</label>
                 {% if current_user.team %}
-                    <p>{{ current_user.team.name }}</p>
+                    <p class="text-lg font-semibold">{{ current_user.team.name }}</p>
                 {% else %}
-                    <p class="text-gray-400">Você ainda não está num time. <a href="{{ url_for('teams_list') }}" class="font-medium text-blue-500 hover:underline">Junte-se a um!</a></p>
+                    <a href="{{ url_for('teams_list') }}" class="text-sm text-blue-500 hover:underline">Junte-se a um time!</a>
                 {% endif %}
             </div>
         </div>
 
-        <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm font-medium text-white bg-green-600 hover:bg-green-700">Salvar Alterações</button>
+        <button type="submit" class="w-full py-3 px-4 border border-transparent rounded-lg shadow-sm font-medium text-white bg-green-600 hover:bg-green-700 transition">
+            Salvar Alterações
+        </button>
+
     </form>
 </div>
 {% endblock %}
