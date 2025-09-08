@@ -55,8 +55,9 @@
         <div class="flex flex-col space-y-3">
             <a href="{{ url_for('list_challenges') }}" class="hover:text-blue-400">Desafios</a>
             <a href="{{ url_for('teams_list') }}" class="hover:text-blue-400">Times</a>
-            <a href="{{ url_for('ranking') }}" class="hover:text-blue-400">Ranking</a>
-            <a href="{{ url_for('profile') }}" class="hover:text-gray-400">Perfil</a>
+            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-blue-500 transition">Ranking</a>
+            <a href="{{ url_for('list_paths') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-blue-500 transition">Trilhas</a>
+            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-gray-600 transition">Perfil</a>
             
             {% if current_user.is_admin %}
                 <div class="border-t border-gray-700 pt-3 mt-2">

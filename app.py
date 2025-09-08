@@ -793,29 +793,60 @@ def list_challenges():
                             unlocked_challenges=unlocked_challenges, 
                             locked_challenges=locked_challenges)
 
+# Crie esta nova função de ajuda (pode colocá-la antes da rota submit_challenge)
+def check_and_complete_paths(user, completed_challenge_id):
+    # Encontra todas as trilhas que contêm o desafio que acabou de ser concluído
+    paths_containing_challenge = PathChallenge.query.filter_by(challenge_id=completed_challenge_id).all()
+    
+    if not paths_containing_challenge:
+        return
+
+    user_completed_challenges = {uc.challenge_id for uc in user.completed_challenges}
+    
+    for pc in paths_containing_challenge:
+        path = pc.path
+        # Verifica se o utilizador já completou esta trilha
+        if UserPathProgress.query.filter_by(user_id=user.id, path_id=path.id).first():
+            continue
+
+        # Verifica se todos os desafios da trilha estão completos
+        all_challenges_in_path = {c.challenge_id for c in path.challenges}
+        if all_challenges_in_path.issubset(user_completed_challenges):
+            # O utilizador completou a trilha!
+            user.points += path.reward_points
+            progress = UserPathProgress(user_id=user.id, path_id=path.id)
+            db.session.add(progress)
+            flash(f'Trilha "{path.name}" concluída! Você ganhou {path.reward_points} pontos de bónus!', 'success')
+
 @app.route('/challenges/submit/<int:challenge_id>', methods=['POST'])
 @login_required
 def submit_challenge(challenge_id):
     challenge = Challenge.query.get_or_404(challenge_id)
     submitted_answer = request.form.get('answer').strip()
 
-    if submitted_answer == challenge.expected_answer:
+    if submitted_answer.lower() == challenge.expected_answer.lower():
         existing_completion = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=challenge_id).first()
         if not existing_completion:
+            # Adiciona pontos e regista a conclusão do desafio
             current_user.points += challenge.points_reward
-            update_user_level(current_user)
-            
             completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
             db.session.add(completion)
+            flash(f'Parabéns! Completou o desafio "{challenge.title}" e ganhou {challenge.points_reward} pontos!', 'success')
+            
+            # --- VERIFICAÇÃO DE CONCLUSÃO DE TRILHA ---
+            check_and_complete_paths(current_user, challenge_id)
+            
+            # Atualiza o nível do utilizador por último
+            update_user_level(current_user)
             db.session.commit()
-
-            flash(f'Parabéns! Você completou o desafio "{challenge.title}" e ganhou {challenge.points_reward} pontos!', 'success')
         else:
             flash('Você já completou este desafio.', 'info')
     else:
         flash('Resposta incorreta. Tente novamente!', 'error')
 
     return redirect(url_for('list_challenges'))
+
+
 
 @app.route('/teams', methods=['GET', 'POST'])
 @login_required
@@ -1112,6 +1143,35 @@ def admin_paths():
     all_paths = LearningPath.query.all()
     all_challenges = Challenge.query.all()
     return render_template('admin_paths.html', paths=all_paths, challenges=all_challenges)
+
+@app.route('/paths')
+@login_required
+def list_paths():
+    all_paths = LearningPath.query.filter_by(is_active=True).all()
+    
+    # Busca os IDs dos desafios que o utilizador já completou
+    completed_challenges_ids = {uc.challenge_id for uc in current_user.completed_challenges}
+    
+    # Busca os IDs das trilhas que o utilizador já completou
+    completed_paths_ids = {up.path_id for up in UserPathProgress.query.filter_by(user_id=current_user.id).all()}
+
+    paths_with_progress = []
+    for path in all_paths:
+        total_steps = len(path.challenges)
+        completed_steps = 0
+        for pc in path.challenges:
+            if pc.challenge_id in completed_challenges_ids:
+                completed_steps += 1
+        
+        progress_percentage = (completed_steps / total_steps) * 100 if total_steps > 0 else 0
+        
+        paths_with_progress.append({
+            'path': path,
+            'progress': progress_percentage,
+            'is_completed': path.id in completed_paths_ids
+        })
+
+    return render_template('paths.html', paths_data=paths_with_progress)
 
 # Comando CLI para criar administrador
 @click.command(name='create-admin')

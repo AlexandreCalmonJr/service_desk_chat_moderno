@@ -1,0 +1,44 @@
+{% extends "base_user.html" %}
+
+{% block title %}Trilhas de Aprendizagem - Service Desk{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6 text-center">Trilhas de Aprendizagem</h1>
+    <p class="text-center text-gray-500 dark:text-gray-400 mb-8">Siga um percurso de desafios para dominar um tópico e ganhar recompensas extras!</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {% for data in paths_data %}
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transform hover:-translate-y-1 transition-transform duration-300">
+                <div class="p-6">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ data.path.name }}</h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 h-16">{{ data.path.description }}</p>
+
+                    <div class="mt-4">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm font-medium text-gray-500 dark:text-gray-300">Progresso</span>
+                            <span class="text-sm font-medium text-blue-500">{{ data.progress|round|int }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ data.progress }}%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50">
+                    {% if data.is_completed %}
+                        <div class="text-center font-bold text-green-500 flex items-center justify-center">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            Trilha Concluída!
+                        </div>
+                    {% else %}
+                        <a href="#" class="block w-full text-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                            Continuar Trilha
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
