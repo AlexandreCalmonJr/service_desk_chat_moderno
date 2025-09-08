@@ -136,12 +136,15 @@ class Ticket(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Challenge(db.Model):
+# Encontre a sua classe Challenge
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     expected_answer = db.Column(db.String(500), nullable=False)
     points_reward = db.Column(db.Integer, default=10)
     level_required = db.Column(db.String(50), default='Iniciante')
+    # ADICIONE A LINHA ABAIXO
+    is_team_challenge = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class UserChallenge(db.Model):
@@ -1033,6 +1036,7 @@ def admin_challenges():
         points_reward = request.form.get('points_reward')
         expected_answer = request.form.get('expected_answer')
         unlocks_faq_id = request.form.get('unlocks_faq_id')
+        is_team_challenge = request.form.get('is_team_challenge') == 'on'
 
         if title and description and level_required and points_reward and expected_answer:
             new_challenge = Challenge(
@@ -1040,7 +1044,8 @@ def admin_challenges():
                 description=description,
                 level_required=level_required,
                 points_reward=int(points_reward),
-                expected_answer=expected_answer
+                expected_answer=expected_answer,
+                is_team_challenge=is_team_challenge
                 # A lógica para unlocks_faq_id precisa ser adicionada ao modelo se necessário
             )
             db.session.add(new_challenge)

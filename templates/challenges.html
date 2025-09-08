@@ -10,7 +10,14 @@
         <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4 border-b-2 border-blue-500 pb-2">Disponíveis para Você</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for challenge in unlocked_challenges %}
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border border-transparent hover:border-blue-500 transition">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border border-transparent hover:border-blue-500 transition relative">
+                    
+                    {% if challenge.is_team_challenge %}
+                        <div class="absolute top-4 right-4 bg-purple-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center" title="Desafio de Time">
+                            <i class="fas fa-users mr-1"></i> TIME
+                        </div>
+                    {% endif %}
+
                     <div class="flex items-center mb-3">
                         <i class="fas fa-gamepad text-yellow-500 text-2xl mr-3"></i>
                         <h3 class="text-lg font-bold">{{ challenge.title }}</h3>
@@ -20,36 +27,23 @@
                         <p><strong>Nível:</strong> {{ challenge.level_required }}</p>
                         <p><strong>Recompensa:</strong> {{ challenge.points_reward }} Pontos</p>
                     </div>
-                    <form method="POST" action="{{ url_for('submit_challenge', challenge_id=challenge.id) }}">
-                        <input type="text" name="answer" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="Sua resposta aqui...">
-                        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 mt-2 w-full transition">Enviar Resposta</button>
-                    </form>
+
+                    {% if challenge.is_team_challenge and not current_user.team %}
+                        <div class="text-center p-2 bg-gray-200 dark:bg-gray-700 rounded-lg">
+                            <p class="text-sm font-semibold">Você precisa estar num time para fazer este desafio.</p>
+                            <a href="{{ url_for('teams_list') }}" class="text-blue-500 hover:underline text-xs">Ver times</a>
+                        </div>
+                    {% else %}
+                        <form method="POST" action="{{ url_for('submit_challenge', challenge_id=challenge.id) }}">
+                            <input type="text" name="answer" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="Sua resposta aqui...">
+                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 mt-2 w-full transition">Enviar Resposta</button>
+                        </form>
+                    {% endif %}
                 </div>
             {% else %}
                 <p class="text-gray-500 dark:text-gray-400 md:col-span-2">Parabéns! Você completou todos os desafios disponíveis para o seu nível.</p>
             {% endfor %}
         </div>
     </div>
-
-    <div>
-        <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4 border-b-2 border-gray-600 pb-2">Desafios Futuros</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {% for challenge in locked_challenges %}
-                <div class="bg-gray-200 dark:bg-gray-800/50 p-6 rounded-lg shadow-md opacity-60 relative">
-                    <div class="absolute top-4 right-4 text-gray-500 dark:text-gray-400">
-                        <i class="fas fa-lock fa-2x"></i>
-                    </div>
-                    <div class="flex items-center mb-3">
-                        <i class="fas fa-gamepad text-gray-500 text-2xl mr-3"></i>
-                        <h3 class="text-lg font-bold">{{ challenge.title }}</h3>
-                    </div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 h-20">{{ challenge.description }}</p>
-                    <div class="text-xs font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                        <p><strong>Nível Necessário:</strong> {{ challenge.level_required }}</p>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
     </div>
-</div>
 {% endblock %}
