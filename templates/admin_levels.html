@@ -1,74 +1,58 @@
 {% extends "admin_base.html" %}
 
-{% block title %}Admin - Desafios - Service Desk{% endblock %}
+{% block title %}Admin - Níveis - Service Desk{% endblock %}
 
-{% block page_title %}Gerenciar Desafios{% endblock %}
+{% block page_title %}Gerenciar Níveis e Insígnias{% endblock %}
 
 {% block content %}
     <div class="mb-8">
-        <h2 class="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Adicionar Novo Desafio</h2>
-        <form method="POST" action="{{ url_for('admin_challenges') }}" class="max-w-lg bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Adicionar Novo Nível</h2>
+        <form method="POST" enctype="multipart/form-data" class="max-w-lg bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
             <div class="mb-4">
-                <label for="title" class="block text-sm font-medium">Título</label>
-                <input type="text" id="title" name="title" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-            </div>
-            <div class="mb-4">
-                <label for="description" class="block text-sm font-medium">Descrição</label>
-                <textarea id="description" name="description" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required></textarea>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label for="level_required" class="block text-sm font-medium">Nível Requerido</label>
-                    <select id="level_required" name="level_required" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-                        <option value="" disabled selected>Selecione um nível</option>
-                        {% for level in levels %}
-                            <option value="{{ level.name }}">{{ level.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label for="points_reward" class="block text-sm font-medium">Pontos de Recompensa</label>
-                    <input type="number" id="points_reward" name="points_reward" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-                </div>
+                <label for="name" class="block text-sm font-medium">Nome do Nível</label>
+                <input type="text" id="name" name="name" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
             </div>
             <div class="mb-4">
-                <label for="expected_answer" class="block text-sm font-medium">Resposta Esperada</label>
-                <input type="text" id="expected_answer" name="expected_answer" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                <label for="min_points" class="block text-sm font-medium">Pontos Mínimos</label>
+                <input type="number" id="min_points" name="min_points" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
             </div>
             <div class="mb-4">
-                <label for="unlocks_faq_id" class="block text-sm font-medium">Desbloqueia FAQ (opcional)</label>
-                <select id="unlocks_faq_id" name="unlocks_faq_id" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600">
-                    <option value="">Nenhuma</option>
-                    {% for faq in faqs %}
-                        <option value="{{ faq.id }}">{{ faq.question }}</option>
-                    {% endfor %}
-                </select>
+                <label for="insignia_image" class="block text-sm font-medium">Imagem da Insígnia (Opcional)</label>
+                <input type="file" id="insignia_image" name="insignia_image" class="w-full mt-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600" accept="image/*">
             </div>
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Adicionar Desafio</button>
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Adicionar Nível</button>
         </form>
     </div>
-
+    
     <div>
-        <h2 class="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Lista de Desafios</h2>
+        <h2 class="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Lista de Níveis</h2>
         <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
                         <tr class="bg-gray-200 dark:bg-gray-700">
-                            <th class="p-3 text-left">Título</th>
-                            <th class="p-3 text-left">Nível</th>
-                            <th class="p-3 text-left">Pontos</th>
+                            <th class="p-3 text-left">Insígnia</th>
+                            <th class="p-3 text-left">Nome</th>
+                            <th class="p-3 text-left">Pontos Mínimos</th>
                             <th class="p-3 text-left">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for challenge in challenges %}
+                        {% for level in levels %}
                             <tr class="border-b dark:border-gray-600">
-                                <td class="p-3">{{ challenge.title }}</td>
-                                <td class="p-3">{{ challenge.level_required }}</td>
-                                <td class="p-3">{{ challenge.points_reward }}</td>
                                 <td class="p-3">
-                                    <form method="POST" action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" onsubmit="return confirm('Tem a certeza que quer excluir este desafio?');">
+                                    {% if level.insignia and 'cloudinary' in level.insignia %}
+                                        <img src="{{ level.insignia }}" alt="{{ level.name }}" class="w-10 h-10 rounded-full object-cover">
+                                    {% elif level.insignia %}
+                                        <span class="text-2xl">{{ level.insignia }}</span>
+                                    {% else %}
+                                        <span class="text-gray-400">Nenhuma</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3">{{ level.name }}</td>
+                                <td class="p-3">{{ level.min_points }}</td>
+                                <td class="p-3">
+                                    <form method="POST" action="{{ url_for('admin_delete_level', level_id=level.id) }}" onsubmit="return confirm('Tem a certeza que quer excluir este nível?');">
                                         <button type="submit" class="text-red-500 hover:underline">Excluir</button>
                                     </form>
                                 </td>
