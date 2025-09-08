@@ -3,48 +3,36 @@
 {% block page_title %}Gerenciar Níveis e Insígnias{% endblock %}
 
 {% block content %}
-    <h2 class="text-xl font-semibold mb-2">Adicionar Novo Nível</h2>
-    <form method="POST" enctype="multipart/form-data" class="max-w-md mb-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <div class="mb-4">
-            <label for="name" class="block text-sm font-medium">Nome do Nível</label>
-            <input type="text" id="name" name="name" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-        </div>
-        <div class="mb-4">
-            <label for="min_points" class="block text-sm font-medium">Pontos Mínimos</label>
-            <input type="number" id="min_points" name="min_points" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-        </div>
-        <div class="mb-4">
-            <label for="insignia_image" class="block text-sm font-medium">Imagem da Insígnia (PNG, JPG, etc.)</label>
-            <input type="file" id="insignia_image" name="insignia_image" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" accept="image/*">
-        </div>
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Adicionar Nível</button>
-    </form>
-    
-    <h2 class="text-xl font-semibold mb-2">Lista de Níveis</h2>
-    <div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
-        <table class="w-full">
-            <thead>
-                <tr class="bg-gray-200 dark:bg-gray-700">
-                    <th class="p-2 text-left">Insígnia</th>
-                    <th class="p-2 text-left">Nome</th>
-                    <th class="p-2 text-left">Pontos Mínimos</th>
+<h2 class="text-xl font-semibold mb-2">Lista de Níveis</h2>
+<div class="bg-white dark:bg-gray-800 p-4 rounded shadow-md">
+    <table class="w-full">
+        <thead>
+            <tr class="bg-gray-200 dark:bg-gray-700">
+                <th class="p-2 text-left">Insígnia</th>
+                <th class="p-2 text-left">Nome</th>
+                <th class="p-2 text-left">Pontos Mínimos</th>
+                <th class="p-2 text-left">Ações</th> </tr>
+        </thead>
+        <tbody>
+            {% for level in levels %}
+                <tr class="border-b dark:border-gray-700">
+                    <td class="p-2">
+                        {% if level.insignia and 'cloudinary' in level.insignia %}
+                            <img src="{{ level.insignia }}" alt="{{ level.name }}" class="w-10 h-10 rounded-full">
+                        {% elif level.insignia %}
+                            <span class="text-2xl">{{ level.insignia }}</span> {% else %}
+                            <span>N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-2">{{ level.name }}</td>
+                    <td class="p-2">{{ level.min_points }}</td>
+                    <td class="p-2"> <form method="POST" action="{{ url_for('admin_delete_level', level_id=level.id) }}" onsubmit="return confirm('Tem a certeza que quer excluir este nível?');">
+                            <button type="submit" class="text-red-500 hover:underline">Excluir</button>
+                        </form>
+                    </td>
                 </tr>
-            </thead>
-            <tbody>
-                {% for level in levels %}
-                    <tr class="border-b dark:border-gray-700">
-                        <td class="p-2">
-                            {% if level.insignia %}
-                                <img src="{{ level.insignia }}" alt="{{ level.name }}" class="w-10 h-10 rounded-full">
-                            {% else %}
-                                <span>N/A</span>
-                            {% endif %}
-                        </td>
-                        <td class="p-2">{{ level.name }}</td>
-                        <td class="p-2">{{ level.min_points }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% endblock %}

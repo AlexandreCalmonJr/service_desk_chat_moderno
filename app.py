@@ -866,6 +866,30 @@ def admin_faqs():
     categories = Category.query.all()
     return render_template('admin_faq.html', categories=categories)
 
+
+@app.route('/admin/levels/delete/<int:level_id>', methods=['POST'])
+@login_required
+def admin_delete_level(level_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    level_to_delete = Level.query.get_or_404(level_id)
+
+    # Verifica se algum usuário está neste nível antes de excluir
+    if level_to_delete.users:
+        flash(f'Não é possível excluir o nível "{level_to_delete.name}", pois existem usuários associados a ele.', 'error')
+        return redirect(url_for('admin_levels'))
+    
+    # Se a insígnia for uma imagem no Cloudinary, podemos opcionalmente deletá-la de lá também
+    # (Esta parte é opcional e mais avançada, mas deixo aqui a ideia)
+
+    db.session.delete(level_to_delete)
+    db.session.commit()
+    
+    flash(f'O nível "{level_to_delete.name}" foi excluído com sucesso!', 'success')
+    return redirect(url_for('admin_levels'))
+
 @app.route('/admin/levels', methods=['GET', 'POST'])
 @login_required
 def admin_levels():
