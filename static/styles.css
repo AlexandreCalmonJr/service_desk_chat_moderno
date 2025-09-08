@@ -381,3 +381,26 @@ body.dark .chat-input-modern {
         scroll-behavior: auto !important;
     }
 }
+
+.suggestion-bubble {
+    background-color: #dbeafe; /* Azul claro */
+    border: 1px solid #93c5fd;
+}
+body.dark .suggestion-bubble {
+    background-color: #1e3a8a; /* Azul escuro */
+    border-color: #2563eb;
+}
+.suggestion-button {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 16px;
+    background-color: var(--primary-500);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+.suggestion-button:hover {
+    background-color: var(--primary-600);
+}

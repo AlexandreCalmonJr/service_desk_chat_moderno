@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const message = chatInput.value.trim();
         if (!message || isBotTyping) return;
 
+        
+
         addToHistory(message);
         addMessageToUI(message, 'user');
         chatInput.value = '';
@@ -46,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) throw new Error(`Erro na resposta do servidor: ${response.status}`);
             
             const data = await response.json();
-            addMessageToUI(data.text, 'bot', data.html, data.options);
+            addMessageToUI(data.text, 'bot', data.html, data.options, data.suggestion);
 
         } catch (error) {
             console.error('Falha ao enviar mensagem:', error);
@@ -56,41 +58,31 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    const addMessageToUI = (text, type, isHtml = false, options = []) => {
+    const addMessageToUI = (text, type, isHtml = false, options = [], suggestion = null) => {
         messageCount++;
         const messageId = messageCount;
-
+    
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message-modern ${type}`;
         messageDiv.setAttribute('data-message-id', messageId);
         
-        // Adiciona classe especial para a mensagem de boas-vindas
         if (type === 'welcome') {
             messageDiv.classList.add('welcome-message-modern');
-            type = 'bot'; // Trata como bot para alinhamento e avatar
+            type = 'bot';
         }
-
+    
         const bubbleDiv = document.createElement('div');
         bubbleDiv.className = `message-bubble-modern ${type}`;
-
-        if (isHtml) {
-            bubbleDiv.innerHTML = text;
-        } else {
-            const formattedText = text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`(.*?)`/g, '<code>$1</code>')
-                .replace(/\n/g, '<br>');
-            bubbleDiv.innerHTML = formattedText;
-        }
-
+    
+        bubbleDiv.innerHTML = isHtml ? text : text.replace(/\n/g, '<br>');
+    
         const avatarDiv = document.createElement('div');
         avatarDiv.className = `avatar-modern ${type}-avatar`;
         avatarDiv.innerHTML = type === 'user' ? '<i class="fas fa-user"></i>' : '<i class="fas fa-robot"></i>';
         
         messageDiv.appendChild(type === 'user' ? bubbleDiv : avatarDiv);
         messageDiv.appendChild(type === 'user' ? avatarDiv : bubbleDiv);
-
+    
         if (options && options.length > 0) {
             bubbleDiv.appendChild(createFAQOptions(options));
         }
@@ -98,8 +90,30 @@ document.addEventListener('DOMContentLoaded', function() {
         if (type === 'bot' && !messageDiv.classList.contains('welcome-message-modern')) {
             bubbleDiv.appendChild(createMessageActions(messageId));
         }
-
+    
         chatBox.appendChild(messageDiv);
+    
+        // --- LÓGICA PARA EXIBIR A SUGESTÃO PROATIVA ---
+        if (suggestion) {
+            const suggestionDiv = document.createElement('div');
+            suggestionDiv.className = 'chat-message-modern bot'; // Exibe como uma mensagem do bot
+            
+            const suggestionBubble = document.createElement('div');
+            suggestionBubble.className = 'message-bubble-modern bot suggestion-bubble'; // Estilo especial
+            
+            suggestionBubble.innerHTML = `
+                <p>${suggestion.text}</p>
+                <a href="/challenges" class="suggestion-button">Ver Desafios</a>
+            `;
+            
+            const suggestionAvatar = avatarDiv.cloneNode(true); // Reutiliza o avatar do bot
+    
+            suggestionDiv.appendChild(suggestionAvatar);
+            suggestionDiv.appendChild(suggestionBubble);
+            chatBox.appendChild(suggestionDiv);
+        }
+        // --- FIM DA LÓGICA DA SUGESTÃO ---
+    
         scrollToBottom();
     };
     

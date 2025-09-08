@@ -145,6 +145,8 @@ class Challenge(db.Model):
     level_required = db.Column(db.String(50), default='Iniciante')
     # ADICIONE A LINHA ABAIXO
     is_team_challenge = db.Column(db.Boolean, default=False)
+    hint = db.Column(db.Text, nullable=True)  # O texto da dica
+    hint_cost = db.Column(db.Integer, default=5) # O custo em pontos para ver a dica
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class UserChallenge(db.Model):
@@ -616,32 +618,60 @@ def chat():
         'text': "Desculpe, não entendi. Tente reformular a pergunta.",
         'html': False,
         'state': 'normal',
-        'options': []
+        'options': [],
+        'suggestion': None # Novo campo para a sugestão proativa
     }
 
+    # Mantém a lógica de tickets e sugestões
     ticket_response = process_ticket_command(mensagem)
     if ticket_response:
         resposta['text'] = ticket_response
+        return jsonify(resposta)
+    
+    solution_response = suggest_solution(mensagem)
+    if solution_response:
+        resposta['text'] = solution_response
+        return jsonify(resposta)
+
+    # Lógica de busca de FAQ
+    faq_matches = find_faq_by_nlp(mensagem)
+    if faq_matches:
+        if len(faq_matches) == 1:
+            faq = faq_matches[0]
+            resposta['text'] = format_faq_response(faq.id, faq.question, faq.answer, faq.image_url, faq.video_url, faq.file_name)
+            resposta['html'] = True
+            
+            # --- LÓGICA DO CHATBOT PROATIVO ---
+            # Verifica se algum desafio desbloqueia esta FAQ
+            # (Assumindo que o modelo Challenge tem uma relação `unlocks_faq_id`)
+            # Se o seu modelo for diferente, teremos que ajustar aqui.
+            # Por agora, vamos procurar por palavras-chave no título do desafio.
+            
+            # Extrai palavras-chave da pergunta da FAQ
+            doc = nlp(faq.question.lower())
+            keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ == 'NOUN'}
+
+            if keywords:
+                # Procura por desafios que contenham estas palavras-chave no título
+                relevant_challenge = Challenge.query.filter(Challenge.title.ilike(f'%{next(iter(keywords))}%')).first()
+                if relevant_challenge:
+                    # Verifica se o aluno já completou este desafio
+                    is_completed = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=relevant_challenge.id).first()
+                    if not is_completed:
+                        resposta['suggestion'] = {
+                            'text': f"Parece que você está interessado neste tópico! Que tal tentar o desafio '{relevant_challenge.title}' e ganhar {relevant_challenge.points_reward} pontos?",
+                            'challenge_id': relevant_challenge.id
+                        }
+
+        else: # Múltiplas FAQs encontradas
+            faq_ids = [faq.id for faq in faq_matches]
+            session['faq_selection'] = faq_ids
+            resposta['state'] = 'faq_selection'
+            resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
+            resposta['html'] = True
+            resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5]
     else:
-        solution_response = suggest_solution(mensagem)
-        if solution_response:
-            resposta['text'] = solution_response
-        else:
-            faq_matches = find_faq_by_nlp(mensagem)
-            if faq_matches:
-                if len(faq_matches) == 1:
-                    faq = faq_matches[0]
-                    resposta['text'] = format_faq_response(faq.id, faq.question, faq.answer, faq.image_url, faq.video_url, faq.file_name)
-                    resposta['html'] = True
-                else:
-                    faq_ids = [faq.id for faq in faq_matches]
-                    session['faq_selection'] = faq_ids
-                    resposta['state'] = 'faq_selection'
-                    resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
-                    resposta['html'] = True
-                    resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5]
-            else:
-                resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
+        resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
 
     return jsonify(resposta)
 
@@ -1037,6 +1067,9 @@ def admin_challenges():
         expected_answer = request.form.get('expected_answer')
         unlocks_faq_id = request.form.get('unlocks_faq_id')
         is_team_challenge = request.form.get('is_team_challenge') == 'on'
+        hint = request.form.get('hint')
+        hint_cost = request.form.get('hint_cost', 5, type=int)
+        
 
         if title and description and level_required and points_reward and expected_answer:
             new_challenge = Challenge(
@@ -1045,7 +1078,9 @@ def admin_challenges():
                 level_required=level_required,
                 points_reward=int(points_reward),
                 expected_answer=expected_answer,
-                is_team_challenge=is_team_challenge
+                is_team_challenge=is_team_challenge,
+                hint=hint,
+                hint_cost=hint_cost
                 # A lógica para unlocks_faq_id precisa ser adicionada ao modelo se necessário
             )
             db.session.add(new_challenge)
@@ -1096,6 +1131,28 @@ def inject_gamification_progress():
             progress_data['percentage'] = 100
             
     return dict(progress=progress_data)
+
+
+@app.route('/challenges/hint/<int:challenge_id>', methods=['POST'])
+@login_required
+def get_challenge_hint(challenge_id):
+    challenge = Challenge.query.get_or_404(challenge_id)
+
+    # Verifica se o desafio tem uma dica
+    if not challenge.hint:
+        return jsonify({'error': 'Este desafio não tem uma dica disponível.'}), 404
+
+    # Verifica se o utilizador tem pontos suficientes
+    if current_user.points < challenge.hint_cost:
+        return jsonify({'error': 'Você não tem pontos suficientes para comprar esta dica.'}), 403
+
+    # Deduz os pontos e salva na base de dados
+    current_user.points -= challenge.hint_cost
+    db.session.commit()
+
+    # Retorna a dica com sucesso
+    flash(f'Você gastou {challenge.hint_cost} pontos para ver uma dica!', 'info')
+    return jsonify({'hint': challenge.hint})
 
 @app.route('/admin/paths', methods=['GET', 'POST'])
 @login_required

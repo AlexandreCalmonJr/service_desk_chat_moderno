@@ -10,40 +10,62 @@
         <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4 border-b-2 border-blue-500 pb-2">Disponíveis para Você</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for challenge in unlocked_challenges %}
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border border-transparent hover:border-blue-500 transition relative">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border border-transparent hover:border-blue-500 transition flex flex-col">
                     
-                    {% if challenge.is_team_challenge %}
-                        <div class="absolute top-4 right-4 bg-purple-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center" title="Desafio de Time">
-                            <i class="fas fa-users mr-1"></i> TIME
-                        </div>
-                    {% endif %}
-
                     <div class="flex items-center mb-3">
                         <i class="fas fa-gamepad text-yellow-500 text-2xl mr-3"></i>
                         <h3 class="text-lg font-bold">{{ challenge.title }}</h3>
                     </div>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 h-20">{{ challenge.description }}</p>
-                    <div class="text-xs font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded mb-4">
+                    
+                    <div id="hint-area-{{ challenge.id }}" class="hidden my-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg text-sm">
+                        </div>
+
+                    <div class="text-xs font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded mb-4 mt-auto">
                         <p><strong>Nível:</strong> {{ challenge.level_required }}</p>
                         <p><strong>Recompensa:</strong> {{ challenge.points_reward }} Pontos</p>
                     </div>
 
-                    {% if challenge.is_team_challenge and not current_user.team %}
-                        <div class="text-center p-2 bg-gray-200 dark:bg-gray-700 rounded-lg">
-                            <p class="text-sm font-semibold">Você precisa estar num time para fazer este desafio.</p>
-                            <a href="{{ url_for('teams_list') }}" class="text-blue-500 hover:underline text-xs">Ver times</a>
-                        </div>
-                    {% else %}
-                        <form method="POST" action="{{ url_for('submit_challenge', challenge_id=challenge.id) }}">
-                            <input type="text" name="answer" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="Sua resposta aqui...">
-                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 mt-2 w-full transition">Enviar Resposta</button>
-                        </form>
+                    {% if challenge.hint %}
+                    <button onclick="getHint({{ challenge.id }}, {{ challenge.hint_cost }})" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 w-full transition mb-2 text-sm">
+                        <i class="fas fa-lightbulb"></i> Pedir Dica (-{{ challenge.hint_cost }} Pontos)
+                    </button>
                     {% endif %}
-                </div>
-            {% else %}
-                <p class="text-gray-500 dark:text-gray-400 md:col-span-2">Parabéns! Você completou todos os desafios disponíveis para o seu nível.</p>
+                    
+                    </div>
             {% endfor %}
         </div>
     </div>
     </div>
+
+<script>
+    async function getHint(challengeId, hintCost) {
+        if (!confirm(`Você tem a certeza que quer gastar ${hintCost} pontos para ver esta dica?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/challenges/hint/${challengeId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                const hintArea = document.getElementById(`hint-area-${challengeId}`);
+                hintArea.innerHTML = `<strong>Dica:</strong> ${data.hint}`;
+                hintArea.classList.remove('hidden');
+                // Opcional: desabilitar o botão após o uso
+                event.target.disabled = true;
+                event.target.textContent = 'Dica Revelada!';
+            } else {
+                alert(data.error || 'Ocorreu um erro.');
+            }
+        } catch (error) {
+            console.error('Erro ao buscar dica:', error);
+            alert('Não foi possível conectar ao servidor para obter a dica.');
+        }
+    }
+</script>
 {% endblock %}
