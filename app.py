@@ -239,16 +239,14 @@ class BossFight(db.Model):
     description = db.Column(db.Text, nullable=False)
     reward_points = db.Column(db.Integer, nullable=False) # Recompensa para cada membro da equipa
     is_active = db.Column(db.Boolean, default=False)
-    
-    stages = db.relationship('BossFightStage', backref='boss_fight', lazy='dynamic', order_by='BossFightStage.order')
+    stages = db.relationship('BossFightStage', backref='boss_fight', lazy='dynamic', order_by='BossFightStage.order', cascade='all, delete-orphan')
 
 class BossFightStage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     boss_fight_id = db.Column(db.Integer, db.ForeignKey('boss_fight.id'), nullable=False)
     name = db.Column(db.String(200), nullable=False)
     order = db.Column(db.Integer, nullable=False) # Ordem da etapa (1, 2, 3...)
-    
-    steps = db.relationship('BossFightStep', backref='stage', lazy='dynamic', order_by='BossFightStep.id')
+    steps = db.relationship('BossFightStep', backref='stage', lazy='dynamic', order_by='BossFightStep.id', cascade='all, delete-orphan')
 
 class BossFightStep(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1368,6 +1366,9 @@ def admin_delete_challenge(challenge_id):
     # --- CORREÇÃO: Remove o desafio de todas as trilhas ---
     PathChallenge.query.filter_by(challenge_id=challenge_id).delete()
     
+    # --- CORREÇÃO: Remove o desafio do histórico diário ---
+    DailyChallenge.query.filter_by(challenge_id=challenge_id).delete()
+    
     db.session.delete(challenge_to_delete)
     db.session.commit()
     
@@ -1586,10 +1587,9 @@ def admin_achievements():
         trigger_type = request.form.get('trigger_type')
         trigger_value = request.form.get('trigger_value', type=int)
         
-        # CORREÇÃO: Pega o ficheiro de imagem
+        # CORREÇÃO: Mover a lógica do ficheiro para dentro do POST
         file = request.files.get('icon_image')
-
-        icon_url = None # Garante que a variável sempre existe
+        icon_url = None
         if file and file.filename:
             try:
                 upload_result = cloudinary.uploader.upload(file)
@@ -1602,7 +1602,7 @@ def admin_achievements():
             new_achievement = Achievement(
                 name=name,
                 description=description,
-                icon=icon_url, # Usa a URL ou None
+                icon=icon_url,
                 trigger_type=trigger_type,
                 trigger_value=trigger_value
             )

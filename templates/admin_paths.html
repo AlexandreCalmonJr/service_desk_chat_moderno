@@ -31,14 +31,29 @@
         <div class="space-y-6">
             {% for path in paths %}
             <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                <h3 class="text-lg font-bold">{{ path.name }}</h3>
-                <p class="text-sm text-gray-500 mb-4">{{ path.description }}</p>
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold">{{ path.name }}</h3>
+                        <p class="text-sm text-gray-500">{{ path.description }}</p>
+                    </div>
+                    <div class="flex space-x-2 flex-shrink-0">
+                        <a href="{{ url_for('admin_edit_path', path_id=path.id) }}" class="text-sm text-blue-500 hover:underline">Editar</a>
+                        <form method="POST" action="{{ url_for('admin_delete_path', path_id=path.id) }}" onsubmit="return confirm('Tem a certeza que quer excluir esta trilha inteira?');">
+                            <button type="submit" class="text-sm text-red-500 hover:underline">Excluir</button>
+                        </form>
+                    </div>
+                </div>
 
                 <h4 class="font-semibold mb-2">Desafios na Trilha:</h4>
                 {% if path.challenges %}
-                    <ul class="list-decimal list-inside space-y-2 mb-4">
+                    <ul class="space-y-2 mb-4">
                         {% for pc in path.challenges %}
-                            <li><strong>Passo {{ pc.step }}:</strong> {{ pc.challenge.title }}</li>
+                            <li class="flex justify-between items-center p-2 bg-gray-100 dark:bg-gray-700 rounded-md">
+                                <span><strong>Passo {{ pc.step }}:</strong> {{ pc.challenge.title }}</span>
+                                <form method="POST" action="{{ url_for('admin_remove_challenge_from_path', path_id=path.id, challenge_id=pc.challenge_id) }}" onsubmit="return confirm('Remover este desafio da trilha?');">
+                                    <button type="submit" class="text-xs text-red-500 hover:underline">Remover</button>
+                                </form>
+                            </li>
                         {% endfor %}
                     </ul>
                 {% else %}
