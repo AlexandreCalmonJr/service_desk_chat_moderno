@@ -1,151 +1,174 @@
-# Assistente de Service Desk 🤖
+# 🚀 Plataforma de Aprendizagem Gamificada
 
-Bem-vindo ao **Assistente de Service Desk**, uma aplicação web desenvolvida para fornecer suporte técnico rápido e eficiente através de FAQs (perguntas frequentes) interativas. Com um chat integrado que utiliza **Processamento de Linguagem Natural (NLP)** via Dialogflow, o sistema entende perguntas dos usuários e retorna respostas úteis, além de permitir a gestão de FAQs por administradores.
+Bem-vindo à **Plataforma de Aprendizagem Gamificada**, uma aplicação web interativa projetada para instituições de ensino. O nosso objetivo é tornar a aprendizagem mais envolvente e colaborativa através de um sistema de chatbot inteligente, desafios, equipas e recompensas.
 
-## 📋 Visão Geral
+## 📖 Visão Geral
 
-O Assistente de Service Desk é ideal para equipes de TI que desejam oferecer suporte interno ou externo de forma automatizada. Ele combina uma interface amigável, gestão de FAQs, e um chat inteligente para responder a perguntas comuns sobre hardware, software, rede, e mais.
+Esta plataforma combina um chatbot para responder a dúvidas dos alunos com um robusto sistema de gamificação. Os alunos podem ganhar pontos, subir de nível, formar equipas para enfrentar desafios complexos ("Boss Fights") e competir em rankings, transformando o processo de aprendizagem numa jornada emocionante.
 
-### Funcionalidades Principais
-- **Chat com NLP**: Utiliza o Dialogflow para interpretar perguntas e responder com base em FAQs.
-- **Gerenciamento de FAQs**:
-  - Adicione FAQs manualmente ou importe via JSON.
-  - Exclua FAQs existentes (somente para administradores).
-  - Suporte a imagens e arquivos associados às FAQs.
-- **Autenticação**:
-  - Login seguro para usuários e administradores.
-  - Controle de acesso (apenas admins podem gerenciar FAQs).
-- **Interface Responsiva**:
-  - Design moderno com TailwindCSS.
-  - Modo claro/escuro com alternância de tema.
-- **Internacionalização**: Suporte a português (pt-BR) no chat e na interface.
+## 👨‍🎓 Guia do Usuário (Aluno)
 
-## 🚀 Tecnologias Utilizadas
-- **Backend**: Flask (Python)
-- **Frontend**: HTML, TailwindCSS, JavaScript
-- **Banco de Dados**: PostgreSQL (ou SQLite para desenvolvimento local)
-- **NLP**: Google Dialogflow para processamento de linguagem natural
-- **Hospedagem**: Render (ou qualquer serviço compatível com Flask)
-- **Autenticação**: Flask-Login
-- **Outras Dependências**:
-  - `google-cloud-dialogflow` (para NLP)
-  - `SQLAlchemy` (para ORM)
-  - `Werkzeug` (para segurança)
+Esta secção é para si, aluno! Descubra como tirar o máximo proveito da plataforma.
 
-## 🛠️ Configuração e Instalação
+### 1. Dashboard Principal
 
-Siga os passos abaixo para configurar o projeto localmente.
+Ao fazer login, você será recebido pelo seu Dashboard pessoal. Aqui, você encontra um resumo de tudo o que é importante:
 
-### Pré-requisitos
-- Python 3.8 ou superior
-- PostgreSQL (ou SQLite para testes locais)
-- Conta no Google Cloud para usar o Dialogflow
-- Git
+- **Seu Progresso**: Veja o seu nível atual, a sua insígnia e uma barra de XP que mostra o quão perto está de subir de nível.
+- **Desafio do Dia**: Fique atento a um desafio especial diário que oferece pontos de bónus!
+- **Chatbot**: O seu assistente de IA está sempre pronto para responder às suas perguntas.
 
-### Passo 1: Clonar o Repositório
+### 2. Chatbot Inteligente
+
+Use o chat para pesquisar qualquer tópico relacionado com os seus estudos. O bot irá procurar na nossa base de conhecimento (FAQs) e, se encontrar um desafio relacionado com a sua pesquisa, irá sugeri-lo para você ganhar pontos extra!
+
+### 3. Central de Desafios
+
+Na página de Desafios, você encontrará:
+
+- **Desafios Individuais**: Testes de conhecimento que você pode completar sozinho.
+- **Desafios de Time**: Marcados com um ícone especial, estes desafios requerem que você faça parte de uma equipa.
+- **Dicas (Hints)**: Se estiver preso num desafio, pode gastar alguns dos seus pontos para desbloquear uma dica útil.
+
+### 4. Times e Colaboração
+
+Na secção de Times, você pode:
+
+- Criar o seu próprio time
+- Juntar-se a um time existente
+- Ver os detalhes de cada time, incluindo os seus membros e estatísticas
+- Enfrentar os **"Boss Fights"**: Desafios épicos com múltiplas etapas que só podem ser derrotados com o trabalho de toda a equipa!
+
+### 5. Ranking
+
+Visite a página de Ranking para ver a sua posição e a da sua equipa. A competição é dividida em:
+
+- **Ranking Individual**: Classificação geral de todos os alunos
+- **Ranking de Times**: Veja qual é a equipa com mais pontos
+
+### 6. Perfil e Conquistas
+
+Na sua página de Perfil, você pode:
+
+- **Personalizar o seu avatar** com uma imagem à sua escolha
+- **Ver as suas Conquistas**: Uma galeria de "medalhas" que você desbloqueia ao atingir marcos importantes, como completar o seu primeiro desafio ou entrar num time
+
+## 🛡️ Guia do Administrador
+
+Esta secção detalha como gerir todo o conteúdo e os utilizadores da plataforma através do Painel de Administração.
+
+### 1. Dashboard de Administração
+
+O seu ponto de partida, onde tem uma visão geral da plataforma e atalhos para todas as secções de gestão.
+
+### 2. Gestão de Conteúdo
+
+- **Gerenciar FAQs**: Crie, edite e apague as perguntas e respostas que alimentam o chatbot. Você pode adicionar texto, imagens, vídeos e até ficheiros para download.
+- **Gerenciar Desafios**: Crie e gira os desafios individuais e de time. Defina a pergunta, a resposta esperada, a recompensa em pontos, o nível necessário e adicione dicas (com um custo em pontos).
+- **Gerenciar Trilhas**: Agrupe desafios numa sequência lógica para criar percursos de aprendizagem guiados. Defina a ordem dos desafios e uma recompensa de bónus por completar a trilha.
+- **Gerenciar Boss Fights**: Crie os desafios mais complexos da plataforma. Defina o "Boss", as suas múltiplas "Etapas" e as "Tarefas" individuais dentro de cada etapa que os times precisarão de completar.
+
+### 3. Gestão de Gamificação
+
+- **Gerenciar Níveis**: Crie os diferentes níveis que os alunos podem alcançar. Defina os pontos mínimos para cada nível e faça o upload de uma imagem personalizada para a insígnia.
+- **Gerenciar Conquistas**: Crie "medalhas" que são atribuídas automaticamente quando os alunos atingem certos marcos (ex: completar 10 desafios, entrar num time).
+
+### 4. Gestão de Utilizadores e Times
+
+- **Gerenciar Utilizadores**: Veja a lista de todos os alunos, o seu progresso e atribua ou remova permissões de administrador.
+- **Gerenciar Times**: Monitore todos os times criados na plataforma e, se necessário, dissolva um time.
+
+## 💻 Guia do Desenvolvedor
+
+Esta secção contém as informações técnicas para configurar, executar e contribuir para o projeto.
+
+## 🛠️ Tecnologias Utilizadas
+
+- **Backend**: Python com Flask
+- **Base de Dados**: PostgreSQL (produção) / SQLite (desenvolvimento) com SQLAlchemy
+- **Frontend**: HTML5, TailwindCSS, JavaScript (com Alpine.js para interatividade)
+- **NLP**: spaCy para processamento de linguagem natural no chatbot
+- **Armazenamento de Ficheiros**: Cloudinary para upload de imagens (insígnias, avatares, etc.)
+- **Cache**: Redis para caching de queries e sessões
+- **Deployment**: Configurado para a plataforma Railway
+
+## ⚙️ Configuração do Ambiente Local
+
+### 1. Clonar o Repositório
+
 ```bash
-git clone https://github.com/seu-usuario/assistente-service-desk.git
-cd assistente-service-desk
+git clone <URL_DO_SEU_REPOSITORIO>
+cd <NOME_DA_PASTA>
 ```
 
-### Passo 2: Criar um Ambiente Virtual
+### 2. Criar e Ativar um Ambiente Virtual
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # No Windows: venv\Scripts\activate
 ```
 
-### Passo 3: Instalar Dependências
+### 3. Instalar as Dependências
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### Passo 4: Configurar Variáveis de Ambiente
-Crie um arquivo `.env` na raiz do projeto e adicione as seguintes variáveis:
-```env
-SECRET_KEY=sua-chave-secreta-aqui
-DATABASE_URL=postgresql://seu-usuario:sua-senha@localhost:5432/service_desk
-GOOGLE_APPLICATION_CREDENTIALS=/caminho/para/dialogflow-credentials.json
-UPLOAD_FOLDER=uploads
-```
+### 4. Descarregar o Modelo de Linguagem
 
-- **`SECRET_KEY`**: Uma chave secreta para segurança do Flask.
-- **`DATABASE_URL`**: URL do banco de dados (ajuste para SQLite se necessário: `sqlite:///service_desk.db`).
-- **`GOOGLE_APPLICATION_CREDENTIALS`**: Caminho para o arquivo de credenciais do Dialogflow (ou o conteúdo do JSON).
-- **`UPLOAD_FOLDER`**: Diretório para armazenar arquivos enviados (ex.: PDFs).
-
-### Passo 5: Configurar o Dialogflow
-1. Crie um agente no [Dialogflow Console](https://dialogflow.cloud.google.com/).
-2. Configure os intents (ex.: `consult_faq`, `saudacao`, `ajuda`) conforme descrito na seção **Configuração do Dialogflow** abaixo.
-3. Baixe as credenciais do Google Cloud e configure a variável `GOOGLE_APPLICATION_CREDENTIALS`.
-
-### Passo 6: Inicializar o Banco de Dados
-Execute o seguinte comando para criar as tabelas:
 ```bash
-flask shell
->>> from app import db
->>> db.create_all()
->>> exit()
+python -m spacy download pt_core_news_sm
 ```
 
-### Passo 7: Rodar a Aplicação
+### 5. Configurar Variáveis de Ambiente
+
+Crie um ficheiro `.env` na raiz do projeto. Para um ambiente de desenvolvimento local simples, você pode usar SQLite.
+
+```env
+SECRET_KEY=uma-chave-secreta-muito-segura
+DATABASE_URL=sqlite:///service_desk.db
+
+# As credenciais do Cloudinary são opcionais para o desenvolvimento local,
+# mas necessárias para o upload de imagens.
+CLOUDINARY_CLOUD_NAME=seu_cloud_name
+CLOUDINARY_API_KEY=sua_api_key
+CLOUDINARY_API_SECRET=seu_api_secret
+```
+
+### 6. Inicializar a Base de Dados
+
+A aplicação irá criar a base de dados SQLite e as tabelas automaticamente na primeira vez que for executada.
+
+### 7. Criar um Utilizador Administrador
+
+Use o comando CLI personalizado para criar a sua conta de administrador:
+
+```bash
+flask create-admin --name "Seu Nome" --email "admin@exemplo.com" --password "sua_senha"
+```
+
+### 8. Executar a Aplicação
+
 ```bash
 flask run
 ```
-Acesse `http://localhost:5000` no navegador.
 
-## 🌐 Deploy no Render
-1. Crie uma conta no [Render](https://render.com).
-2. Crie um novo **Web Service** e conecte seu repositório GitHub.
-3. Configure as variáveis de ambiente no Render (mesmas do `.env`).
-4. Adicione um banco de dados PostgreSQL no Render e atualize `DATABASE_URL`.
-5. Faça o deploy e acesse a URL gerada (ex.: `https://seu-app.onrender.com`).
+A aplicação estará disponível em `http://127.0.0.1:5000`.
 
-## 🧠 Configuração do Dialogflow
-1. Crie um agente chamado `ServiceDeskBot` no Dialogflow.
-2. Adicione os seguintes intents:
-   - **`consult_faq`**: Para consultar FAQs (ex.: "Como configurar uma impressora?").
-     - Entidade: `@keyword` (ex.: "impressora", "Wi-Fi").
-   - **`saudacao`**: Para saudações (ex.: "Oi", "Bom dia").
-   - **`ajuda`**: Para explicar o que o bot pode fazer (ex.: "Preciso de ajuda").
-3. Configure o Webhook (se necessário) apontando para `https://seu-app.onrender.com/webhook`.
-4. Baixe as credenciais e configure `GOOGLE_APPLICATION_CREDENTIALS`.
+## 🚀 Deploy (Railway)
 
-## 📖 Uso
-1. **Login**:
-   - Acesse `/login` e faça login com um usuário existente (crie um admin manualmente no banco de dados para o primeiro acesso).
-2. **Chat**:
-   - Na página inicial (`/`), use o chat para fazer perguntas como:
-     - "Como configurar uma impressora zebra?"
-     - "Oi, tudo bem?"
-     - "Preciso de ajuda"
-   - O bot responderá com base nos intents do Dialogflow e nas FAQs cadastradas.
-3. **Gerenciar FAQs** (somente admins):
-   - Acesse `/admin/faq` para adicionar ou importar FAQs.
-   - Acesse `/faqs` para visualizar e excluir FAQs.
-4. **Importar FAQs**:
-   - Use um arquivo JSON no formato:
-     ```json
-     [
-         {
-             "category": "Hardware",
-             "question": "Como configurar uma impressora zebra?",
-             "answer": "Conecte o cabo USB.\nInstale os drivers.\nTeste a impressão.",
-             "image_url": "https://example.com/zebra-printer.jpg"
-         }
-     ]
-     ```
-
-## 🤝 Contribuição
-Contribuições são bem-vindas! Siga os passos abaixo:
-1. Faça um fork do repositório.
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`).
-3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`).
-4. Faça push para a branch (`git push origin feature/nova-funcionalidade`).
-5. Abra um Pull Request.
-
-## 📜 Licença
-Este projeto está licenciado sob a [MIT License](LICENSE).
+O projeto está configurado para deploy contínuo no Railway. Simplesmente faça `git push` para o seu repositório do GitHub conectado ao Railway, e a plataforma irá construir e fazer o deploy da nova versão automaticamente. As variáveis de ambiente (como `DATABASE_URL`, `REDIS_URL` e as do Cloudinary) devem ser configuradas diretamente na interface do Railway.
 
 ---
 
-**Feito com 💡 por [AlexandreCalmon] para ajudar equipes de TI a brilharem!**
+## 📄 Licença
+
+Este projeto está licenciado sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+## 🤝 Contribuições
+
+Contribuições são bem-vindas! Por favor, abra uma issue ou envie um pull request com suas sugestões.
+
+## 📞 Suporte
+
+Para dúvidas ou suporte, entre em contato através do email: suporte@exemplo.com

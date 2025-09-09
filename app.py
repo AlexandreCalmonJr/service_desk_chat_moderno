@@ -1574,6 +1574,18 @@ def admin_achievements():
     achievements = Achievement.query.all()
     return render_template('admin_achievements.html', achievements=achievements)
 
+@app.route('/admin/daily_challenges')
+@login_required
+def admin_daily_challenges():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    # Busca o histórico de desafios diários, ordenado do mais recente para o mais antigo
+    history = DailyChallenge.query.order_by(DailyChallenge.day.desc()).all()
+    
+    return render_template('admin_daily_challenges.html', history=history)
+
 @app.route('/admin/achievements/edit/<int:achievement_id>', methods=['GET', 'POST'])
 @login_required
 def admin_edit_achievement(achievement_id):
