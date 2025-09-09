@@ -1,0 +1,29 @@
+{% extends "base_user.html" %}
+
+{% block title %}Boss Fights - Service Desk{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-6xl mx-auto">
+    <div class="text-center mb-10">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">Arena de Boss Fights</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-2">Junte a sua equipa e enfrentem os desafios mais difíceis!</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {% for boss in bosses %}
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden flex flex-col">
+                <div class="p-6 flex-grow">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ boss.name }}</h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">{{ boss.description }}</p>
+                </div>
+                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50">
+                    <p class="text-sm font-semibold">Recompensa por Membro: <span class="text-green-500">{{ boss.reward_points }} Pontos</span></p>
+                    <a href="{{ url_for('view_boss_fight', boss_id=boss.id) }}" class="mt-4 block w-full text-center bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-bold">
+                        Enfrentar o Boss
+                    </a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base_user.html" %}
+
+{% block title %}{{ boss.name }} - Boss Fight{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-4xl mx-auto">
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">{{ boss.name }}</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-2">{{ boss.description }}</p>
+    </div>
+
+    <div class="space-y-6">
+        {% for stage in boss.stages %}
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
+                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-200 border-b-2 dark:border-gray-700 pb-2 mb-4">Etapa {{ stage.order }}: {{ stage.name }}</h2>
+                
+                <ul class="space-y-4">
+                    {% for step in stage.steps %}
+                        <li class="p-4 rounded-lg {% if step.id in completed_step_ids %}bg-green-100 dark:bg-green-900/50{% else %}bg-gray-100 dark:bg-gray-900/50{% endif %}">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-semibold">{{ step.description }}</p>
+                                    {% if step.id in completed_step_ids %}
+                                        {% set progress = team_progress|selectattr('step_id', 'equalto', step.id)|first %}
+                                        <p class="text-xs text-green-600 dark:text-green-400">
+                                            Completo por: {{ progress.user.name }} em {{ progress.completed_at.strftime('%d/%m/%Y') }}
+                                        </p>
+                                    {% endif %}
+                                </div>
+                                {% if step.id in completed_step_ids %}
+                                    <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                                {% else %}
+                                    <i class="far fa-circle text-gray-400 text-2xl"></i>
+                                {% endif %}
+                            </div>
+                            
+                            {% if step.id not in completed_step_ids %}
+                                <form method="POST" action="{{ url_for('submit_boss_step', step_id=step.id) }}" class="mt-3 flex gap-2">
+                                    <input type="text" name="answer" class="w-full p-2 border rounded-lg dark:bg-gray-700" placeholder="Sua resposta...">
+                                    <button type="submit" class="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700">Enviar</button>
+                                </form>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

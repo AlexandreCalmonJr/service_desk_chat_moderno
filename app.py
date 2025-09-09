@@ -265,6 +265,15 @@ class TeamBossProgress(db.Model):
     step = db.relationship('BossFightStep')
     user = db.relationship('User')
 
+class TeamBossCompletion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    boss_fight_id = db.Column(db.Integer, db.ForeignKey('boss_fight.id'), nullable=False)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    team = db.relationship('Team')
+    boss_fight = db.relationship('BossFight')
+
 # Constante de níveis
 LEVELS = {
     'Iniciante': {'min_points': 0, 'insignia': '🌱'},
@@ -545,6 +554,36 @@ def check_and_award_achievements(user):
             flash(f'Nova Conquista Desbloqueada: {achievement.name}!', 'success')
             # O commit será feito na rota que chamou esta função
 
+def check_boss_fight_completion(team_id, boss_id):
+    boss = BossFight.query.get(boss_id)
+    team = Team.query.get(team_id)
+
+    # Verifica se a equipa já completou este boss
+    if TeamBossCompletion.query.filter_by(team_id=team_id, boss_fight_id=boss_id).first():
+        return
+
+    # Conta o total de tarefas necessárias para este boss
+    total_steps_required = db.session.query(func.count(BossFightStep.id))\
+        .join(BossFightStage).filter(BossFightStage.boss_fight_id == boss_id).scalar()
+
+    # Conta o total de tarefas que a equipa já completou para este boss
+    steps_completed_by_team = TeamBossProgress.query.filter_by(team_id=team_id)\
+        .join(BossFightStep).join(BossFightStage)\
+        .filter(BossFightStage.boss_fight_id == boss_id).count()
+
+    if total_steps_required > 0 and steps_completed_by_team >= total_steps_required:
+        # BOSS DERROTADO!
+        # Distribui a recompensa para todos os membros da equipa
+        for member in team.members:
+            member.points += boss.reward_points
+            update_user_level(member) # Verifica se algum membro subiu de nível
+
+        # Regista a conclusão para evitar recompensas duplicadas
+        completion_record = TeamBossCompletion(team_id=team_id, boss_fight_id=boss_id)
+        db.session.add(completion_record)
+        db.session.commit()
+
+        flash(f'Parabéns Equipa "{team.name}"! Vocês derrotaram o Boss "{boss.name}" e cada membro ganhou {boss.reward_points} pontos!', 'success')
 # Context processors
 @app.context_processor
 def inject_user_gamification_data():
@@ -1475,6 +1514,102 @@ def admin_achievements():
 
     achievements = Achievement.query.all()
     return render_template('admin_achievements.html', achievements=achievements)
+
+@app.route('/admin/bossfights', methods=['GET', 'POST'])
+@login_required
+def admin_boss_fights():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'create_boss':
+            name = request.form.get('name')
+            description = request.form.get('description')
+            reward_points = request.form.get('reward_points', type=int)
+            if name and description and reward_points:
+                new_boss = BossFight(name=name, description=description, reward_points=reward_points, is_active=True)
+                db.session.add(new_boss)
+                db.session.commit()
+                flash('Boss Fight criado com sucesso!', 'success')
+        
+        elif action == 'create_stage':
+            boss_id = request.form.get('boss_id', type=int)
+            name = request.form.get('name')
+            order = request.form.get('order', type=int)
+            if boss_id and name and order:
+                new_stage = BossFightStage(boss_fight_id=boss_id, name=name, order=order)
+                db.session.add(new_stage)
+                db.session.commit()
+                flash('Etapa adicionada ao Boss Fight!', 'success')
+
+        elif action == 'create_step':
+            stage_id = request.form.get('stage_id', type=int)
+            description = request.form.get('description')
+            expected_answer = request.form.get('expected_answer')
+            if stage_id and description and expected_answer:
+                new_step = BossFightStep(stage_id=stage_id, description=description, expected_answer=expected_answer)
+                db.session.add(new_step)
+                db.session.commit()
+                flash('Tarefa adicionada à etapa!', 'success')
+
+        return redirect(url_for('admin_boss_fights'))
+
+    all_boss_fights = BossFight.query.all()
+    return render_template('admin_boss_fights.html', boss_fights=all_boss_fights)
+
+@app.route('/bossfights')
+@login_required
+def list_boss_fights():
+    if not current_user.team:
+        flash('Você precisa de estar num time para participar nas Boss Fights!', 'warning')
+        return redirect(url_for('teams_list'))
+    
+    all_bosses = BossFight.query.filter_by(is_active=True).all()
+    return render_template('boss_fights_list.html', bosses=all_bosses)
+
+@app.route('/bossfight/<int:boss_id>')
+@login_required
+def view_boss_fight(boss_id):
+    if not current_user.team:
+        return redirect(url_for('list_boss_fights'))
+
+    boss = BossFight.query.get_or_404(boss_id)
+    team_progress = TeamBossProgress.query.filter_by(team_id=current_user.team_id).all()
+    completed_step_ids = {progress.step_id for progress in team_progress}
+
+    return render_template('view_boss_fight.html', boss=boss, completed_step_ids=completed_step_ids, team_progress=team_progress)
+
+@app.route('/bossfight/submit/<int:step_id>', methods=['POST'])
+@login_required
+def submit_boss_step(step_id):
+    if not current_user.team:
+        return redirect(url_for('list_boss_fights'))
+
+    step = BossFightStep.query.get_or_404(step_id)
+    boss = step.stage.boss_fight
+    submitted_answer = request.form.get('answer', '').strip()
+
+    if submitted_answer.lower() == step.expected_answer.lower():
+        # Verifica se esta tarefa já foi completada pela equipa
+        if not TeamBossProgress.query.filter_by(team_id=current_user.team_id, step_id=step_id).first():
+            progress = TeamBossProgress(
+                team_id=current_user.team_id,
+                step_id=step_id,
+                completed_by_user_id=current_user.id
+            )
+            db.session.add(progress)
+            db.session.commit()
+            flash(f'Parabéns! Você completou a tarefa "{step.description}" para o seu time!', 'success')
+            check_boss_fight_completion(current_user.team_id, boss.id)
+            
+            # TODO: Adicionar lógica para verificar se o Boss Fight inteiro foi concluído
+    else:
+        flash('Resposta incorreta. Tente novamente!', 'error')
+        
+    return redirect(url_for('view_boss_fight', boss_id=boss.id))
 
 # Comando CLI para criar administrador
 @click.command(name='create-admin')
