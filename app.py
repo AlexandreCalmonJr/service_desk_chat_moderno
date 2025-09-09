@@ -1323,8 +1323,11 @@ def admin_delete_challenge(challenge_id):
 
     challenge_to_delete = Challenge.query.get_or_404(challenge_id)
     
-    # Remove as conclusões de desafios dos utilizadores antes de o excluir
+    # Remove as conclusões de desafios dos utilizadores
     UserChallenge.query.filter_by(challenge_id=challenge_id).delete()
+    
+    # --- CORREÇÃO: Remove o desafio de todas as trilhas ---
+    PathChallenge.query.filter_by(challenge_id=challenge_id).delete()
     
     db.session.delete(challenge_to_delete)
     db.session.commit()
@@ -1541,25 +1544,26 @@ def admin_achievements():
     if request.method == 'POST':
         name = request.form.get('name')
         description = request.form.get('description')
-        icon = request.form.get('icon', 'fas fa-star')
         trigger_type = request.form.get('trigger_type')
         trigger_value = request.form.get('trigger_value', type=int)
-        file = request.f
         
-        # Novo
-    if file and file.filename:
-        try:
-            upload_result = cloudinary.uploader.upload(file)
-            icon_url = upload_result['secure_url']
-        except Exception as e:
-            flash(f'Erro ao fazer upload da imagem: {e}', 'error')
-            return redirect(url_for('admin_achievements'))
-        
+        # CORREÇÃO: Pega o ficheiro de imagem
+        file = request.files.get('icon_image')
+
+        icon_url = None # Garante que a variável sempre existe
+        if file and file.filename:
+            try:
+                upload_result = cloudinary.uploader.upload(file)
+                icon_url = upload_result['secure_url']
+            except Exception as e:
+                flash(f'Erro ao fazer upload da imagem: {e}', 'error')
+                return redirect(url_for('admin_achievements'))
+
         if name and description and trigger_type and trigger_value is not None:
             new_achievement = Achievement(
                 name=name,
                 description=description,
-                icon=icon_url,
+                icon=icon_url, # Usa a URL ou None
                 trigger_type=trigger_type,
                 trigger_value=trigger_value
             )
