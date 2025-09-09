@@ -23,6 +23,15 @@
                 <textarea id="description" name="description" rows="2" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600"></textarea>
             </div>
             <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Criar Trilha</button>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="import_paths">
+                <h3 class="font-semibold mb-2">Importar de Ficheiro</h3>
+                <div class="mb-4">
+                    <label for="path_file" class="block text-sm font-medium">Ficheiro JSON</label>
+                    <input type="file" id="path_file" name="path_file" class="w-full mt-1 text-sm" accept=".json" required>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Importar</button>
+            </form>
         </form>
     </div>
 

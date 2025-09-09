@@ -22,6 +22,17 @@
             </div>
             <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Adicionar Nível</button>
         </form>
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Importar Níveis</h2>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="import_levels">
+                <div class="mb-4">
+                    <label for="level_file" class="block text-sm font-medium">Ficheiro JSON</label>
+                    <input type="file" id="level_file" name="level_file" class="w-full mt-1 text-sm" accept=".json" required>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Importar</button>
+            </form>
+        </div>
     </div>
     
     <div>

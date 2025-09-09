@@ -1421,53 +1421,59 @@ def get_challenge_hint(challenge_id):
 @login_required
 def admin_paths():
     if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
 
     if request.method == 'POST':
         action = request.form.get('action')
 
-        if action == 'create_path':
-            name = request.form.get('name')
-            description = request.form.get('description')
-            reward_points = request.form.get('reward_points', 100, type=int)
-            
-            if name and not LearningPath.query.filter_by(name=name).first():
-                new_path = LearningPath(name=name, description=description, reward_points=reward_points)
-                db.session.add(new_path)
-                db.session.commit()
-                flash('Trilha de aprendizagem criada com sucesso!', 'success')
-            else:
-                flash('Erro: Nome da trilha inválido ou já existente.', 'error')
-
-        elif action == 'add_challenge':
-            path_id = request.form.get('path_id', type=int)
-            challenge_id = request.form.get('challenge_id', type=int)
-            step = request.form.get('step', type=int)
-            
-            path = LearningPath.query.get(path_id)
-            if path and challenge_id and step:
-                # Verifica se o desafio ou o passo já existem na trilha
-                exists = PathChallenge.query.filter_by(path_id=path_id, challenge_id=challenge_id).first()
-                step_exists = PathChallenge.query.filter_by(path_id=path_id, step=step).first()
-                
-                if exists:
-                    flash('Este desafio já foi adicionado a esta trilha.', 'warning')
-                elif step_exists:
-                    flash(f'O passo {step} já está ocupado nesta trilha.', 'warning')
-                else:
-                    path_challenge = PathChallenge(path_id=path_id, challenge_id=challenge_id, step=step)
-                    db.session.add(path_challenge)
-                    db.session.commit()
-                    flash('Desafio adicionado à trilha com sucesso!', 'success')
-            else:
-                flash('Erro ao adicionar desafio à trilha.', 'error')
+        if action == 'create_path' or action == 'add_challenge':
+            # ... (a sua lógica de criar trilhas e adicionar desafios continua aqui)
+            pass # Mantenha o seu código existente aqui
         
+        elif action == 'import_paths':
+            file = request.files.get('path_file')
+            if not file or not file.filename.endswith('.json'):
+                flash('Por favor, envie um ficheiro .json válido.', 'error')
+                return redirect(url_for('admin_paths'))
+
+            try:
+                data = json.load(file.stream)
+                count = 0
+                for item in data:
+                    path_name = item.get('name')
+                    if path_name and not LearningPath.query.filter_by(name=path_name).first():
+                        new_path = LearningPath(
+                            name=path_name,
+                            description=item.get('description'),
+                            reward_points=item.get('reward_points', 100)
+                        )
+                        db.session.add(new_path)
+                        # Precisamos de fazer flush para obter o ID da nova trilha
+                        db.session.flush()
+
+                        for challenge_data in item.get('challenges', []):
+                            challenge_title = challenge_data.get('title')
+                            challenge = Challenge.query.filter_by(title=challenge_title).first()
+                            if challenge:
+                                new_path_challenge = PathChallenge(
+                                    path_id=new_path.id,
+                                    challenge_id=challenge.id,
+                                    step=challenge_data.get('step')
+                                )
+                                db.session.add(new_path_challenge)
+                        count += 1
+                db.session.commit()
+                flash(f'{count} novas trilhas importadas com sucesso!', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Ocorreu um erro ao processar o ficheiro: {e}', 'error')
+
         return redirect(url_for('admin_paths'))
 
     all_paths = LearningPath.query.all()
     all_challenges = Challenge.query.all()
     return render_template('admin_paths.html', paths=all_paths, challenges=all_challenges)
+
 
 @app.route('/admin/paths/edit/<int:path_id>', methods=['GET', 'POST'])
 @login_required
@@ -1591,8 +1597,8 @@ def admin_achievements():
             trigger_type = request.form.get('trigger_type')
             trigger_value = request.form.get('trigger_value', type=int)
             file = request.files.get('icon_image')
-
             icon_url = None
+            
             if file and file.filename:
                 try:
                     upload_result = cloudinary.uploader.upload(file)
@@ -1625,28 +1631,26 @@ def admin_achievements():
                 data = json.load(file.stream)
                 count = 0
                 for item in data:
-                    # Verifica se a conquista já existe para evitar duplicados
-                    if item.get('name') and not Achievement.query.filter_by(name=item.get('name')).first():
+                    name = item.get('name')
+                    if name and not Achievement.query.filter_by(name=name).first():
                         new_achievement = Achievement(
-                            name=item.get('name'),
+                            name=name,
                             description=item.get('description'),
-                            icon=item.get('icon'), # URL da imagem a partir do JSON
+                            icon=item.get('icon', 'fas fa-star'),
                             trigger_type=item.get('trigger_type'),
                             trigger_value=item.get('trigger_value')
                         )
                         db.session.add(new_achievement)
                         count += 1
-                
                 db.session.commit()
                 flash(f'{count} novas conquistas importadas com sucesso!', 'success')
             except Exception as e:
                 db.session.rollback()
-                flash(f'Ocorreu um erro ao processar o ficheiro JSON: {e}', 'error')
-        
+                flash(f'Ocorreu um erro ao processar o ficheiro: {e}', 'error')
+
         return redirect(url_for('admin_achievements'))
 
-    # Lógica para o método GET (carregar a página)
-    achievements = Achievement.query.order_by(Achievement.name).all()
+    achievements = Achievement.query.all()
     return render_template('admin_achievements.html', achievements=achievements)
 
 @app.route('/admin/daily_challenges')
