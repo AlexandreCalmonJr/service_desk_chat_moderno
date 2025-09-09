@@ -21,6 +21,9 @@ import cloudinary.uploader
 import cloudinary.api
 from sqlalchemy import func
 from datetime import datetime, timedelta
+import random
+from sqlalchemy.sql.expression import func
+from datetime import date
 
 app = Flask(__name__)
 
@@ -220,6 +223,14 @@ class UserAchievement(db.Model):
     user = db.relationship('User', backref='achievements')
     achievement = db.relationship('Achievement')
 
+class DailyChallenge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    day = db.Column(db.Date, unique=True, nullable=False, default=datetime.utcnow)
+    challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), nullable=False)
+    bonus_points = db.Column(db.Integer, default=20) # Pontos extra por completar o desafio no dia
+
+    challenge = db.relationship('Challenge')
+
 # Constante de níveis
 LEVELS = {
     'Iniciante': {'min_points': 0, 'insignia': '🌱'},
@@ -371,6 +382,36 @@ def format_faq_response(faq_id, question, answer, image_url=None, video_url=None
         formatted_response += f'<br><br><a href="/download/{faq_id}" class="text-blue-400 hover:underline" target="_blank">📎 Baixar ficheiro: {file_name}</a>'
     
     return formatted_response
+
+def get_or_create_daily_challenge():
+    """Verifica se existe um desafio para o dia de hoje. Se não, cria um novo."""
+    today = date.today()
+    daily_challenge_entry = DailyChallenge.query.filter_by(day=today).first()
+
+    if daily_challenge_entry:
+        return daily_challenge_entry
+
+    # Se não existir, seleciona um novo desafio aleatório
+    # Exclui desafios que já foram desafios do dia nos últimos 30 dias
+    thirty_days_ago = today - timedelta(days=30)
+    recent_daily_ids = [dc.challenge_id for dc in DailyChallenge.query.filter(DailyChallenge.day > thirty_days_ago).all()]
+    
+    available_challenges = Challenge.query.filter(Challenge.id.notin_(recent_daily_ids)).all()
+    
+    if not available_challenges:
+        # Se todos os desafios já foram usados recentemente, pega qualquer um
+        available_challenges = Challenge.query.all()
+
+    if available_challenges:
+        selected_challenge = random.choice(available_challenges)
+        new_daily = DailyChallenge(challenge_id=selected_challenge.id)
+        db.session.add(new_daily)
+        db.session.commit()
+        return new_daily
+    
+    return None
+
+
 def find_faqs_by_keywords(message):
     search_words = set(message.lower().split())
     if not search_words:
@@ -481,6 +522,7 @@ def inject_user_gamification_data():
 @app.route('/')
 @login_required
 def index():
+    daily_challenge = get_or_create_daily_challenge()
     return render_template('dashboard.html')
 
 
@@ -946,6 +988,11 @@ def submit_challenge(challenge_id):
         if not existing_completion:
             # Adiciona pontos e regista a conclusão do desafio
             current_user.points += challenge.points_reward
+            flash_message = f'Parabéns! Completou o desafio "{challenge.title}" e ganhou {challenge.points_reward} pontos!'
+            today_challenge_entry = DailyChallenge.query.filter_by(day=date.today()).first()
+            if today_challenge_entry and today_challenge_entry.challenge_id == challenge.id:
+                current_user.points += today_challenge_entry.bonus_points
+                flash_message += f' Você ganhou {today_challenge_entry.bonus_points} pontos de bónus por completar o desafio do dia!'
             completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
             db.session.add(completion)
             flash(f'Parabéns! Completou o desafio "{challenge.title}" e ganhou {challenge.points_reward} pontos!', 'success')
