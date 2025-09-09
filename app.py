@@ -1267,51 +1267,81 @@ def admin_levels():
     levels = Level.query.order_by(Level.min_points).all()
     return render_template('admin_levels.html', levels=levels)
 
-# Substitua a sua função admin_challenges por esta
-@app.route('/admin/challenges', methods=['GET', 'POST']) # Adicionado POST
+@app.route('/admin/challenges', methods=['GET', 'POST'])
 @login_required
 def admin_challenges():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
     
-    # CORREÇÃO: Busca todos os níveis para passar para o template
+    if request.method == 'POST':
+        # Usamos um campo 'action' para diferenciar os formulários
+        action = request.form.get('action')
+
+        if action == 'create_challenge':
+            title = request.form.get('title')
+            description = request.form.get('description')
+            level_required = request.form.get('level_required')
+            points_reward = request.form.get('points_reward')
+            expected_answer = request.form.get('expected_answer')
+            is_team_challenge = request.form.get('is_team_challenge') == 'on'
+            hint = request.form.get('hint')
+            hint_cost = request.form.get('hint_cost', 5, type=int)
+
+            if title and description and level_required and points_reward and expected_answer:
+                new_challenge = Challenge(
+                    title=title,
+                    description=description,
+                    level_required=level_required,
+                    points_reward=int(points_reward),
+                    expected_answer=expected_answer,
+                    is_team_challenge=is_team_challenge,
+                    hint=hint,
+                    hint_cost=hint_cost
+                )
+                db.session.add(new_challenge)
+                db.session.commit()
+                flash('Desafio adicionado com sucesso!', 'success')
+            else:
+                flash('Todos os campos obrigatórios devem ser preenchidos.', 'error')
+        
+        elif action == 'import_challenges':
+            file = request.files.get('challenge_file')
+            if not file or not file.filename.endswith('.json'):
+                flash('Por favor, envie um ficheiro .json válido.', 'error')
+                return redirect(url_for('admin_challenges'))
+
+            try:
+                data = json.load(file.stream)
+                count = 0
+                for item in data:
+                    # Verifica se um desafio com o mesmo título já existe para evitar duplicados
+                    if item.get('title') and not Challenge.query.filter_by(title=item.get('title')).first():
+                        new_challenge = Challenge(
+                            title=item.get('title'),
+                            description=item.get('description'),
+                            expected_answer=item.get('expected_answer'),
+                            points_reward=item.get('points_reward', 10),
+                            level_required=item.get('level_required', 'Iniciante'),
+                            is_team_challenge=item.get('is_team_challenge', False),
+                            hint=item.get('hint'),
+                            hint_cost=item.get('hint_cost', 5)
+                        )
+                        db.session.add(new_challenge)
+                        count += 1
+                
+                db.session.commit()
+                flash(f'{count} novos desafios importados com sucesso!', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Ocorreu um erro ao processar o ficheiro JSON: {e}', 'error')
+
+        return redirect(url_for('admin_challenges'))
+
+    # Lógica para o método GET (carregar a página)
     all_levels = Level.query.order_by(Level.min_points).all()
     all_faqs = FAQ.query.order_by(FAQ.question).all()
-
-    if request.method == 'POST':
-        title = request.form.get('title')
-        description = request.form.get('description')
-        level_required = request.form.get('level_required')
-        points_reward = request.form.get('points_reward')
-        expected_answer = request.form.get('expected_answer')
-        unlocks_faq_id = request.form.get('unlocks_faq_id')
-        is_team_challenge = request.form.get('is_team_challenge') == 'on'
-        hint = request.form.get('hint')
-        hint_cost = request.form.get('hint_cost', 5, type=int)
-        
-
-        if title and description and level_required and points_reward and expected_answer:
-            new_challenge = Challenge(
-                title=title,
-                description=description,
-                level_required=level_required,
-                points_reward=int(points_reward),
-                expected_answer=expected_answer,
-                is_team_challenge=is_team_challenge,
-                hint=hint,
-                hint_cost=hint_cost
-                # A lógica para unlocks_faq_id precisa ser adicionada ao modelo se necessário
-            )
-            db.session.add(new_challenge)
-            db.session.commit()
-            flash('Desafio adicionado com sucesso!', 'success')
-            return redirect(url_for('admin_challenges'))
-        else:
-            flash('Todos os campos são obrigatórios.', 'error')
-
     all_challenges = Challenge.query.order_by(Challenge.level_required).all()
-    # CORREÇÃO: Envia a variável 'levels' para o template
     return render_template('admin_challenges.html', challenges=all_challenges, levels=all_levels, faqs=all_faqs)
 
 @app.route('/admin/challenges/delete/<int:challenge_id>', methods=['POST'])

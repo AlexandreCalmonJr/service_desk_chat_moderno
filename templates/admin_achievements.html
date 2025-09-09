@@ -47,25 +47,60 @@
                         <tr class="bg-gray-200 dark:bg-gray-700">
                             <th class="p-3 text-left">Ícone</th>
                             <th class="p-3 text-left">Nome</th>
+                            <th class="p-3 text-left">Descrição</th>
                             <th class="p-3 text-left">Gatilho</th>
                             <th class="p-3 text-left">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for achievement in achievements %}
-                        <tr class="border-b dark:border-gray-600">
+                        <tr class="border-b dark:border-gray-600" id="achievement-{{ achievement.id }}">
                             <td class="p-3">
                                 {% if achievement.icon %}
                                     <img src="{{ achievement.icon }}" alt="{{ achievement.name }}" class="w-10 h-10 rounded-full object-cover">
                                 {% endif %}
                             </td>
-                            <td class="p-3 font-bold">{{ achievement.name }}</td>
-                            <td class="p-3 font-mono text-sm">{{ achievement.trigger_type }} ({{ achievement.trigger_value }})</td>
-                            <td class="p-3 flex space-x-4">
-                                <a href="#" class="text-blue-500 hover:underline">Editar</a>
-                                <form method="POST" action="#">
-                                    <button type="submit" class="text-red-500 hover:underline">Excluir</button>
-                                </form>
+                            <td class="p-3">
+                                <div class="achievement-display">
+                                    <span class="font-bold">{{ achievement.name }}</span>
+                                </div>
+                                <div class="achievement-edit hidden">
+                                    <input type="text" name="name" value="{{ achievement.name }}" class="w-full p-1 border rounded dark:bg-gray-700 dark:border-gray-600">
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <div class="achievement-display">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ achievement.description }}</span>
+                                </div>
+                                <div class="achievement-edit hidden">
+                                    <textarea name="description" rows="2" class="w-full p-1 border rounded dark:bg-gray-700 dark:border-gray-600">{{ achievement.description }}</textarea>
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <div class="achievement-display">
+                                    <span class="font-mono text-sm">{{ achievement.trigger_type }} ({{ achievement.trigger_value }})</span>
+                                </div>
+                                <div class="achievement-edit hidden">
+                                    <select name="trigger_type" class="w-full p-1 mb-1 border rounded dark:bg-gray-700 dark:border-gray-600">
+                                        <option value="challenges_completed" {% if achievement.trigger_type == 'challenges_completed' %}selected{% endif %}>Nº de Desafios Completados</option>
+                                        <option value="points_earned" {% if achievement.trigger_type == 'points_earned' %}selected{% endif %}>Nº de Pontos Ganhos</option>
+                                        <option value="paths_completed" {% if achievement.trigger_type == 'paths_completed' %}selected{% endif %}>Nº de Trilhas Completadas</option>
+                                        <option value="first_team_join" {% if achievement.trigger_type == 'first_team_join' %}selected{% endif %}>Entrar num Time</option>
+                                    </select>
+                                    <input type="number" name="trigger_value" value="{{ achievement.trigger_value }}" class="w-full p-1 border rounded dark:bg-gray-700 dark:border-gray-600">
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <div class="achievement-display flex space-x-2">
+                                    <button onclick="editAchievement({{ achievement.id }})" class="text-blue-500 hover:underline">Editar</button>
+                                    <form method="POST" action="{{ url_for('admin_delete_achievement', achievement_id=achievement.id) }}" class="inline" onsubmit="return confirm('Tem a certeza que quer excluir esta conquista?');">
+                                        <button type="submit" class="text-red-500 hover:underline">Excluir</button>
+                                    </form>
+                                </div>
+                                <div class="achievement-edit hidden flex space-x-2">
+                                    <button onclick="saveAchievement({{ achievement.id }})" class="text-green-500 hover:underline">Salvar</button>
+                                    <button onclick="cancelEditAchievement({{ achievement.id }})" class="text-gray-500 hover:underline">Cancelar</button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -74,4 +109,43 @@
             </div>
         </div>
     </div>
+
+    <script>
+        function editAchievement(id) {
+            const row = document.getElementById(`achievement-${id}`);
+            row.querySelectorAll('.achievement-display').forEach(el => el.classList.add('hidden'));
+            row.querySelectorAll('.achievement-edit').forEach(el => el.classList.remove('hidden'));
+        }
+
+        function cancelEditAchievement(id) {
+            const row = document.getElementById(`achievement-${id}`);
+            row.querySelectorAll('.achievement-display').forEach(el => el.classList.remove('hidden'));
+            row.querySelectorAll('.achievement-edit').forEach(el => el.classList.add('hidden'));
+        }
+
+        function saveAchievement(id) {
+            const row = document.getElementById(`achievement-${id}`);
+            const formData = new FormData();
+            
+            formData.append('name', row.querySelector('input[name="name"]').value);
+            formData.append('description', row.querySelector('textarea[name="description"]').value);
+            formData.append('trigger_type', row.querySelector('select[name="trigger_type"]').value);
+            formData.append('trigger_value', row.querySelector('input[name="trigger_value"]').value);
+
+            fetch(`{{ url_for('admin_edit_achievement', achievement_id='') }}${id}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Erro ao salvar alterações');
+                }
+            })
+            .catch(error => {
+                alert('Erro ao salvar alterações');
+            });
+        }
+    </script>
 {% endblock %}
