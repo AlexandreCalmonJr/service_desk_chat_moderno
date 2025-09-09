@@ -231,6 +231,40 @@ class DailyChallenge(db.Model):
 
     challenge = db.relationship('Challenge')
 
+class BossFight(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    reward_points = db.Column(db.Integer, nullable=False) # Recompensa para cada membro da equipa
+    is_active = db.Column(db.Boolean, default=False)
+    
+    stages = db.relationship('BossFightStage', backref='boss_fight', lazy='dynamic', order_by='BossFightStage.order')
+
+class BossFightStage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    boss_fight_id = db.Column(db.Integer, db.ForeignKey('boss_fight.id'), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    order = db.Column(db.Integer, nullable=False) # Ordem da etapa (1, 2, 3...)
+    
+    steps = db.relationship('BossFightStep', backref='stage', lazy='dynamic', order_by='BossFightStep.id')
+
+class BossFightStep(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    stage_id = db.Column(db.Integer, db.ForeignKey('boss_fight_stage.id'), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    expected_answer = db.Column(db.String(500), nullable=False)
+
+class TeamBossProgress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    step_id = db.Column(db.Integer, db.ForeignKey('boss_fight_step.id'), nullable=False)
+    completed_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    team = db.relationship('Team')
+    step = db.relationship('BossFightStep')
+    user = db.relationship('User')
+
 # Constante de níveis
 LEVELS = {
     'Iniciante': {'min_points': 0, 'insignia': '🌱'},
