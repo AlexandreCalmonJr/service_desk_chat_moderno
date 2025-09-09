@@ -229,24 +229,22 @@ class DailyChallenge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     day = db.Column(db.Date, unique=True, nullable=False, default=datetime.utcnow)
     challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), nullable=False)
-    bonus_points = db.Column(db.Integer, default=20) # Pontos extra por completar o desafio no dia
-
+    bonus_points = db.Column(db.Integer, default=20) 
     challenge = db.relationship('Challenge')
-
 class BossFight(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=False)
     reward_points = db.Column(db.Integer, nullable=False)
-    is_active = db.Column(db.Boolean, default=False)# Recompensa para cada membro da equipa
+    is_active = db.Column(db.Boolean, default=False)
     image_url = db.Column(db.String(255), nullable=True)
-    stages = db.relationship('BossFightStage', backref='boss_fight', lazy='dynamic', order_by='BossFightStage.order', cascade='all, delete-orphan')
+    stages = db.relationship('BossFightStage', backref='boss_fight', lazy='dynamic', order_by='BossFightStage.order')
 
 class BossFightStage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     boss_fight_id = db.Column(db.Integer, db.ForeignKey('boss_fight.id'), nullable=False)
     name = db.Column(db.String(200), nullable=False)
-    order = db.Column(db.Integer, nullable=False) # Ordem da etapa (1, 2, 3...)
+    order = db.Column(db.Integer, nullable=False) 
     steps = db.relationship('BossFightStep', backref='stage', lazy='dynamic', order_by='BossFightStep.id', cascade='all, delete-orphan')
 
 class BossFightStep(db.Model):
