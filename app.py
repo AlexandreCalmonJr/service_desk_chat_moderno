@@ -237,7 +237,8 @@ class BossFight(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=False)
-    reward_points = db.Column(db.Integer, nullable=False) # Recompensa para cada membro da equipa
+    reward_points = db.Column(db.Integer, nullable=False)
+    is_active = db.Column(db.Boolean, default=False)# Recompensa para cada membro da equipa
     image_url = db.Column(db.String(255), nullable=True)
     stages = db.relationship('BossFightStage', backref='boss_fight', lazy='dynamic', order_by='BossFightStage.order', cascade='all, delete-orphan')
 
@@ -1365,9 +1366,6 @@ def admin_delete_challenge(challenge_id):
     
     # --- CORREÇÃO: Remove o desafio de todas as trilhas ---
     PathChallenge.query.filter_by(challenge_id=challenge_id).delete()
-    
-    # --- CORREÇÃO: Remove o desafio do histórico diário ---
-    DailyChallenge.query.filter_by(challenge_id=challenge_id).delete()
     
     db.session.delete(challenge_to_delete)
     db.session.commit()
