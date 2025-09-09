@@ -1274,6 +1274,11 @@ def admin_challenges():
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
     
+    challenge_to_edit = None
+    edit_id = request.args.get('edit_id', type=int)
+    if edit_id:
+        challenge_to_edit = Challenge.query.get_or_404(edit_id)
+    
     if request.method == 'POST':
         # Usamos um campo 'action' para diferenciar os formulários
         action = request.form.get('action')
@@ -1342,7 +1347,11 @@ def admin_challenges():
     all_levels = Level.query.order_by(Level.min_points).all()
     all_faqs = FAQ.query.order_by(FAQ.question).all()
     all_challenges = Challenge.query.order_by(Challenge.level_required).all()
-    return render_template('admin_challenges.html', challenges=all_challenges, levels=all_levels, faqs=all_faqs)
+    return render_template('admin_challenges.html', 
+                    challenges=all_challenges, 
+                    levels=all_levels, 
+                    faqs=all_faqs,
+                    challenge_to_edit=challenge_to_edit)
 
 @app.route('/admin/challenges/delete/<int:challenge_id>', methods=['POST'])
 @login_required
@@ -1809,35 +1818,26 @@ def submit_boss_step(step_id):
         
     return redirect(url_for('view_boss_fight', boss_id=boss.id))
 
-@app.route('/admin/challenges/edit/<int:challenge_id>', methods=['GET', 'POST'])
+@app.route('/admin/challenges/edit/<int:challenge_id>', methods=['POST'])
 @login_required
 def admin_edit_challenge(challenge_id):
     if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
+        return jsonify({'error': 'Acesso negado'}), 403
 
     challenge_to_edit = Challenge.query.get_or_404(challenge_id)
-    all_levels = Level.query.order_by(Level.min_points).all()
-    all_faqs = FAQ.query.order_by(FAQ.question).all()
+    
+    challenge_to_edit.title = request.form.get('title')
+    challenge_to_edit.description = request.form.get('description')
+    challenge_to_edit.level_required = request.form.get('level_required')
+    challenge_to_edit.points_reward = request.form.get('points_reward', type=int)
+    challenge_to_edit.expected_answer = request.form.get('expected_answer')
+    challenge_to_edit.is_team_challenge = request.form.get('is_team_challenge') == 'true'
+    challenge_to_edit.hint = request.form.get('hint')
+    challenge_to_edit.hint_cost = request.form.get('hint_cost', type=int)
+    
+    db.session.commit()
+    return jsonify({'success': 'Desafio atualizado com sucesso!'})
 
-    if request.method == 'POST':
-        challenge_to_edit.title = request.form.get('title')
-        challenge_to_edit.description = request.form.get('description')
-        challenge_to_edit.level_required = request.form.get('level_required')
-        challenge_to_edit.points_reward = request.form.get('points_reward', type=int)
-        challenge_to_edit.expected_answer = request.form.get('expected_answer')
-        challenge_to_edit.is_team_challenge = request.form.get('is_team_challenge') == 'on'
-        challenge_to_edit.hint = request.form.get('hint')
-        challenge_to_edit.hint_cost = request.form.get('hint_cost', type=int)
-        
-        db.session.commit()
-        flash('Desafio atualizado com sucesso!', 'success')
-        return redirect(url_for('admin_challenges'))
-
-    return render_template('admin_edit_challenge.html', 
-                            challenge=challenge_to_edit, 
-                            levels=all_levels, 
-                            faqs=all_faqs)
     
    
 # Comando CLI para criar administrador

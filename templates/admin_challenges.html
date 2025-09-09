@@ -8,64 +8,52 @@
 
     <div class="space-y-8">
         <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-            {% if challenge_to_edit %}
-                <h2 class="text-xl font-semibold mb-4">Editar Desafio: {{ challenge_to_edit.title }}</h2>
-            {% else %}
-                <h2 class="text-xl font-semibold mb-4">Adicionar Novo Desafio</h2>
-            {% endif %}
-            
+            <h2 class="text-xl font-semibold mb-4">Adicionar Novo Desafio</h2>
             <form method="POST" action="{{ url_for('admin_challenges') }}">
-                <input type="hidden" name="action" value="save_challenge">
-                {% if challenge_to_edit %}
-                    <input type="hidden" name="challenge_id" value="{{ challenge_to_edit.id }}">
-                {% endif %}
-
+                <input type="hidden" name="action" value="create_challenge">
                 <div class="mb-4">
                     <label for="title" class="block text-sm font-medium">Título</label>
-                    <input type="text" id="title" name="title" value="{{ challenge_to_edit.title if challenge_to_edit else '' }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                    <input type="text" id="title" name="title" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
                 </div>
                 <div class="mb-4">
                     <label for="description" class="block text-sm font-medium">Descrição</label>
-                    <textarea id="description" name="description" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>{{ challenge_to_edit.description if challenge_to_edit else '' }}</textarea>
+                    <textarea id="description" name="description" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required></textarea>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label for="level_required" class="block text-sm font-medium">Nível Requerido</label>
                         <select id="level_required" name="level_required" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
                             {% for level in levels %}
-                                <option value="{{ level.name }}" {% if challenge_to_edit and level.name == challenge_to_edit.level_required %}selected{% endif %}>{{ level.name }}</option>
+                                <option value="{{ level.name }}">{{ level.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                     <div>
                         <label for="points_reward" class="block text-sm font-medium">Pontos</label>
-                        <input type="number" id="points_reward" name="points_reward" value="{{ challenge_to_edit.points_reward if challenge_to_edit else '' }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                        <input type="number" id="points_reward" name="points_reward" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
                     </div>
                 </div>
                 <div class="mb-4">
                     <label for="expected_answer" class="block text-sm font-medium">Resposta Esperada</label>
-                    <input type="text" id="expected_answer" name="expected_answer" value="{{ challenge_to_edit.expected_answer if challenge_to_edit else '' }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                    <input type="text" id="expected_answer" name="expected_answer" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
                 </div>
                 <div class="mb-4">
                     <label for="hint" class="block text-sm font-medium">Dica (Opcional)</label>
-                    <textarea id="hint" name="hint" rows="2" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600">{{ challenge_to_edit.hint or '' }}</textarea>
+                    <textarea id="hint" name="hint" rows="2" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600"></textarea>
                 </div>
                 <div class="mb-4">
                     <label for="hint_cost" class="block text-sm font-medium">Custo da Dica</label>
-                    <input type="number" id="hint_cost" name="hint_cost" value="{{ challenge_to_edit.hint_cost if challenge_to_edit else 5 }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600">
+                    <input type="number" id="hint_cost" name="hint_cost" value="5" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600">
                 </div>
                 <div class="mb-4">
                     <label class="flex items-center">
-                        <input type="checkbox" name="is_team_challenge" class="h-4 w-4" {% if challenge_to_edit and challenge_to_edit.is_team_challenge %}checked{% endif %}>
+                        <input type="checkbox" name="is_team_challenge" class="h-4 w-4">
                         <span class="ml-2 text-sm">Este é um desafio de time</span>
                     </label>
                 </div>
 
-                <div class="flex justify-end space-x-4">
-                    {% if challenge_to_edit %}
-                        <a href="{{ url_for('admin_challenges') }}" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">Cancelar Edição</a>
-                    {% endif %}
-                    <button type="submit" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition">Salvar Desafio</button>
+                <div class="flex justify-end">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">Adicionar Desafio</button>
                 </div>
             </form>
         </div>
@@ -97,14 +85,34 @@
                     </thead>
                     <tbody>
                         {% for challenge in challenges %}
-                        <tr class="border-b dark:border-gray-600">
-                            <td class="p-3">{{ challenge.title }}</td>
-                            <td class="p-3">{{ challenge.level_required }}</td>
-                            <td class="p-3 flex space-x-4">
-                                <a href="{{ url_for('admin_challenges', edit_id=challenge.id) }}" class="text-blue-500 hover:underline">Editar</a>
-                                <form method="POST" action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" onsubmit="return confirm('Tem a certeza?');">
-                                    <button type="submit" class="text-red-500 hover:underline">Excluir</button>
-                                </form>
+                        <tr class="border-b dark:border-gray-600" id="challenge-row-{{ challenge.id }}">
+                            <td class="p-3">
+                                <div class="challenge-display">{{ challenge.title }}</div>
+                                <div class="challenge-edit hidden">
+                                    <input type="text" name="title" value="{{ challenge.title }}" class="w-full p-1 border rounded dark:bg-gray-700">
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <div class="challenge-display">{{ challenge.level_required }}</div>
+                                <div class="challenge-edit hidden">
+                                    <select name="level_required" class="w-full p-1 border rounded dark:bg-gray-700">
+                                        {% for level in levels %}
+                                        <option value="{{ level.name }}" {% if level.name == challenge.level_required %}selected{% endif %}>{{ level.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </td>
+                            <td class="p-3">
+                                <div class="challenge-display flex space-x-4">
+                                    <button onclick="editChallenge({{ challenge.id }})" class="text-blue-500 hover:underline">Editar</button>
+                                    <form method="POST" action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" onsubmit="return confirm('Tem a certeza?');">
+                                        <button type="submit" class="text-red-500 hover:underline">Excluir</button>
+                                    </form>
+                                </div>
+                                <div class="challenge-edit hidden">
+                                    <button onclick="saveChallenge({{ challenge.id }})" class="text-green-500 hover:underline">Salvar</button>
+                                    <button onclick="cancelEditChallenge({{ challenge.id }})" class="text-gray-500 hover:underline ml-2">Cancelar</button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -114,4 +122,42 @@
         </div>
     </div>
 </div>
+
+<script>
+    function editChallenge(id) {
+        const row = document.getElementById(`challenge-row-${id}`);
+        row.querySelectorAll('.challenge-display').forEach(el => el.classList.add('hidden'));
+        row.querySelectorAll('.challenge-edit').forEach(el => el.classList.remove('hidden'));
+    }
+
+    function cancelEditChallenge(id) {
+        const row = document.getElementById(`challenge-row-${id}`);
+        row.querySelectorAll('.challenge-display').forEach(el => el.classList.remove('hidden'));
+        row.querySelectorAll('.challenge-edit').forEach(el => el.classList.add('hidden'));
+    }
+
+    function saveChallenge(id) {
+        const row = document.getElementById(`challenge-row-${id}`);
+        const formData = new FormData();
+        
+        // Coleta todos os dados do formulário de edição "in-loco"
+        // Esta parte precisa ser expandida para incluir todos os campos que você quer editar
+        formData.append('title', row.querySelector('input[name="title"]').value);
+        formData.append('level_required', row.querySelector('select[name="level_required"]').value);
+        // Adicione aqui outros campos conforme necessário, por exemplo:
+        // formData.append('description', row.querySelector('textarea[name="description"]').value);
+
+        fetch(`/admin/challenges/edit/${id}`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload(); // Recarrega a página para ver as alterações
+            } else {
+                alert('Erro ao salvar. Verifique a consola para mais detalhes.');
+            }
+        });
+    }
+</script>
 {% endblock %}

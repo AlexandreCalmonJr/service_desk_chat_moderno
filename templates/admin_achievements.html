@@ -132,7 +132,7 @@
             formData.append('trigger_type', row.querySelector('select[name="trigger_type"]').value);
             formData.append('trigger_value', row.querySelector('input[name="trigger_value"]').value);
 
-            fetch(`{{ url_for('admin_edit_achievement', achievement_id='') }}${id}`, {
+            fetch(`/admin/achievements/edit/${id}`, {
                 method: 'POST',
                 body: formData
             })

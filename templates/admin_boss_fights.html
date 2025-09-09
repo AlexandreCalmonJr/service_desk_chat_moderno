@@ -138,7 +138,7 @@
             formData.append('reward_points', container.querySelector('input[name="reward_points"]').value);
             formData.append('is_active', container.querySelector('input[name="is_active"]').checked);
 
-            fetch(`{{ url_for('admin_edit_boss_fight', boss_id='') }}${id}`, {
+            fetch(`/admin/bossfights/edit/${id}`, {
                 method: 'POST',
                 body: formData
             })
