@@ -238,7 +238,7 @@ class BossFight(db.Model):
     name = db.Column(db.String(200), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=False)
     reward_points = db.Column(db.Integer, nullable=False) # Recompensa para cada membro da equipa
-    is_active = db.Column(db.Boolean, default=False)
+    image_url = db.Column(db.String(255), nullable=True)
     stages = db.relationship('BossFightStage', backref='boss_fight', lazy='dynamic', order_by='BossFightStage.order', cascade='all, delete-orphan')
 
 class BossFightStage(db.Model):
@@ -1717,21 +1717,22 @@ def admin_boss_fights():
             name = request.form.get('name')
             description = request.form.get('description')
             reward_points = request.form.get('reward_points', type=int)
+            file = request.files.get('boss_image')
+
+            image_url = None
+            if file and file.filename:
+                try:
+                    upload_result = cloudinary.uploader.upload(file, folder="boss_fights")
+                    image_url = upload_result['secure_url']
+                except Exception as e:
+                    flash(f'Erro ao fazer upload da imagem: {e}', 'error')
+                    return redirect(url_for('admin_boss_fights'))
+
             if name and description and reward_points:
-                new_boss = BossFight(name=name, description=description, reward_points=reward_points, is_active=True)
+                new_boss = BossFight(name=name, description=description, reward_points=reward_points, image_url=image_url, is_active=True)
                 db.session.add(new_boss)
                 db.session.commit()
                 flash('Boss Fight criado com sucesso!', 'success')
-        
-        elif action == 'create_stage':
-            boss_id = request.form.get('boss_id', type=int)
-            name = request.form.get('name')
-            order = request.form.get('order', type=int)
-            if boss_id and name and order:
-                new_stage = BossFightStage(boss_fight_id=boss_id, name=name, order=order)
-                db.session.add(new_stage)
-                db.session.commit()
-                flash('Etapa adicionada ao Boss Fight!', 'success')
 
         elif action == 'create_step':
             stage_id = request.form.get('stage_id', type=int)
@@ -1754,7 +1755,7 @@ def admin_edit_boss_fight(boss_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-
+    
     boss_to_edit = BossFight.query.get_or_404(boss_id)
 
     if request.method == 'POST':
@@ -1762,6 +1763,14 @@ def admin_edit_boss_fight(boss_id):
         boss_to_edit.description = request.form.get('description')
         boss_to_edit.reward_points = request.form.get('reward_points', type=int)
         boss_to_edit.is_active = request.form.get('is_active') == 'on'
+        
+        file = request.files.get('boss_image')
+        if file and file.filename:
+            try:
+                upload_result = cloudinary.uploader.upload(file, folder="boss_fights")
+                boss_to_edit.image_url = upload_result['secure_url']
+            except Exception as e:
+                flash(f'Erro ao atualizar a imagem: {e}', 'error')
         
         db.session.commit()
         flash('Boss Fight atualizado com sucesso!', 'success')
@@ -1804,6 +1813,7 @@ def admin_delete_boss_step(step_id):
     return redirect(url_for('admin_boss_fights'))
 @app.route('/bossfights')
 
+@app.route('/bossfights')
 @login_required
 def list_boss_fights():
     if not current_user.team:
@@ -1811,7 +1821,9 @@ def list_boss_fights():
         return redirect(url_for('teams_list'))
     
     all_bosses = BossFight.query.filter_by(is_active=True).all()
-    return render_template('boss_fights_list.html', bosses=all_bosses)
+    # SUBSTITUA A LINHA ABAIXO
+    return render_template('boss_fights_list_user.html', bosses=all_bosses)
+
 
 @app.route('/bossfight/<int:boss_id>')
 @login_required

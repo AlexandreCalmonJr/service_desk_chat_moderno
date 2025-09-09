@@ -1,0 +1,96 @@
+{% extends "base_user.html" %}
+
+{% block title %}Arena de Boss Fights - Service Desk{% endblock %}
+
+{% block content %}
+<style>
+    .boss-arena-container {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        color: #ffffff;
+        padding: 2rem 1rem;
+        border-radius: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .boss-card {
+        background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        transition: all 0.3s ease;
+        position: relative;
+        z-index: 10;
+        padding: 0;
+    }
+    .boss-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        box-shadow: 0 20px 40px rgba(255, 71, 87, 0.3);
+        border-color: rgba(255, 87, 87, 0.5);
+    }
+    .boss-card-content {
+        padding: 1.5rem;
+    }
+    .boss-icon {
+        font-size: 3rem;
+        background: linear-gradient(45deg, #ff4757, #ff3742);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 10px rgba(255,71,87,0.5));
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+    @keyframes glow {
+        from { filter: drop-shadow(0 0 10px rgba(255,71,87,0.5)); }
+        to { filter: drop-shadow(0 0 20px rgba(255,71,87,0.8)); }
+    }
+    .title-glow {
+        text-shadow: 0 0 20px rgba(255,255,255,0.5);
+    }
+    .btn-boss {
+        background: linear-gradient(45deg, #ff4757, #ff3742);
+        transition: all 0.3s ease;
+    }
+    .btn-boss:hover {
+        background: linear-gradient(45deg, #ff3742, #ff2f3a);
+        box-shadow: 0 0 20px rgba(255,71,87,0.6);
+        transform: scale(1.05);
+    }
+</style>
+
+<div class="boss-arena-container">
+    <div class="relative z-10">
+        <div class="text-center mb-16">
+            <h1 class="text-5xl font-bold mb-4 title-glow">Arena de Boss Fights</h1>
+            <p class="text-xl text-gray-300 max-w-2xl mx-auto">Junte a sua equipa e enfrentem os desafios mais épicos.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+            {% for boss in bosses %}
+                <div class="boss-card rounded-2xl text-center flex flex-col">
+                    {% if boss.image_url %}
+                        <img src="{{ boss.image_url }}" alt="{{ boss.name }}" class="w-full h-48 object-cover rounded-t-2xl">
+                    {% else %}
+                        <div class="text-center py-8">
+                            <i class="fas fa-dragon boss-icon"></i>
+                        </div>
+                    {% endif %}
+                    <div class="boss-card-content flex flex-col flex-grow">
+                        <div class="flex-grow">
+                            <h2 class="text-2xl font-bold mb-3 text-red-400">{{ boss.name }}</h2>
+                            <p class="text-gray-300 mb-6 min-h-[4rem]">{{ boss.description }}</p>
+                            <div class="bg-black/30 rounded-xl p-4 mb-6">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-400">Recompensa por Membro:</span>
+                                    <span class="text-green-400 font-bold">{{ boss.reward_points }} Pontos</span>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="{{ url_for('view_boss_fight', boss_id=boss.id) }}" class="btn-boss w-full py-4 rounded-xl text-white font-bold text-lg mt-auto">
+                            ENFRENTAR BOSS
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
