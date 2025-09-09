@@ -4,38 +4,61 @@
 
 {% block content %}
 <div class="w-full max-w-6xl mx-auto">
-    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-6 text-center">Central de Desafios</h1>
+    <div class="text-center mb-10">
+        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">Central de Desafios</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-2">Teste os seus conhecimentos, ganhe pontos e suba no ranking!</p>
+    </div>
 
     <div class="mb-12">
         <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4 border-b-2 border-blue-500 pb-2">Disponíveis para Você</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {% for challenge in unlocked_challenges %}
-                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border border-transparent hover:border-blue-500 transition flex flex-col">
-                    
-                    <div class="flex items-center mb-3">
-                        <i class="fas fa-gamepad text-yellow-500 text-2xl mr-3"></i>
-                        <h3 class="text-lg font-bold">{{ challenge.title }}</h3>
-                    </div>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 h-20">{{ challenge.description }}</p>
-                    
-                    <div id="hint-area-{{ challenge.id }}" class="hidden my-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg text-sm">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center">
+                                <i class="fas fa-gamepad text-yellow-500 text-2xl mr-3"></i>
+                                <h3 class="text-lg font-bold">{{ challenge.title }}</h3>
+                            </div>
+                            {% if challenge.is_team_challenge %}
+                                <span class="bg-purple-500 text-white text-xs font-bold px-2 py-1 rounded-full" title="Desafio de Time">TIME</span>
+                            {% endif %}
                         </div>
-
-                    <div class="text-xs font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded mb-4 mt-auto">
-                        <p><strong>Nível:</strong> {{ challenge.level_required }}</p>
-                        <p><strong>Recompensa:</strong> {{ challenge.points_reward }} Pontos</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4 min-h-[60px]">{{ challenge.description }}</p>
+                        <div class="text-xs font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded mb-4">
+                            <p><strong>Nível:</strong> {{ challenge.level_required }}</p>
+                            <p><strong>Recompensa:</strong> {{ challenge.points_reward }} Pontos</p>
+                        </div>
+                        
+                        {% if challenge.hint %}
+                            <div id="hint-area-{{ challenge.id }}" class="hidden my-2 p-3 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg text-sm transition-all">
+                                </div>
+                            <button id="hint-button-{{ challenge.id }}" onclick="getHint({{ challenge.id }}, {{ challenge.hint_cost }})" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 w-full transition mb-2 text-sm">
+                                <i class="fas fa-lightbulb"></i> Pedir Dica (-{{ challenge.hint_cost }} Pontos)
+                            </button>
+                        {% endif %}
                     </div>
-
-                    {% if challenge.hint %}
-                    <button onclick="getHint({{ challenge.id }}, {{ challenge.hint_cost }})" class="bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 w-full transition mb-2 text-sm">
-                        <i class="fas fa-lightbulb"></i> Pedir Dica (-{{ challenge.hint_cost }} Pontos)
-                    </button>
-                    {% endif %}
                     
+                    <div>
+                        {% if challenge.is_team_challenge and not current_user.team %}
+                            <div class="text-center p-2 mt-2 bg-gray-200 dark:bg-gray-700 rounded-lg">
+                                <p class="text-sm font-semibold">Você precisa de estar num time para fazer este desafio.</p>
+                                <a href="{{ url_for('teams_list') }}" class="text-blue-500 hover:underline text-xs">Ver times</a>
+                            </div>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('submit_challenge', challenge_id=challenge.id) }}" class="mt-4">
+                                <input type="text" name="answer" class="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600" placeholder="Digite a sua resposta aqui...">
+                                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 mt-2 w-full font-semibold transition">Enviar Resposta</button>
+                            </form>
+                        {% endif %}
                     </div>
+                </div>
+            {% else %}
+                <p class="text-gray-500 dark:text-gray-400 md:col-span-3">Parabéns! Você completou todos os desafios disponíveis para o seu nível.</p>
             {% endfor %}
         </div>
     </div>
+
     </div>
 
 <script>
@@ -44,21 +67,21 @@
             return;
         }
 
-        try {
-            const response = await fetch(`/challenges/hint/${challengeId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
+        const hintButton = document.getElementById(`hint-button-${challengeId}`);
 
+        try {
+            const response = await fetch(`/challenges/hint/${challengeId}`, { method: 'POST' });
             const data = await response.json();
 
             if (response.ok) {
                 const hintArea = document.getElementById(`hint-area-${challengeId}`);
                 hintArea.innerHTML = `<strong>Dica:</strong> ${data.hint}`;
                 hintArea.classList.remove('hidden');
-                // Opcional: desabilitar o botão após o uso
-                event.target.disabled = true;
-                event.target.textContent = 'Dica Revelada!';
+                
+                hintButton.disabled = true;
+                hintButton.textContent = 'Dica Revelada!';
+                hintButton.classList.add('bg-gray-500', 'hover:bg-gray-500');
+
             } else {
                 alert(data.error || 'Ocorreu um erro.');
             }
