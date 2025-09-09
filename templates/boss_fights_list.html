@@ -1,29 +1,57 @@
-{% extends "base_user.html" %}
+{% extends "admin_base.html" %}
 
-{% block title %}Boss Fights - Service Desk{% endblock %}
+{% block title %}Admin - Boss Fights - Service Desk{% endblock %}
+{% block page_title %}Gerenciar Boss Fights{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-6xl mx-auto">
-    <div class="text-center mb-10">
-        <h1 class="text-4xl font-bold text-gray-900 dark:text-white">Arena de Boss Fights</h1>
-        <p class="text-gray-500 dark:text-gray-400 mt-2">Junte a sua equipa e enfrentem os desafios mais difíceis!</p>
-    </div>
+    <div class="mb-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {% for boss in bosses %}
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden flex flex-col">
-                <div class="p-6 flex-grow">
-                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ boss.name }}</h2>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">{{ boss.description }}</p>
+    <div>
+        <h2 class="text-xl font-semibold mb-4">Gerir Boss Fights Existentes</h2>
+        <div class="space-y-6">
+            {% for boss in boss_fights %}
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-2xl font-bold">{{ boss.name }}</h3>
+                        <p class="text-sm text-gray-500">{{ boss.description }}</p>
+                    </div>
+                    <div class="flex space-x-2 flex-shrink-0">
+                        <a href="{{ url_for('admin_edit_boss_fight', boss_id=boss.id) }}" class="text-sm text-blue-500 hover:underline">Editar</a>
+                        <form method="POST" action="{{ url_for('admin_delete_boss_fight', boss_id=boss.id) }}" onsubmit="return confirm('Tem a certeza que quer excluir este Boss Fight inteiro?');">
+                            <button type="submit" class="text-sm text-red-500 hover:underline">Excluir</button>
+                        </form>
+                    </div>
                 </div>
-                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50">
-                    <p class="text-sm font-semibold">Recompensa por Membro: <span class="text-green-500">{{ boss.reward_points }} Pontos</span></p>
-                    <a href="{{ url_for('view_boss_fight', boss_id=boss.id) }}" class="mt-4 block w-full text-center bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-bold">
-                        Enfrentar o Boss
-                    </a>
+
+                <div class="space-y-4">
+                    {% for stage in boss.stages %}
+                    <div class="p-4 border rounded-md dark:border-gray-700">
+                        <div class="flex justify-between items-start">
+                            <h4 class="font-bold">Etapa {{ stage.order }}: {{ stage.name }}</h4>
+                            <form method="POST" action="{{ url_for('admin_delete_boss_stage', stage_id=stage.id) }}" onsubmit="return confirm('Excluir esta etapa irá apagar todas as suas tarefas. Continuar?');">
+                                <button type="submit" class="text-xs text-red-500 hover:underline">Excluir Etapa</button>
+                            </form>
+                        </div>
+                        <ul class="list-disc list-inside space-y-2 mt-2 text-sm">
+                            {% for step in stage.steps %}
+                                <li class="flex justify-between items-center">
+                                    <span>{{ step.description }} (Resposta: {{ step.expected_answer }})</span>
+                                    <form method="POST" action="{{ url_for('admin_delete_boss_step', step_id=step.id) }}">
+                                        <button type="submit" class="text-xs text-red-500 hover:underline">x</button>
+                                    </form>
+                                </li>
+                            {% else %}
+                                <li class="text-gray-400">Nenhuma tarefa nesta etapa.</li>
+                            {% endfor %}
+                        </ul>
+                        </div>
+                    {% endfor %}
                 </div>
-            </div>
-        {% endfor %}
+
+                </div>
+            {% endfor %}
+        </div>
     </div>
-</div>
 {% endblock %}

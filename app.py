@@ -206,13 +206,15 @@ class UserPathProgress(db.Model):
     user = db.relationship('User')
     path = db.relationship('LearningPath')
 
+# Encontre a sua classe Achievement
 class Achievement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=False)
-    icon = db.Column(db.String(100), default='fas fa-star') # Ícone do FontAwesome
-    trigger_type = db.Column(db.String(50), nullable=False) # Ex: 'challenges_completed', 'first_login'
-    trigger_value = db.Column(db.Integer, nullable=False) # Ex: 5 (para 5 desafios completados)
+    # SUBSTITUA A LINHA 'icon' PELA LINHA ABAIXO
+    icon = db.Column(db.String(255), nullable=True) # Alterado para guardar o URL da imagem
+    trigger_type = db.Column(db.String(50), nullable=False)
+    trigger_value = db.Column(db.Integer, nullable=False)
 
 class UserAchievement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -1424,6 +1426,53 @@ def admin_paths():
     all_challenges = Challenge.query.all()
     return render_template('admin_paths.html', paths=all_paths, challenges=all_challenges)
 
+@app.route('/admin/paths/edit/<int:path_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_path(path_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    path_to_edit = LearningPath.query.get_or_404(path_id)
+
+    if request.method == 'POST':
+        path_to_edit.name = request.form.get('name')
+        path_to_edit.description = request.form.get('description')
+        path_to_edit.reward_points = request.form.get('reward_points', type=int)
+        path_to_edit.is_active = request.form.get('is_active') == 'on'
+        
+        db.session.commit()
+        flash('Trilha de aprendizagem atualizada com sucesso!', 'success')
+        return redirect(url_for('admin_paths'))
+
+    return render_template('admin_edit_path.html', path=path_to_edit)
+
+@app.route('/admin/paths/delete/<int:path_id>', methods=['POST'])
+@login_required
+def admin_delete_path(path_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    path_to_delete = LearningPath.query.get_or_404(path_id)
+    db.session.delete(path_to_delete)
+    db.session.commit()
+    flash('Trilha de aprendizagem excluída com sucesso!', 'success')
+    return redirect(url_for('admin_paths'))
+
+@app.route('/admin/paths/remove_challenge/<int:path_id>/<int:challenge_id>', methods=['POST'])
+@login_required
+def admin_remove_challenge_from_path(path_id, challenge_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+        
+    path_challenge = PathChallenge.query.filter_by(path_id=path_id, challenge_id=challenge_id).first_or_404()
+    db.session.delete(path_challenge)
+    db.session.commit()
+    flash('Desafio removido da trilha com sucesso!', 'success')
+    return redirect(url_for('admin_paths'))
+
 @app.route('/paths')
 @login_required
 def list_paths():
@@ -1495,12 +1544,22 @@ def admin_achievements():
         icon = request.form.get('icon', 'fas fa-star')
         trigger_type = request.form.get('trigger_type')
         trigger_value = request.form.get('trigger_value', type=int)
-
+        file = request.f
+        
+        # Novo
+    if file and file.filename:
+        try:
+            upload_result = cloudinary.uploader.upload(file)
+            icon_url = upload_result['secure_url']
+        except Exception as e:
+            flash(f'Erro ao fazer upload da imagem: {e}', 'error')
+            return redirect(url_for('admin_achievements'))
+        
         if name and description and trigger_type and trigger_value is not None:
             new_achievement = Achievement(
                 name=name,
                 description=description,
-                icon=icon,
+                icon=icon_url,
                 trigger_type=trigger_type,
                 trigger_value=trigger_value
             )
@@ -1514,6 +1573,44 @@ def admin_achievements():
 
     achievements = Achievement.query.all()
     return render_template('admin_achievements.html', achievements=achievements)
+
+@app.route('/admin/achievements/edit/<int:achievement_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_achievement(achievement_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    achievement_to_edit = Achievement.query.get_or_404(achievement_id)
+
+    if request.method == 'POST':
+        achievement_to_edit.name = request.form.get('name')
+        achievement_to_edit.description = request.form.get('description')
+        achievement_to_edit.icon = request.form.get('icon')
+        achievement_to_edit.trigger_type = request.form.get('trigger_type')
+        achievement_to_edit.trigger_value = request.form.get('trigger_value', type=int)
+        
+        db.session.commit()
+        flash('Conquista atualizada com sucesso!', 'success')
+        return redirect(url_for('admin_achievements'))
+
+    return render_template('admin_edit_achievement.html', achievement=achievement_to_edit)
+
+@app.route('/admin/achievements/delete/<int:achievement_id>', methods=['POST'])
+@login_required
+def admin_delete_achievement(achievement_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    achievement_to_delete = Achievement.query.get_or_404(achievement_id)
+    # Apaga também os registos de quem já ganhou esta conquista
+    UserAchievement.query.filter_by(achievement_id=achievement_id).delete()
+    
+    db.session.delete(achievement_to_delete)
+    db.session.commit()
+    flash('Conquista excluída com sucesso!', 'success')
+    return redirect(url_for('admin_achievements'))
 
 @app.route('/admin/bossfights', methods=['GET', 'POST'])
 @login_required
@@ -1560,7 +1657,62 @@ def admin_boss_fights():
     all_boss_fights = BossFight.query.all()
     return render_template('admin_boss_fights.html', boss_fights=all_boss_fights)
 
+@app.route('/admin/bossfights/edit/<int:boss_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_boss_fight(boss_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    boss_to_edit = BossFight.query.get_or_404(boss_id)
+
+    if request.method == 'POST':
+        boss_to_edit.name = request.form.get('name')
+        boss_to_edit.description = request.form.get('description')
+        boss_to_edit.reward_points = request.form.get('reward_points', type=int)
+        boss_to_edit.is_active = request.form.get('is_active') == 'on'
+        
+        db.session.commit()
+        flash('Boss Fight atualizado com sucesso!', 'success')
+        return redirect(url_for('admin_boss_fights'))
+
+    return render_template('admin_edit_boss_fight.html', boss=boss_to_edit)
+
+@app.route('/admin/bossfights/delete/<int:boss_id>', methods=['POST'])
+@login_required
+def admin_delete_boss_fight(boss_id):
+    if not current_user.is_admin:
+        return redirect(url_for('index'))
+    boss = BossFight.query.get_or_404(boss_id)
+    # Apaga em cascata: stages, steps e progressos serão apagados por causa da configuração do modelo
+    db.session.delete(boss)
+    db.session.commit()
+    flash('Boss Fight excluído com sucesso!', 'success')
+    return redirect(url_for('admin_boss_fights'))
+
+@app.route('/admin/bossfights/stage/delete/<int:stage_id>', methods=['POST'])
+@login_required
+def admin_delete_boss_stage(stage_id):
+    if not current_user.is_admin:
+        return redirect(url_for('index'))
+    stage = BossFightStage.query.get_or_404(stage_id)
+    db.session.delete(stage)
+    db.session.commit()
+    flash('Etapa excluída com sucesso!', 'success')
+    return redirect(url_for('admin_boss_fights'))
+
+@app.route('/admin/bossfights/step/delete/<int:step_id>', methods=['POST'])
+@login_required
+def admin_delete_boss_step(step_id):
+    if not current_user.is_admin:
+        return redirect(url_for('index'))
+    step = BossFightStep.query.get_or_404(step_id)
+    db.session.delete(step)
+    db.session.commit()
+    flash('Tarefa excluída com sucesso!', 'success')
+    return redirect(url_for('admin_boss_fights'))
 @app.route('/bossfights')
+
 @login_required
 def list_boss_fights():
     if not current_user.team:
@@ -1611,6 +1763,37 @@ def submit_boss_step(step_id):
         
     return redirect(url_for('view_boss_fight', boss_id=boss.id))
 
+@app.route('/admin/challenges/edit/<int:challenge_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_challenge(challenge_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    challenge_to_edit = Challenge.query.get_or_404(challenge_id)
+    all_levels = Level.query.order_by(Level.min_points).all()
+    all_faqs = FAQ.query.order_by(FAQ.question).all()
+
+    if request.method == 'POST':
+        challenge_to_edit.title = request.form.get('title')
+        challenge_to_edit.description = request.form.get('description')
+        challenge_to_edit.level_required = request.form.get('level_required')
+        challenge_to_edit.points_reward = request.form.get('points_reward', type=int)
+        challenge_to_edit.expected_answer = request.form.get('expected_answer')
+        challenge_to_edit.is_team_challenge = request.form.get('is_team_challenge') == 'on'
+        challenge_to_edit.hint = request.form.get('hint')
+        challenge_to_edit.hint_cost = request.form.get('hint_cost', type=int)
+        
+        db.session.commit()
+        flash('Desafio atualizado com sucesso!', 'success')
+        return redirect(url_for('admin_challenges'))
+
+    return render_template('admin_edit_challenge.html', 
+                            challenge=challenge_to_edit, 
+                            levels=all_levels, 
+                            faqs=all_faqs)
+    
+   
 # Comando CLI para criar administrador
 @click.command(name='create-admin')
 @with_appcontext

@@ -81,6 +81,7 @@
                                 <td class="p-3">{{ challenge.title }}</td>
                                 <td class="p-3">{{ challenge.level_required }}</td>
                                 <td class="p-3">{{ challenge.points_reward }}</td>
+                                <td class="p-3 flex space-x-4"> <a href="{{ url_for('admin_edit_challenge', challenge_id=challenge.id) }}" class="text-blue-500 hover:underline">Editar</a>
                                 <td class="p-3">
                                     <form method="POST" action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" onsubmit="return confirm('Tem a certeza que quer excluir este desafio?');">
                                         <button type="submit" class="text-red-500 hover:underline">Excluir</button>

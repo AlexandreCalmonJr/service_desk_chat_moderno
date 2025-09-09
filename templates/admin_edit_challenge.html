@@ -1,0 +1,56 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Editar Desafio - Service Desk{% endblock %}
+{% block page_title %}Editar Desafio: {{ challenge.title }}{% endblock %}
+
+{% block content %}
+<div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md max-w-lg mx-auto">
+    <form method="POST" action="{{ url_for('admin_edit_challenge', challenge_id=challenge.id) }}">
+        <div class="mb-4">
+            <label for="title" class="block text-sm font-medium">Título</label>
+            <input type="text" id="title" name="title" value="{{ challenge.title }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+        </div>
+        <div class="mb-4">
+            <label for="description" class="block text-sm font-medium">Descrição</label>
+            <textarea id="description" name="description" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>{{ challenge.description }}</textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+                <label for="level_required" class="block text-sm font-medium">Nível Requerido</label>
+                <select id="level_required" name="level_required" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                    {% for level in levels %}
+                        <option value="{{ level.name }}" {% if level.name == challenge.level_required %}selected{% endif %}>{{ level.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="points_reward" class="block text-sm font-medium">Pontos de Recompensa</label>
+                <input type="number" id="points_reward" name="points_reward" value="{{ challenge.points_reward }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+            </div>
+        </div>
+        <div class="mb-4">
+            <label for="expected_answer" class="block text-sm font-medium">Resposta Esperada</label>
+            <input type="text" id="expected_answer" name="expected_answer" value="{{ challenge.expected_answer }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+        </div>
+        <div class="mb-4">
+            <label for="hint" class="block text-sm font-medium">Dica (Opcional)</label>
+            <textarea id="hint" name="hint" rows="2" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600">{{ challenge.hint or '' }}</textarea>
+        </div>
+        <div class="mb-4">
+            <label for="hint_cost" class="block text-sm font-medium">Custo da Dica</label>
+            <input type="number" id="hint_cost" name="hint_cost" value="{{ challenge.hint_cost }}" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600">
+        </div>
+        <div class="mb-4">
+            <label for="is_team_challenge" class="flex items-center">
+                <input type="checkbox" id="is_team_challenge" name="is_team_challenge" class="h-4 w-4 text-blue-600 border-gray-300 rounded" {% if challenge.is_team_challenge %}checked{% endif %}>
+                <span class="ml-2 text-sm">Este é um desafio exclusivo para times</span>
+            </label>
+        </div>
+
+        <div class="flex justify-end space-x-4">
+            <a href="{{ url_for('admin_challenges') }}" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition">Cancelar</a>
+            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">Salvar Alterações</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

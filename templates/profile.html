@@ -66,8 +66,14 @@
                 <h3 class="text-xl font-bold mb-4">Minhas Conquistas ({{ current_user.achievements|length }})</h3>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {% for user_achievement in current_user.achievements %}
-                        <div class="text-center p-4 bg-gray-100 dark:bg-gray-700/50 rounded-lg" title="{{ user_achievement.achievement.description }}">
-                            <i class="{{ user_achievement.achievement.icon }} fa-3x text-yellow-500"></i>
+                        <div class="text-center p-4" title="{{ user_achievement.achievement.description }}">
+                            {% if user_achievement.achievement.icon %}
+                                <img src="{{ user_achievement.achievement.icon }}" alt="{{ user_achievement.achievement.name }}" class="w-16 h-16 rounded-full mx-auto object-cover transition-transform duration-300 hover:scale-110">
+                            {% else %}
+                                <div class="w-16 h-16 rounded-full mx-auto bg-gray-700 flex items-center justify-center">
+                                    <i class="fas fa-star fa-2x text-yellow-500"></i>
+                                </div>
+                            {% endif %}
                             <p class="mt-2 text-sm font-semibold">{{ user_achievement.achievement.name }}</p>
                         </div>
                     {% else %}
