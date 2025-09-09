@@ -203,6 +203,23 @@ class UserPathProgress(db.Model):
     user = db.relationship('User')
     path = db.relationship('LearningPath')
 
+class Achievement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    icon = db.Column(db.String(100), default='fas fa-star') # Ícone do FontAwesome
+    trigger_type = db.Column(db.String(50), nullable=False) # Ex: 'challenges_completed', 'first_login'
+    trigger_value = db.Column(db.Integer, nullable=False) # Ex: 5 (para 5 desafios completados)
+
+class UserAchievement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    achievement_id = db.Column(db.Integer, db.ForeignKey('achievement.id'), nullable=False)
+    earned_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='achievements')
+    achievement = db.relationship('Achievement')
+
 # Constante de níveis
 LEVELS = {
     'Iniciante': {'min_points': 0, 'insignia': '🌱'},
