@@ -1,60 +1,81 @@
 {% extends "base_user.html" %}
 
-{% block title %}Meu Perfil - Service Desk{% endblock %}
+{% block title %}Meu Perfil e Conquistas - Service Desk{% endblock %}
 
 {% block content %}
-<div class="w-full max-w-lg p-8 space-y-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
-    
-    <form method="POST" action="{{ url_for('profile') }}" enctype="multipart/form-data" class="space-y-6">
+<div class="w-full max-w-4xl mx-auto space-y-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        <div class="text-center">
-            <div class="relative w-32 h-32 mx-auto">
-                {% if current_user.avatar_url %}
-                    <img src="{{ current_user.avatar_url }}" alt="Avatar do Utilizador" class="w-32 h-32 rounded-full object-cover border-4 border-blue-500 shadow-md">
-                {% else %}
-                    <div class="w-32 h-32 rounded-full bg-gray-700 flex items-center justify-center text-5xl text-white border-4 border-blue-500 shadow-md">
-                        {{ current_user.name[0]|upper }}
+        <div class="lg:col-span-1 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl h-fit">
+            <form method="POST" action="{{ url_for('profile') }}" enctype="multipart/form-data" class="space-y-6">
+                <div class="text-center">
+                    <div class="relative w-24 h-24 mx-auto">
+                        {% if current_user.avatar_url %}
+                            <img src="{{ current_user.avatar_url }}" alt="Avatar do Utilizador" class="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md">
+                        {% else %}
+                            <div class="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-4xl text-white border-4 border-blue-500 shadow-md">
+                                {{ current_user.name[0]|upper }}
+                            </div>
+                        {% endif %}
+                        <label for="avatar" class="absolute bottom-0 right-0 bg-gray-900 p-2 rounded-full cursor-pointer hover:bg-gray-700 transition" title="Mudar avatar">
+                            <i class="fas fa-camera text-white"></i>
+                            <input type="file" id="avatar" name="avatar" class="hidden" accept="image/*">
+                        </label>
                     </div>
-                {% endif %}
-                <label for="avatar" class="absolute bottom-1 right-1 bg-gray-900 p-2 rounded-full cursor-pointer hover:bg-gray-700 transition" title="Mudar avatar">
-                    <i class="fas fa-camera text-white"></i>
-                    <input type="file" id="avatar" name="avatar" class="hidden" accept="image/*">
-                </label>
-            </div>
-            <h2 class="mt-4 text-3xl font-bold text-gray-900 dark:text-white">{{ current_user.name }}</h2>
-            <p class="text-gray-500 dark:text-gray-400">{{ current_user.email }}</p>
+                    <h2 class="mt-4 text-2xl font-bold text-gray-900 dark:text-white">{{ current_user.name }}</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ current_user.email }}</p>
+                </div>
+
+                <div class="space-y-4 pt-4 border-t dark:border-gray-700">
+                    <div>
+                        <label for="phone" class="block text-sm font-medium text-gray-500 dark:text-gray-400">Telefone</label>
+                        <input type="text" id="phone" name="phone" value="{{ current_user.phone or '' }}" class="mt-1 block w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="O seu contacto telefónico">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-2 px-4 rounded-lg font-medium text-white bg-green-600 hover:bg-green-700 transition">
+                    Salvar Alterações
+                </button>
+            </form>
         </div>
 
-        <div class="space-y-4 pt-6 border-t dark:border-gray-700">
-            <div>
-                <label for="phone" class="block text-sm font-medium text-gray-500 dark:text-gray-400">Telefone</label>
-                <input type="text" id="phone" name="phone" value="{{ current_user.phone or '' }}" class="mt-1 block w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="O seu contacto telefónico">
+        <div class="lg:col-span-2 space-y-8">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
+                 <h3 class="text-xl font-bold mb-4">Estatísticas</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Nível</label>
+                        <p class="text-2xl font-bold">{{ current_user.level.name if current_user.level else 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Pontos</label>
+                        <p class="text-2xl font-bold">{{ current_user.points }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Time</label>
+                        {% if current_user.team %}
+                            <p class="text-xl font-bold">{{ current_user.team.name }}</p>
+                        {% else %}
+                            <a href="{{ url_for('teams_list') }}" class="text-sm text-blue-500 hover:underline mt-2 inline-block">Junte-se a um time!</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
+                <h3 class="text-xl font-bold mb-4">Minhas Conquistas ({{ current_user.achievements|length }})</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {% for user_achievement in current_user.achievements %}
+                        <div class="text-center p-4 bg-gray-100 dark:bg-gray-700/50 rounded-lg" title="{{ user_achievement.achievement.description }}">
+                            <i class="{{ user_achievement.achievement.icon }} fa-3x text-yellow-500"></i>
+                            <p class="mt-2 text-sm font-semibold">{{ user_achievement.achievement.name }}</p>
+                        </div>
+                    {% else %}
+                        <p class="col-span-full text-center text-gray-500 dark:text-gray-400">Continue a participar para desbloquear a sua primeira conquista!</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t dark:border-gray-700 text-center">
-            <div>
-                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Nível</label>
-                <p class="text-lg font-semibold">{{ current_user.level.name if current_user.level else 'N/A' }}</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Pontos</label>
-                <p class="text-lg font-semibold">{{ current_user.points }}</p>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Time</label>
-                {% if current_user.team %}
-                    <p class="text-lg font-semibold">{{ current_user.team.name }}</p>
-                {% else %}
-                    <a href="{{ url_for('teams_list') }}" class="text-sm text-blue-500 hover:underline">Junte-se a um time!</a>
-                {% endif %}
-            </div>
-        </div>
-
-        <button type="submit" class="w-full py-3 px-4 border border-transparent rounded-lg shadow-sm font-medium text-white bg-green-600 hover:bg-green-700 transition">
-            Salvar Alterações
-        </button>
-
-    </form>
+    </div>
 </div>
 {% endblock %}

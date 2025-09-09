@@ -1,0 +1,71 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Admin - Conquistas - Service Desk{% endblock %}
+{% block page_title %}Gerenciar Conquistas{% endblock %}
+
+{% block content %}
+    <div class="mb-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+        <h2 class="text-xl font-semibold mb-4">Criar Nova Conquista</h2>
+        <form method="POST" action="{{ url_for('admin_achievements') }}">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="name" class="block text-sm font-medium">Nome da Conquista</label>
+                    <input type="text" id="name" name="name" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                </div>
+                <div>
+                    <label for="icon" class="block text-sm font-medium">Ícone (FontAwesome)</label>
+                    <input type="text" id="icon" name="icon" value="fas fa-star" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                </div>
+            </div>
+            <div class="mt-4">
+                <label for="description" class="block text-sm font-medium">Descrição</label>
+                <textarea id="description" name="description" rows="2" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                    <label for="trigger_type" class="block text-sm font-medium">Tipo de Gatilho</label>
+                    <select id="trigger_type" name="trigger_type" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                        <option value="challenges_completed">Nº de Desafios Completados</option>
+                        <option value="points_earned">Nº de Pontos Ganhos</option>
+                        <option value="paths_completed">Nº de Trilhas Completadas</option>
+                        <option value="first_team_join">Entrar num Time</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="trigger_value" class="block text-sm font-medium">Valor para Ativar</label>
+                    <input type="number" id="trigger_value" name="trigger_value" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+                    <p class="text-xs text-gray-500 mt-1">Ex: 10 (para 10 desafios). Para 'Entrar num Time', use 1.</p>
+                </div>
+            </div>
+            <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Criar Conquista</button>
+        </form>
+    </div>
+
+    <div>
+        <h2 class="text-xl font-semibold mb-4">Conquistas Criadas</h2>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-200 dark:bg-gray-700">
+                            <th class="p-3 text-left">Ícone</th>
+                            <th class="p-3 text-left">Nome</th>
+                            <th class="p-3 text-left">Descrição</th>
+                            <th class="p-3 text-left">Gatilho</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for achievement in achievements %}
+                        <tr class="border-b dark:border-gray-600">
+                            <td class="p-3 text-center"><i class="{{ achievement.icon }} fa-2x text-yellow-500"></i></td>
+                            <td class="p-3 font-bold">{{ achievement.name }}</td>
+                            <td class="p-3">{{ achievement.description }}</td>
+                            <td class="p-3 font-mono text-sm">{{ achievement.trigger_type }} ({{ achievement.trigger_value }})</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

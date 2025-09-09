@@ -431,6 +431,45 @@ def update_user_level(user):
         user.level_id = new_level.id
         flash(f'Subiu de nível! Você agora é {new_level.name}!', 'success')
 
+# Adicione esta nova função de ajuda ao seu app.py
+
+def check_and_award_achievements(user):
+    # Busca todas as conquistas que o utilizador ainda não ganhou
+    user_achievements_ids = {ua.achievement_id for ua in user.achievements}
+    potential_achievements = Achievement.query.filter(Achievement.id.notin_(user_achievements_ids)).all()
+
+    if not potential_achievements:
+        return # Não há novas conquistas para verificar
+
+    # Obtém as estatísticas atuais do utilizador
+    challenges_completed_count = len(user.completed_challenges)
+    paths_completed_count = UserPathProgress.query.filter_by(user_id=user.id).count()
+    
+    for achievement in potential_achievements:
+        unlocked = False
+        if achievement.trigger_type == 'challenges_completed':
+            if challenges_completed_count >= achievement.trigger_value:
+                unlocked = True
+        
+        elif achievement.trigger_type == 'points_earned':
+            if user.points >= achievement.trigger_value:
+                unlocked = True
+
+        elif achievement.trigger_type == 'paths_completed':
+            if paths_completed_count >= achievement.trigger_value:
+                unlocked = True
+        
+        elif achievement.trigger_type == 'first_team_join':
+            if user.team_id is not None and achievement.trigger_value == 1:
+                unlocked = True
+        
+        if unlocked:
+            # Atribui a conquista ao utilizador
+            user_achievement = UserAchievement(user_id=user.id, achievement_id=achievement.id)
+            db.session.add(user_achievement)
+            flash(f'Nova Conquista Desbloqueada: {achievement.name}!', 'success')
+            # O commit será feito na rota que chamou esta função
+
 # Context processors
 @app.context_processor
 def inject_user_gamification_data():
@@ -892,6 +931,8 @@ def check_and_complete_paths(user, completed_challenge_id):
             user.points += path.reward_points
             progress = UserPathProgress(user_id=user.id, path_id=path.id)
             db.session.add(progress)
+            db.session.commit()
+            check_and_award_achievements(user)
             flash(f'Trilha "{path.name}" concluída! Você ganhou {path.reward_points} pontos de bónus!', 'success')
 
 @app.route('/challenges/submit/<int:challenge_id>', methods=['POST'])
@@ -915,6 +956,8 @@ def submit_challenge(challenge_id):
             # Atualiza o nível do utilizador por último
             update_user_level(current_user)
             db.session.commit()
+            check_and_award_achievements(current_user)
+            db.session.commit() 
         else:
             flash('Você já completou este desafio.', 'info')
     else:
@@ -965,6 +1008,8 @@ def join_team(team_id):
 
     team_to_join = Team.query.get_or_404(team_id)
     current_user.team = team_to_join
+    db.session.commit()
+    check_and_award_achievements(current_user)
     db.session.commit()
     flash(f'Você entrou no time "{team_to_join.name}"!', 'success')
     return redirect(url_for('teams_list'))
@@ -1316,6 +1361,39 @@ def kick_from_team(user_id):
         flash('Este utilizador não faz parte do seu time.', 'error')
         
     return redirect(url_for('manage_team'))
+
+@app.route('/admin/achievements', methods=['GET', 'POST'])
+@login_required
+def admin_achievements():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        icon = request.form.get('icon', 'fas fa-star')
+        trigger_type = request.form.get('trigger_type')
+        trigger_value = request.form.get('trigger_value', type=int)
+
+        if name and description and trigger_type and trigger_value is not None:
+            new_achievement = Achievement(
+                name=name,
+                description=description,
+                icon=icon,
+                trigger_type=trigger_type,
+                trigger_value=trigger_value
+            )
+            db.session.add(new_achievement)
+            db.session.commit()
+            flash('Conquista criada com sucesso!', 'success')
+        else:
+            flash('Erro ao criar conquista. Verifique os campos.', 'error')
+        
+        return redirect(url_for('admin_achievements'))
+
+    achievements = Achievement.query.all()
+    return render_template('admin_achievements.html', achievements=achievements)
 
 # Comando CLI para criar administrador
 @click.command(name='create-admin')
