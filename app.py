@@ -1582,39 +1582,71 @@ def admin_achievements():
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        name = request.form.get('name')
-        description = request.form.get('description')
-        trigger_type = request.form.get('trigger_type')
-        trigger_value = request.form.get('trigger_value', type=int)
-        
-        # CORREÇÃO: Mover a lógica do ficheiro para dentro do POST
-        file = request.files.get('icon_image')
-        icon_url = None
-        if file and file.filename:
-            try:
-                upload_result = cloudinary.uploader.upload(file)
-                icon_url = upload_result['secure_url']
-            except Exception as e:
-                flash(f'Erro ao fazer upload da imagem: {e}', 'error')
+        # Usamos um campo 'action' para diferenciar os formulários
+        action = request.form.get('action')
+
+        if action == 'create_achievement':
+            name = request.form.get('name')
+            description = request.form.get('description')
+            trigger_type = request.form.get('trigger_type')
+            trigger_value = request.form.get('trigger_value', type=int)
+            file = request.files.get('icon_image')
+
+            icon_url = None
+            if file and file.filename:
+                try:
+                    upload_result = cloudinary.uploader.upload(file)
+                    icon_url = upload_result['secure_url']
+                except Exception as e:
+                    flash(f'Erro ao fazer upload da imagem: {e}', 'error')
+                    return redirect(url_for('admin_achievements'))
+
+            if name and description and trigger_type and trigger_value is not None:
+                new_achievement = Achievement(
+                    name=name,
+                    description=description,
+                    icon=icon_url,
+                    trigger_type=trigger_type,
+                    trigger_value=trigger_value
+                )
+                db.session.add(new_achievement)
+                db.session.commit()
+                flash('Conquista criada com sucesso!', 'success')
+            else:
+                flash('Erro ao criar conquista. Verifique os campos.', 'error')
+
+        elif action == 'import_achievements':
+            file = request.files.get('achievement_file')
+            if not file or not file.filename.endswith('.json'):
+                flash('Por favor, envie um ficheiro .json válido.', 'error')
                 return redirect(url_for('admin_achievements'))
 
-        if name and description and trigger_type and trigger_value is not None:
-            new_achievement = Achievement(
-                name=name,
-                description=description,
-                icon=icon_url,
-                trigger_type=trigger_type,
-                trigger_value=trigger_value
-            )
-            db.session.add(new_achievement)
-            db.session.commit()
-            flash('Conquista criada com sucesso!', 'success')
-        else:
-            flash('Erro ao criar conquista. Verifique os campos.', 'error')
+            try:
+                data = json.load(file.stream)
+                count = 0
+                for item in data:
+                    # Verifica se a conquista já existe para evitar duplicados
+                    if item.get('name') and not Achievement.query.filter_by(name=item.get('name')).first():
+                        new_achievement = Achievement(
+                            name=item.get('name'),
+                            description=item.get('description'),
+                            icon=item.get('icon'), # URL da imagem a partir do JSON
+                            trigger_type=item.get('trigger_type'),
+                            trigger_value=item.get('trigger_value')
+                        )
+                        db.session.add(new_achievement)
+                        count += 1
+                
+                db.session.commit()
+                flash(f'{count} novas conquistas importadas com sucesso!', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Ocorreu um erro ao processar o ficheiro JSON: {e}', 'error')
         
         return redirect(url_for('admin_achievements'))
 
-    achievements = Achievement.query.all()
+    # Lógica para o método GET (carregar a página)
+    achievements = Achievement.query.order_by(Achievement.name).all()
     return render_template('admin_achievements.html', achievements=achievements)
 
 @app.route('/admin/daily_challenges')

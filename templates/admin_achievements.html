@@ -101,6 +101,17 @@
                                     <button onclick="saveAchievement({{ achievement.id }})" class="text-green-500 hover:underline">Salvar</button>
                                     <button onclick="cancelEditAchievement({{ achievement.id }})" class="text-gray-500 hover:underline">Cancelar</button>
                                 </div>
+                                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                                    <h2 class="text-xl font-semibold mb-4">Importar Conquistas de Ficheiro</h2>
+                                    <form method="POST" enctype="multipart/form-data">
+                                        <input type="hidden" name="action" value="import_achievements">
+                                        <div class="mb-4">
+                                            <label for="achievement_file" class="block text-sm font-medium">Ficheiro JSON</label>
+                                            <input type="file" id="achievement_file" name="achievement_file" class="w-full mt-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg" accept=".json" required>
+                                        </div>
+                                        <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Importar Conquistas</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
