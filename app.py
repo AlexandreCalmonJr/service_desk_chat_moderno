@@ -953,6 +953,7 @@ def list_challenges():
     if not current_user.level:
         flash('Não foi possível determinar o seu nível. Contate o suporte.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()  # Adicione esta linha para criar o formulário
     completed_challenges_ids = [uc.challenge_id for uc in current_user.completed_challenges]
     user_min_points = current_user.level.min_points
     RequiredLevel = aliased(Level)
@@ -960,7 +961,7 @@ def list_challenges():
     all_challenges_query = all_challenges_query.join(RequiredLevel, Challenge.level_required == RequiredLevel.name)
     unlocked_challenges = all_challenges_query.filter(RequiredLevel.min_points <= user_min_points).all()
     locked_challenges = all_challenges_query.filter(RequiredLevel.min_points > user_min_points).all()
-    return render_template('challenges.html', unlocked_challenges=unlocked_challenges, locked_challenges=locked_challenges)
+    return render_template('challenges.html', unlocked_challenges=unlocked_challenges, locked_challenges=locked_challenges, form=form)
 
 @app.route('/challenges/submit/<int:challenge_id>', methods=['POST'])
 @login_required
