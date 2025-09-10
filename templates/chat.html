@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let botMessage = data.text;
             if (data.state === 'faq_selection' && data.options) {
                 botMessage += '<div class="faq-options">';
-                data.options.forEach(opt => {
+            data.options.forEach(opt => {
                      botMessage += `<button class="faq-option-button" data-faq-id="${opt.id}">${opt.question}</button>`;
                  });
                  botMessage += '</div>';
