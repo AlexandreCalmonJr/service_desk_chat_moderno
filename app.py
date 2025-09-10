@@ -1732,15 +1732,25 @@ def admin_delete_challenge(challenge_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
+    
     form = BaseForm()
     if not form.validate_on_submit():
         flash('Erro de validação CSRF.', 'error')
         return redirect(url_for('admin_challenges'))
+
     challenge = Challenge.query.get_or_404(challenge_id)
+
+    # Apagar todas as dependências antes de apagar o desafio
+    UserChallenge.query.filter_by(challenge_id=challenge.id).delete()
+    PathChallenge.query.filter_by(challenge_id=challenge.id).delete()
+    DailyChallenge.query.filter_by(challenge_id=challenge.id).delete()
+
     db.session.delete(challenge)
     db.session.commit()
-    flash('Desafio excluído com sucesso!', 'success')
+    
+    flash('Desafio e todas as suas referências foram excluídos com sucesso!', 'success')
     return redirect(url_for('admin_challenges'))
+
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')
