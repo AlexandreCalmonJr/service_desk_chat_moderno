@@ -8,16 +8,16 @@
     .chat-container-modern {
         font-family: 'Inter', sans-serif;
         width: 100%;
-        max-width: 700px;
-        margin: 2rem auto;
+        max-width: 800px; /* Largura máxima definida */
+        margin: 2rem auto; /* ALTERAÇÃO: Margem restaurada para centralizar */
         background-color: #ffffff;
         dark:bg-gray-800;
-        border-radius: 1rem;
+        border-radius: 1.5rem;
         box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        height: 80vh; /* Altura ajustável */
+        height: 80vh; /* ALTERAÇÃO: Altura restaurada */
         border: 1px solid #e5e7eb;
     }
     .dark .chat-container-modern {
@@ -338,8 +338,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // Formatação especial para opções de FAQ
             let botMessage = data.text;
             if (data.state === 'faq_selection' && data.options) {
-                botMessage += '<div class="faq-options">';
-            data.options.forEach(opt => {
+                 botMessage += '<div class="faq-options">';
+                 data.options.forEach(opt => {
                      botMessage += `<button class="faq-option-button" data-faq-id="${opt.id}">${opt.question}</button>`;
                  });
                  botMessage += '</div>';
@@ -387,3 +387,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+

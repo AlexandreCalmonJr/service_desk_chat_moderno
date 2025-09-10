@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class=""> <!-- Classe inicial para o tema, pode ser 'dark' -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,10 +8,13 @@
     <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    {% block head_extra %}{% endblock %}
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col min-h-screen">
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col min-h-screen font-sans">
 
-    <header class="fixed top-0 left-0 right-0 z-10 bg-gray-900/50 backdrop-blur-lg border-b border-gray-700/50 p-4 flex justify-between items-center text-white">
+    <!-- Header Principal -->
+    <header class="fixed top-0 left-0 right-0 z-20 bg-gray-900/60 backdrop-blur-lg border-b border-gray-700/50 p-4 flex justify-between items-center text-white">
+        <!-- Logo e Info do Usuário -->
         <div class="flex items-center space-x-4">
             <a href="{{ url_for('index') }}" class="text-xl font-bold hover:text-gray-300 transition">Assistente de Service Desk</a>
             <div class="text-sm text-gray-400 hidden lg:flex items-center space-x-2">
@@ -24,58 +27,67 @@
                     {% endif %}
                 {% endif %}
                 <span>{{ current_user.name }}!</span>
-                <div class="w-24 bg-gray-700 rounded-full h-2.5 ml-2">
-                    <div class="bg-blue-500 h-2.5 rounded-full" style="width: {{ progress.percentage }}%" title="{{ progress.percentage|round(1) }}%"></div>
+                <div class="w-24 bg-gray-700 rounded-full h-2.5 ml-2" title="{{ progress.percentage|round(1) }}%">
+                    <div class="bg-blue-500 h-2.5 rounded-full" style="width: {{ progress.percentage }}%"></div>
                 </div>
             </div>
         </div>
 
-        <div class="hidden md:flex items-center space-x-2">
-            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-md">Ranking</a>
-            <a href="{{ url_for('list_paths') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-blue-500 transition">Trilhas</a>
-            <a href="{{ url_for('list_boss_fights') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-red-500 transition">Boss Fights</a>
-
+        <!-- Menu Desktop -->
+        <nav class="hidden md:flex items-center space-x-2">
+            <a href="{{ url_for('list_challenges') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-gray-700 transition">Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-gray-700 transition">Times</a>
+            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-gray-700 transition">Ranking</a>
+            <a href="{{ url_for('list_paths') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-gray-700 transition">Trilhas</a>
+            <a href="{{ url_for('list_boss_fights') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-gray-700 transition">Boss Fights</a>
             
+            <div class="w-px h-6 bg-gray-700 mx-2"></div> <!-- Divisor -->
+
             {% if current_user.is_admin %}
                 <a href="{{ url_for('admin_dashboard') }}" class="text-sm px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition shadow-md">Painel Admin</a>
             {% endif %}
 
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition shadow-md">Perfil</a>
+            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition">Perfil</a>
             <a href="{{ url_for('logout') }}" class="text-sm px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition shadow-md">Sair</a>
-            <button id="theme-toggle" title="Alternar tema" class="w-10 h-10 flex items-center justify-center bg-gray-700 rounded-lg hover:bg-gray-600 transition shadow-md">
+            <button id="theme-toggle" title="Alternar tema" class="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-lg hover:bg-gray-700 transition shadow-md">
                 <i class="fas fa-moon"></i>
             </button>
-        </div>
+        </nav>
 
+        <!-- Botão do Menu Mobile -->
         <div class="md:hidden flex items-center">
-            <button id="menu-button" class="text-white focus:outline-none"><i class="fas fa-bars fa-lg"></i></button>
+            <button id="menu-button" class="text-white focus:outline-none z-30">
+                <i class="fas fa-bars fa-lg"></i>
+            </button>
         </div>
     </header>
     
-    <div id="mobile-menu" class="hidden md:hidden bg-gray-800 shadow-lg fixed top-16 right-4 rounded-lg p-4 z-20 w-48 text-white">
-        <div class="flex flex-col space-y-3">
-            <a href="{{ url_for('list_challenges') }}" class="hover:text-blue-400">Desafios</a>
-            <a href="{{ url_for('teams_list') }}" class="hover:text-blue-400">Times</a>
-            <a href="{{ url_for('ranking') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-blue-500 transition">Ranking</a>
-            <a href="{{ url_for('list_paths') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-blue-500 transition">Trilhas</a>
-            <a href="{{ url_for('list_boss_fights') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-red-500 transition">Boss Fights</a>
+    <!-- Painel do Menu Mobile -->
+    <div id="mobile-menu" class="fixed top-0 right-0 h-full w-64 bg-gray-900/80 backdrop-blur-lg shadow-lg z-20 transform translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="flex flex-col p-6 space-y-4 mt-16 text-white">
+            <a href="{{ url_for('list_challenges') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition"><i class="fas fa-gamepad w-6 text-center mr-3"></i>Desafios</a>
+            <a href="{{ url_for('teams_list') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition"><i class="fas fa-users w-6 text-center mr-3"></i>Times</a>
+            <a href="{{ url_for('ranking') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition"><i class="fas fa-trophy w-6 text-center mr-3"></i>Ranking</a>
+            <a href="{{ url_for('list_paths') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition"><i class="fas fa-route w-6 text-center mr-3"></i>Trilhas</a>
+            <a href="{{ url_for('list_boss_fights') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition"><i class="fas fa-skull-crossbones w-6 text-center mr-3"></i>Boss Fights</a>
+            
+            <div class="border-t border-gray-700 my-4"></div>
 
-            <a href="{{ url_for('profile') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-gray-600 transition">Perfil</a>
+            <a href="{{ url_for('profile') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition"><i class="fas fa-user-circle w-6 text-center mr-3"></i>Perfil</a>
             
             {% if current_user.is_admin %}
-                <div class="border-t border-gray-700 pt-3 mt-2">
-                    <a href="{{ url_for('admin_dashboard') }}" class="hover:text-purple-400">Painel Admin</a>
-                </div>
+                <a href="{{ url_for('admin_dashboard') }}" class="flex items-center p-3 rounded-lg bg-purple-600 hover:bg-purple-500 transition"><i class="fas fa-cogs w-6 text-center mr-3"></i>Painel Admin</a>
             {% endif %}
 
-            <div class="border-t border-gray-700 pt-3 mt-2">
-                <a href="{{ url_for('logout') }}" class="text-red-500 hover:text-red-400">Sair</a>
-            </div>
+            <div class="border-t border-gray-700 my-4"></div>
+
+            <a href="{{ url_for('logout') }}" class="flex items-center p-3 rounded-lg text-red-400 hover:bg-red-500 hover:text-white transition"><i class="fas fa-sign-out-alt w-6 text-center mr-3"></i>Sair</a>
         </div>
     </div>
     
+    <!-- Overlay do Menu Mobile -->
+    <div id="mobile-menu-overlay" class="fixed inset-0 bg-black/60 z-10 hidden"></div>
+
     <main class="flex-1 flex flex-col items-center pt-24 pb-4 px-4 w-full">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -93,33 +105,79 @@
     </main>
 
     <script>
-        // Script para o menu mobile
-        const menuButton = document.getElementById('menu-button');
-        const mobileMenu = document.getElementById('mobile-menu');
-        if (menuButton) {
-            menuButton.onclick = function() {
-                mobileMenu.classList.toggle('hidden');
+        document.addEventListener('DOMContentLoaded', () => {
+            // Lógica do Menu Mobile
+            const menuButton = document.getElementById('menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuOverlay = document.getElementById('mobile-menu-overlay');
+            const menuIcon = menuButton.querySelector('i');
+
+            const closeMenu = () => {
+                mobileMenu.classList.add('translate-x-full');
+                menuOverlay.classList.add('hidden');
+                menuIcon.classList.remove('fa-times');
+                menuIcon.classList.add('fa-bars');
             };
-        }
 
-        // Script para alternar o tema
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) {
-            const themeIcon = themeToggle.querySelector('i');
-            themeToggle.onclick = function() {
-                document.body.classList.toggle('dark');
-                const isDarkMode = document.body.classList.contains('dark');
-                if (isDarkMode) {
-                    themeIcon.classList.remove('fa-moon');
-                    themeIcon.classList.add('fa-sun');
-                } else {
-                    themeIcon.classList.remove('fa-sun');
-                    themeIcon.classList.add('fa-moon');
-                }
+            const openMenu = () => {
+                mobileMenu.classList.remove('translate-x-full');
+                menuOverlay.classList.remove('hidden');
+                menuIcon.classList.remove('fa-bars');
+                menuIcon.classList.add('fa-times');
+            };
+
+            if (menuButton) {
+                menuButton.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Impede que o clique no botão se propague
+                    if (mobileMenu.classList.contains('translate-x-full')) {
+                        openMenu();
+                    } else {
+                        closeMenu();
+                    }
+                });
             }
-        }
-    </script>
 
+            if (menuOverlay) {
+                menuOverlay.addEventListener('click', closeMenu);
+            }
+
+            // Lógica do Tema
+            const themeToggle = document.getElementById('theme-toggle');
+            if (themeToggle) {
+                const themeIcon = themeToggle.querySelector('i');
+                const userPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const savedTheme = localStorage.getItem('theme');
+
+                const updateTheme = (isDark) => {
+                    if (isDark) {
+                        document.documentElement.classList.add('dark');
+                        themeIcon.classList.remove('fa-moon');
+                        themeIcon.classList.add('fa-sun');
+                        localStorage.setItem('theme', 'dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                        themeIcon.classList.remove('fa-sun');
+                        themeIcon.classList.add('fa-moon');
+                        localStorage.setItem('theme', 'light');
+                    }
+                };
+
+                // Define o tema inicial
+                if (savedTheme) {
+                    updateTheme(savedTheme === 'dark');
+                } else {
+                    updateTheme(userPrefersDark);
+                }
+
+                themeToggle.addEventListener('click', () => {
+                    updateTheme(!document.documentElement.classList.contains('dark'));
+                });
+            }
+        });
+    </script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
+
+
+

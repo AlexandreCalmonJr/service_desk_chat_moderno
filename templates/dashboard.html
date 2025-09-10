@@ -23,8 +23,9 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
+        <!-- Coluna da Esquerda (Perfil e Progresso) -->
         <div class="lg:col-span-1 space-y-8">
-            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg text-center">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg text-center">
                 {% if current_user.avatar_url %}
                     <img src="{{ current_user.avatar_url }}" alt="Avatar" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-blue-500">
                 {% else %}
@@ -36,7 +37,7 @@
                 <p class="text-gray-500 dark:text-gray-400">Bem-vindo(a) de volta!</p>
             </div>
 
-            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
                 <h3 class="text-lg font-semibold mb-4">Meu Progresso</h3>
                 <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
                     <span>Nível: {{ current_user.level.name if current_user.level }}</span>
@@ -57,7 +58,75 @@
             </div>
         </div>
 
-        <div class="lg:col-span-2">
+        <!-- Coluna da Direita (Chat) -->
+        <div class="lg:col-span-2 h-[80vh] min-h-[600px]">
+            {% include 'chat.html' %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% extends "base_user.html" %}
+
+{% block title %}Meu Dashboard - Service Desk{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-7xl mx-auto">
+
+    {% if daily_challenge %}
+    <div class="mb-8 bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-6 rounded-2xl shadow-lg text-center">
+        <h2 class="text-2xl font-bold">🔥 Desafio do Dia! 🔥</h2>
+        <p class="mt-2">Complete o desafio abaixo hoje e ganhe <strong class="font-bold">{{ daily_challenge.bonus_points }} pontos de bónus!</strong></p>
+        <div class="mt-4 bg-white/20 p-4 rounded-lg inline-block">
+            <p class="font-semibold text-lg">{{ daily_challenge.challenge.title }}</p>
+            <p class="text-sm">{{ daily_challenge.challenge.description }}</p>
+        </div>
+        <div class="mt-4">
+            <a href="{{ url_for('list_challenges') }}" class="px-6 py-3 bg-white text-gray-900 font-bold rounded-lg hover:bg-gray-200 transition">
+                Ir para Desafios
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Coluna da Esquerda (Perfil e Progresso) -->
+        <div class="lg:col-span-1 space-y-8">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg text-center">
+                {% if current_user.avatar_url %}
+                    <img src="{{ current_user.avatar_url }}" alt="Avatar" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-blue-500">
+                {% else %}
+                    <div class="w-24 h-24 rounded-full mx-auto mb-4 bg-gray-700 flex items-center justify-center text-4xl text-white">
+                        {{ current_user.name[0]|upper }}
+                    </div>
+                {% endif %}
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Olá, {{ current_user.name }}!</h2>
+                <p class="text-gray-500 dark:text-gray-400">Bem-vindo(a) de volta!</p>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
+                <h3 class="text-lg font-semibold mb-4">Meu Progresso</h3>
+                <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    <span>Nível: {{ current_user.level.name if current_user.level }}</span>
+                    <span>{{ current_user.points }} Pontos</span>
+                </div>
+                {% if progress %}
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                    <div class="bg-blue-600 h-4 rounded-full" style="width: {{ progress.percentage }}%"></div>
+                </div>
+                <div class="text-xs text-right mt-1 text-gray-500 dark:text-gray-400">
+                    {% if progress.next_level_points %}
+                        Próximo nível em {{ progress.next_level_points - current_user.points }} pontos
+                    {% else %}
+                        Nível Máximo Atingido!
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Coluna da Direita (Chat) -->
+        <div class="lg:col-span-2 h-[80vh] min-h-[600px]">
             {% include 'chat.html' %}
         </div>
     </div>
