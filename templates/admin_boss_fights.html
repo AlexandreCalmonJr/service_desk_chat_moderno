@@ -4,48 +4,50 @@
 {% block page_title %}Gerenciar Boss Fights{% endblock %}
 
 {% block content %}
-    <div class="mb-8">
-        <h2 class="text-2xl font-bold mb-4">Criar Novo Boss Fight</h2>
+<div class="space-y-8">
+    <!-- Formulário de Criação -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Criar Novo Boss Fight</h2>
         <form method="POST" action="{{ url_for('admin_boss_fights') }}" enctype="multipart/form-data" class="space-y-4">
             {{ form.csrf_token }}
             <input type="hidden" name="action" value="create_boss">
             <div>
-                <label for="name" class="block text-gray-700">Nome do Boss Fight</label>
-                <input type="text" id="name" name="name" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+                <label for="name" class="block text-gray-700 dark:text-gray-300">Nome do Boss Fight</label>
+                <input type="text" id="name" name="name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
             </div>
             <div>
-                <label for="description" class="block text-gray-700">Descrição</label>
-                <textarea id="description" name="description" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required></textarea>
+                <label for="description" class="block text-gray-700 dark:text-gray-300">Descrição</label>
+                <textarea id="description" name="description" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required></textarea>
             </div>
             <div>
-                <label for="reward_points" class="block text-gray-700">Recompensa (por membro)</label>
-                <input type="number" id="reward_points" name="reward_points" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+                <label for="reward_points" class="block text-gray-700 dark:text-gray-300">Recompensa (por membro)</label>
+                <input type="number" id="reward_points" name="reward_points" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
             </div>
             <div>
-                <label for="boss_image" class="block text-gray-700">Imagem do Boss (Opcional)</label>
-                <input type="file" id="boss_image" name="boss_image" accept="image/*" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300">
+                <label for="boss_image" class="block text-gray-700 dark:text-gray-300">Imagem do Boss (Opcional)</label>
+                <input type="file" id="boss_image" name="boss_image" accept="image/*" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md">
             </div>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Criar Boss Fight</button>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">Criar Boss Fight</button>
         </form>
     </div>
 
-    <div>
-        <h2 class="text-2xl font-bold mb-4">Gerir Boss Fights Existentes</h2>
+    <!-- Gerenciamento dos Bosses Existentes -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Gerir Boss Fights Existentes</h2>
         <div class="space-y-6">
             {% for boss in boss_fights %}
-                <div class="border p-4 rounded">
-                    <div>
-                        <h3 class="text-lg font-semibold">{{ boss.name }}</h3>
-                        <p>{{ boss.description }}</p>
-                        <p>Recompensa: {{ boss.reward_points }} pontos por membro</p>
-                        <p>Status: {% if boss.is_active %}Ativo{% else %}Inativo{% endif %}</p>
-                        <div class="mt-2">
-                            <a href="{{ url_for('admin_edit_boss_fight', boss_id=boss.id) }}" class="text-blue-500 hover:underline">Editar</a>
-                            <form method="POST" action="{{ url_for('admin_delete_boss_fight', boss_id=boss.id) }}" class="inline">
-                                {{ form.csrf_token }}
-                                <button type="submit" class="text-red-500 hover:underline ml-4">Excluir</button>
-                            </form>
-                        </div>
+                <div class="border border-gray-200 dark:border-gray-700 p-4 rounded-lg">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ boss.name }}</h3>
+                    <p class="text-gray-600 dark:text-gray-400">Recompensa: {{ boss.reward_points }} pontos por membro</p>
+                    <p class="text-gray-600 dark:text-gray-400">Status: {% if boss.is_active %}Ativo{% else %}Inativo{% endif %}</p>
+                    
+                    <!-- Ações -->
+                    <div class="mt-4 flex gap-4">
+                        <a href="{{ url_for('admin_edit_boss_fight', boss_id=boss.id) }}" class="text-blue-500 dark:text-blue-400 hover:underline">Editar</a>
+                        <form method="POST" action="{{ url_for('admin_delete_boss_fight', boss_id=boss.id) }}" class="inline">
+                            {{ form.csrf_token }}
+                            <button type="submit" class="text-red-500 dark:text-red-400 hover:underline">Excluir</button>
+                        </form>
                     </div>
 
                     <form method="POST" action="{{ url_for('admin_edit_boss_fight', boss_id=boss.id) }}" enctype="multipart/form-data" class="mt-4 space-y-4">

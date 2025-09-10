@@ -4,29 +4,31 @@
 {% block page_title %}Histórico de Desafios Diários{% endblock %}
 
 {% block content %}
-    <div>
-        <p class="mb-4">Esta página mostra o histórico de desafios que foram selecionados automaticamente pelo sistema a cada dia.</p>
-        <table class="w-full border-collapse">
-            <thead>
-                <tr class="bg-gray-100">
-                    <th class="border p-2">Data</th>
-                    <th class="border p-2">Desafio Selecionado</th>
-                    <th class="border p-2">Bónus de Pontos</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in history %}
-                    <tr>
-                        <td class="border p-2">{{ item.day.strftime('%d/%m/%Y') }}</td>
-                        <td class="border p-2">{{ item.challenge.title }}</td>
-                        <td class="border p-2">{{ item.bonus_points }}</td>
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <p class="mb-4 text-gray-600 dark:text-gray-400">Esta página mostra o histórico de desafios que foram selecionados automaticamente pelo sistema a cada dia.</p>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+                <thead>
+                    <tr class="bg-gray-100 dark:bg-gray-700">
+                        <th class="border-b dark:border-gray-600 p-3">Data</th>
+                        <th class="border-b dark:border-gray-600 p-3">Desafio Selecionado</th>
+                        <th class="border-b dark:border-gray-600 p-3">Bónus de Pontos</th>
                     </tr>
-                {% else %}
-                    <tr>
-                        <td class="border p-2" colspan="3">Nenhum desafio diário foi gerado ainda.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for item in history %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="p-3">{{ item.day.strftime('%d/%m/%Y') }}</td>
+                            <td class="p-3">{{ item.challenge.title }}</td>
+                            <td class="p-3">{{ item.bonus_points }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td class="p-3 text-center" colspan="3">Nenhum desafio diário foi gerado ainda.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 {% endblock %}

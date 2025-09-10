@@ -4,58 +4,68 @@
 {% block page_title %}Gerenciar Usuários{% endblock %}
 
 {% block content %}
-    <div>
-        <table class="w-full border-collapse">
-            <thead>
-                <tr class="bg-gray-100">
-                    <th class="border p-2">Nome</th>
-                    <th class="border p-2">Email</th>
-                    <th class="border p-2">Nível</th>
-                    <th class="border p-2">Admin</th>
-                    <th class="border p-2">Ações</th>
-                    <th class="border p-2">Código de Convite</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                    <tr>
-                        <td class="border p-2">{{ user.name }}</td>
-                        <td class="border p-2">{{ user.email }}</td>
-                        <td class="border p-2">
-                            {% if user.level and user.level.insignia %}
-                                {% if 'cloudinary' in user.level.insignia %}
-                                    <img src="{{ user.level.insignia }}" alt="Insígnia" class="w-6 h-6 inline-block">
-                                {% else %}
-                                    {{ user.level.insignia }}
-                                {% endif %}
-                                {{ user.level.name if user.level else 'N/A' }}
-                            {% endif %}
-                        </td>
-                        <td class="border p-2">{{ 'Sim' if user.is_admin else 'Não' }}</td>
-                        <td class="border p-2">
-                            {% if user.id != current_user.id %}
-                                <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}" class="inline">
-                                    {{ form.csrf_token }}
-                                    <button type="submit" class="text-blue-500 hover:underline">
-                                        {{ 'Remover Admin' if user.is_admin else 'Tornar Admin' }}
-                                    </button>
-                                </form>
-                            {% endif %}
-                        </td>
-                        <td class="border p-2">
-                            <form method="POST" action="{{ url_for('generate_invitation') }}" class="inline" onsubmit="return handleGenerateCode(event, {{ user.id }})">
-                                {{ form.csrf_token }}
-                                <input type="hidden" name="user_id" value="{{ user.id }}">
-                                <button type="submit" class="text-blue-500 hover:underline">Gerar Código</button>
-                            </form>
-                            <span id="invitation-code-{{ user.id }}" class="ml-2"></span>
-                        </td>
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Gerar Código de Convite Avulso</h2>
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <form method="POST" action="{{ url_for('generate_invitation') }}" class="inline" onsubmit="return handleGenerateSingleCode(event)">
+                {{ form.csrf_token }}
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">
+                    Gerar Novo Código
+                </button>
+            </form>
+            <div class="mt-4">
+                <span class="font-semibold text-gray-700 dark:text-gray-300">Código Gerado:</span>
+                <span id="single-invitation-code" class="ml-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-900 dark:text-gray-100"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lista de Usuários</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+                <thead>
+                    <tr class="bg-gray-100 dark:bg-gray-700">
+                        <th class="border-b dark:border-gray-600 p-3">Nome</th>
+                        <th class="border-b dark:border-gray-600 p-3">Email</th>
+                        <th class="border-b dark:border-gray-600 p-3">Nível</th>
+                        <th class="border-b dark:border-gray-600 p-3">Admin</th>
+                        <th class="border-b dark:border-gray-600 p-3">Ações</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for user in users %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="p-3">{{ user.name }}</td>
+                            <td class="p-3">{{ user.email }}</td>
+                            <td class="p-3">
+                                {% if user.level and user.level.insignia %}
+                                    {% if 'cloudinary' in user.level.insignia %}
+                                        <img src="{{ user.level.insignia }}" alt="Insígnia" class="w-6 h-6 inline-block">
+                                    {% else %}
+                                        <span class="text-xl">{{ user.level.insignia }}</span>
+                                    {% endif %}
+                                    {{ user.level.name if user.level else 'N/A' }}
+                                {% endif %}
+                            </td>
+                            <td class="p-3">{{ 'Sim' if user.is_admin else 'Não' }}</td>
+                            <td class="p-3">
+                                {% if user.id != current_user.id %}
+                                    <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}" class="inline">
+                                        {{ form.csrf_token }}
+                                        <button type="submit" class="text-blue-500 dark:text-blue-400 hover:underline">
+                                            {{ 'Remover Admin' if user.is_admin else 'Tornar Admin' }}
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         <script>
-            async function handleGenerateCode(event, userId) {
+            async function handleGenerateSingleCode(event) {
                 event.preventDefault();
                 const form = event.target;
                 const response = await fetch(form.action, {
@@ -63,10 +73,11 @@
                     body: new FormData(form)
                 });
                 const data = await response.json();
+                const codeSpan = document.getElementById('single-invitation-code');
                 if (data.code) {
-                    document.getElementById(`invitation-code-${userId}`).textContent = data.code;
+                    codeSpan.textContent = data.code;
                 } else {
-                    alert('Erro ao gerar código de convite.');
+                    codeSpan.textContent = data.error || 'Erro ao gerar código.';
                 }
                 return false;
             }

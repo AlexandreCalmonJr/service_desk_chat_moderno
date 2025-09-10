@@ -23,6 +23,7 @@ import random
 from flask_wtf import FlaskForm
 from wtforms import HiddenField
 import uuid
+import io
 
 app = Flask(__name__)
 
@@ -540,9 +541,8 @@ def admin_users():
     if not current_user.is_admin:
         flash('Acesso negado. Apenas administradores podem acessar esta página.', 'error')
         return redirect(url_for('index'))
-    form = BaseForm()  # Cria uma instância do formulário
+    form = BaseForm()
     all_users = User.query.order_by(User.name).all()
-    # Passa o objeto do formulário para o template
     return render_template('admin_users.html', users=all_users, form=form)
 
 @app.route('/ranking')
@@ -733,23 +733,26 @@ def register():
         invitation.used_by_user_id = user.id
         db.session.add(user)
         db.session.commit()
-        flash('Registro concluído! Faça login.', 'success')
-        return redirect(url_for('login'))
+        login_user(user) # Log in the user after registration
+        invitation.used_by_user_id = user.id
+        db.session.commit()
+        flash('Registro concluído! Bem-vindo.', 'success')
+        return redirect(url_for('index'))
     return render_template('register.html', form=form)
 
 @app.route('/generate_invitation', methods=['POST'])
 @login_required
 def generate_invitation():
     if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
+        return jsonify({'error': 'Acesso negado.'}), 403
+    
     form = BaseForm()
     if not form.validate_on_submit():
-        flash('Erro de validação CSRF.', 'error')
-        return redirect(url_for('admin_users'))
-    user_id = request.form.get('user_id')
+        return jsonify({'error': 'Erro de validação CSRF.'}), 400
+
     code = generate_invitation_code()
     return jsonify({'code': code})
+
 
 @app.route('/logout')
 @login_required

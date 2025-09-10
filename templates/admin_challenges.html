@@ -4,111 +4,74 @@
 {% block page_title %}Gerenciar Desafios{% endblock %}
 
 {% block content %}
-    <div class="mb-8">
-        <h2 class="text-2xl font-bold mb-4">Adicionar Novo Desafio</h2>
+<div class="space-y-8">
+    <!-- Formulário de Adição -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Adicionar Novo Desafio</h2>
         <form method="POST" action="{{ url_for('admin_challenges') }}" enctype="multipart/form-data" class="space-y-4">
             {{ form.csrf_token }}
             <input type="hidden" name="action" value="create_challenge">
             <div>
-                <label for="title" class="block text-gray-700">Título</label>
-                <input type="text" id="title" name="title" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+                <label for="title" class="block text-gray-700 dark:text-gray-300">Título</label>
+                <input type="text" id="title" name="title" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
             </div>
             <div>
-                <label for="description" class="block text-gray-700">Descrição</label>
-                <textarea id="description" name="description" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required></textarea>
+                <label for="description" class="block text-gray-700 dark:text-gray-300">Descrição</label>
+                <textarea id="description" name="description" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required></textarea>
             </div>
             <div>
-                <label for="level_required" class="block text-gray-700">Nível Requerido</label>
-                <select id="level_required" name="level_required" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+                <label for="level_required" class="block text-gray-700 dark:text-gray-300">Nível Requerido</label>
+                <select id="level_required" name="level_required" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
                     {% for level in levels %}
                         <option value="{{ level.name }}">{{ level.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div>
-                <label for="points_reward" class="block text-gray-700">Pontos</label>
-                <input type="number" id="points_reward" name="points_reward" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+                <label for="points_reward" class="block text-gray-700 dark:text-gray-300">Pontos</label>
+                <input type="number" id="points_reward" name="points_reward" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
             </div>
             <div>
-                <label for="expected_answer" class="block text-gray-700">Resposta Esperada</label>
-                <input type="text" id="expected_answer" name="expected_answer" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+                <label for="expected_answer" class="block text-gray-700 dark:text-gray-300">Resposta Esperada</label>
+                <input type="text" id="expected_answer" name="expected_answer" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
             </div>
-            <div>
-                <label for="hint" class="block text-gray-700">Dica (Opcional)</label>
-                <textarea id="hint" name="hint" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300"></textarea>
+            <div class="flex items-center">
+                <input type="checkbox" name="is_team_challenge" id="is_team_challenge" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <label for="is_team_challenge" class="ml-2 block text-gray-700 dark:text-gray-300">Este é um desafio de time</label>
             </div>
-            <div>
-                <label for="hint_cost" class="block text-gray-700">Custo da Dica</label>
-                <input type="number" id="hint_cost" name="hint_cost" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" value="5">
-            </div>
-            <div>
-                <label class="inline-flex items-center">
-                    <input type="checkbox" name="is_team_challenge" class="form-checkbox">
-                    <span class="ml-2 text-gray-700">Este é um desafio de time</span>
-                </label>
-            </div>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Adicionar Desafio</button>
-        </form>
-
-        <h3 class="text-xl font-semibold mt-6 mb-4">Importar Desafios</h3>
-        <form method="POST" action="{{ url_for('admin_challenges') }}" enctype="multipart/form-data" class="space-y-4">
-            {{ form.csrf_token }}
-            <input type="hidden" name="action" value="import_challenges">
-            <div>
-                <label for="challenge_file" class="block text-gray-700">Ficheiro JSON</label>
-                <input type="file" id="challenge_file" name="challenge_file" accept=".json" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
-            </div>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Importar de Ficheiro</button>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">Adicionar Desafio</button>
         </form>
     </div>
 
-    <div>
-        <h2 class="text-2xl font-bold mb-4">Lista de Desafios</h2>
-        <table class="w-full border-collapse">
-            <thead>
-                <tr class="bg-gray-100">
-                    <th class="border p-2">Título</th>
-                    <th class="border p-2">Nível</th>
-                    <th class="border p-2">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for challenge in challenges %}
-                    <tr>
-                        <td class="border p-2">
-                            <span class="display">{{ challenge.title }}</span>
-                            <input type="text" name="title" value="{{ challenge.title }}" class="edit hidden w-full px-2 py-1 border rounded">
-                        </td>
-                        <td class="border p-2">
-                            <span class="display">{{ challenge.level_required }}</span>
-                            <select name="level_required" class="edit hidden w-full px-2 py-1 border rounded">
-                                {% for level in levels %}
-                                    <option value="{{ level.name }}" {% if challenge.level_required == level.name %}selected{% endif %}>{{ level.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                        <td class="border p-2">
-                            <form method="POST" action="{{ url_for('admin_edit_challenge', challenge_id=challenge.id) }}" class="inline">
-                                {{ form.csrf_token }}
-                                <button type="button" onclick="toggleEdit(this)" class="text-blue-500 hover:underline">Editar</button>
-                                <button type="submit" class="edit hidden text-green-500 hover:underline">Salvar</button>
-                                <button type="button" onclick="toggleEdit(this)" class="edit hidden text-gray-500 hover:underline">Cancelar</button>
-                            </form>
-                            <form method="POST" action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" class="inline">
-                                {{ form.csrf_token }}
-                                <button type="submit" class="text-red-500 hover:underline">Excluir</button>
-                            </form>
-                        </td>
+    <!-- Tabela de Desafios -->
+    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lista de Desafios</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-left">
+                <thead>
+                    <tr class="bg-gray-100 dark:bg-gray-700">
+                        <th class="border-b dark:border-gray-600 p-3">Título</th>
+                        <th class="border-b dark:border-gray-600 p-3">Nível</th>
+                        <th class="border-b dark:border-gray-600 p-3">Ações</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <script>
-            function toggleEdit(button) {
-                const row = button.closest('tr');
-                row.querySelectorAll('.display').forEach(el => el.classList.toggle('hidden'));
-                row.querySelectorAll('.edit').forEach(el => el.classList.toggle('hidden'));
-            }
-        </script>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for challenge in challenges %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="p-3">{{ challenge.title }}</td>
+                            <td class="p-3">{{ challenge.level_required }}</td>
+                            <td class="p-3">
+                                <a href="#" class="text-blue-500 dark:text-blue-400 hover:underline">Editar</a>
+                                <form method="POST" action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" class="inline ml-4">
+                                    {{ form.csrf_token }}
+                                    <button type="submit" class="text-red-500 dark:text-red-400 hover:underline">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+</div>
 {% endblock %}
