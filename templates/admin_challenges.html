@@ -1,77 +1,139 @@
 {% extends "admin_base.html" %}
 
-{% block title %}Admin - Desafios - Service Desk{% endblock %}
-{% block page_title %}Gerenciar Desafios{% endblock %}
+{% block title %}Admin: Gerenciar Desafios{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
-    <!-- Formulário de Adição -->
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Adicionar Novo Desafio</h2>
-        <form method="POST" action="{{ url_for('admin_challenges') }}" enctype="multipart/form-data" class="space-y-4">
-            {{ form.csrf_token }}
-            <input type="hidden" name="action" value="create_challenge">
-            <div>
-                <label for="title" class="block text-gray-700 dark:text-gray-300">Título</label>
-                <input type="text" id="title" name="title" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
-            </div>
-            <div>
-                <label for="description" class="block text-gray-700 dark:text-gray-300">Descrição</label>
-                <textarea id="description" name="description" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required></textarea>
-            </div>
-            <div>
-                <label for="level_required" class="block text-gray-700 dark:text-gray-300">Nível Requerido</label>
-                <select id="level_required" name="level_required" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
-                    {% for level in levels %}
-                        <option value="{{ level.name }}">{{ level.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="points_reward" class="block text-gray-700 dark:text-gray-300">Pontos</label>
-                <input type="number" id="points_reward" name="points_reward" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
-            </div>
-            <div>
-                <label for="expected_answer" class="block text-gray-700 dark:text-gray-300">Resposta Esperada</label>
-                <input type="text" id="expected_answer" name="expected_answer" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md" required>
-            </div>
-            <div class="flex items-center">
-                <input type="checkbox" name="is_team_challenge" id="is_team_challenge" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                <label for="is_team_challenge" class="ml-2 block text-gray-700 dark:text-gray-300">Este é um desafio de time</label>
-            </div>
-            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">Adicionar Desafio</button>
-        </form>
-    </div>
+<div class="container mx-auto px-4 py-8 text-gray-800 dark:text-gray-200">
+    <h1 class="text-3xl font-bold mb-6 border-b border-gray-300 dark:border-gray-600 pb-2">Gerenciar Desafios</h1>
 
-    <!-- Tabela de Desafios -->
-    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lista de Desafios</h2>
-        <div class="overflow-x-auto">
-            <table class="w-full border-collapse text-left">
-                <thead>
-                    <tr class="bg-gray-100 dark:bg-gray-700">
-                        <th class="border-b dark:border-gray-600 p-3">Título</th>
-                        <th class="border-b dark:border-gray-600 p-3">Nível</th>
-                        <th class="border-b dark:border-gray-600 p-3">Ações</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                    {% for challenge in challenges %}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="p-3">{{ challenge.title }}</td>
-                            <td class="p-3">{{ challenge.level_required }}</td>
-                            <td class="p-3">
-                                <a href="#" class="text-blue-500 dark:text-blue-400 hover:underline">Editar</a>
-                                <form method="POST" action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" class="inline ml-4">
-                                    {{ form.csrf_token }}
-                                    <button type="submit" class="text-red-500 dark:text-red-400 hover:underline">Excluir</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- Mensagens Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="p-4 mb-4 text-sm rounded-lg {% if category == 'error' %} bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 {% elif category == 'success' %} bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200 {% else %} bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 {% endif %}" role="alert">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Coluna de Criação -->
+        <div class="lg:col-span-1">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4">Criar Novo Desafio</h2>
+                <form action="{{ url_for('admin_challenges') }}" method="POST">
+                    {{ form.csrf_token }}
+                    <div class="space-y-4">
+                        <div>
+                            <label for="title" class="block text-sm font-medium">Título</label>
+                            <input type="text" id="title" name="title" required class="mt-1 block w-full input">
+                        </div>
+                        <div>
+                            <label for="description" class="block text-sm font-medium">Descrição</label>
+                            <textarea id="description" name="description" rows="4" required class="mt-1 block w-full input"></textarea>
+                        </div>
+                        <div>
+                            <label for="level_required" class="block text-sm font-medium">Nível Requerido</label>
+                            <select id="level_required" name="level_required" class="mt-1 block w-full input">
+                                {% for level in levels %}
+                                <option value="{{ level.name }}">{{ level.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="points_reward" class="block text-sm font-medium">Pontos de Recompensa</label>
+                            <input type="number" id="points_reward" name="points_reward" value="10" required class="mt-1 block w-full input">
+                        </div>
+                        
+                        <!-- SELETOR DE TIPO DE DESAFIO -->
+                        <div>
+                            <label for="challenge_type" class="block text-sm font-medium">Tipo de Desafio</label>
+                            <select id="challenge_type" name="challenge_type" class="mt-1 block w-full input">
+                                <option value="text">Texto</option>
+                                <option value="code">Código</option>
+                            </select>
+                        </div>
+
+                        <!-- CAMPOS CONDICIONAIS -->
+                        <div id="text-fields">
+                            <label for="expected_answer_text" class="block text-sm font-medium">Resposta Esperada (Texto)</label>
+                            <input type="text" id="expected_answer_text" name="expected_answer_text" class="mt-1 block w-full input">
+                        </div>
+                        <div id="code-fields" style="display: none;">
+                            <label for="expected_answer_code" class="block text-sm font-medium">Código de Resposta Esperado</label>
+                            <textarea id="expected_answer_code" name="expected_answer_code" rows="6" class="mt-1 block w-full input font-mono"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Este é o código que será usado para comparar com a resposta do usuário.</p>
+                        </div>
+
+                        <div class="flex items-center">
+                            <input type="checkbox" id="is_team_challenge" name="is_team_challenge" class="h-4 w-4 rounded">
+                            <label for="is_team_challenge" class="ml-2 block text-sm">Desafio de Equipe</label>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 transition">Criar Desafio</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Coluna de Listagem -->
+        <div class="lg:col-span-2">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4">Desafios Existentes</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead>
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase">Título</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase">Tipo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase">Nível</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium uppercase">Pontos</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            {% for challenge in challenges %}
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ challenge.title }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-blue-100 text-blue-800' if challenge.challenge_type == 'code' else 'bg-green-100 text-green-800' }}">
+                                        {{ challenge.challenge_type }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ challenge.level_required }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ challenge.points_reward }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <form action="{{ url_for('admin_delete_challenge', challenge_id=challenge.id) }}" method="POST" onsubmit="return confirm('Tem certeza?');" class="inline">
+                                        {{ form.csrf_token }}
+                                        <button type="submit" class="text-red-600 hover:text-red-900">Apagar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('challenge_type').addEventListener('change', function() {
+    if (this.value === 'code') {
+        document.getElementById('code-fields').style.display = 'block';
+        document.getElementById('text-fields').style.display = 'none';
+        document.getElementById('expected_answer_text').required = false;
+        document.getElementById('expected_answer_code').required = true;
+    } else {
+        document.getElementById('code-fields').style.display = 'none';
+        document.getElementById('text-fields').style.display = 'block';
+        document.getElementById('expected_answer_text').required = true;
+        document.getElementById('expected_answer_code').required = false;
+    }
+});
+// Trigger a change event on page load to set the initial state
+document.getElementById('challenge_type').dispatchEvent(new Event('change'));
+</script>
 {% endblock %}

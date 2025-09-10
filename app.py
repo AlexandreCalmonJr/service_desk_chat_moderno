@@ -137,13 +137,19 @@ class Challenge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    expected_answer = db.Column(db.String(500), nullable=False)
+    # expected_answer é usado para desafios de texto
+    expected_answer = db.Column(db.String(500), nullable=True)
     points_reward = db.Column(db.Integer, default=10)
     level_required = db.Column(db.String(50), default='Iniciante')
     is_team_challenge = db.Column(db.Boolean, default=False)
     hint = db.Column(db.Text, nullable=True)
     hint_cost = db.Column(db.Integer, default=5)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Novos campos para desafios de código
+    challenge_type = db.Column(db.String(50), default='text', nullable=False) # 'text' ou 'code'
+    # expected_output é a saída esperada para desafios de código
+    expected_output = db.Column(db.Text, nullable=True)
+
 
 class UserChallenge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -202,7 +208,7 @@ class UserAchievement(db.Model):
 
 class DailyChallenge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    day = db.Column(db.Date, unique=True, nullable=False, default=date.today)  # Corrigido para date.today
+    day = db.Column(db.Date, unique=True, nullable=False, default=date.today)
     challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), nullable=False)
     bonus_points = db.Column(db.Integer, default=20)
     challenge = db.relationship('Challenge')
@@ -730,7 +736,7 @@ def register():
             level_id=initial_level.id
         )
         db.session.add(user)
-        db.session.commit() # Commit inicial para gerar o ID do usuário
+        db.session.commit()
         invitation.used = True
         invitation.used_by_user_id = user.id
         db.session.commit()
@@ -916,7 +922,6 @@ def admin_faq():
                 flash('Por favor, envie um arquivo válido.', 'error')
         return redirect(url_for('admin_faq'))
     
-    # Lógica para GET
     categories = Category.query.all()
     faqs = FAQ.query.order_by(FAQ.category_id, FAQ.question).all()
     return render_template('admin_faq.html', faqs=faqs, categories=categories, form=form)
@@ -962,7 +967,18 @@ def list_challenges():
 def submit_challenge(challenge_id):
     challenge = Challenge.query.get_or_404(challenge_id)
     submitted_answer = request.form.get('answer').strip()
-    if submitted_answer.lower() == challenge.expected_answer.lower():
+    
+    is_correct = False
+    if challenge.challenge_type == 'text':
+        is_correct = (submitted_answer.lower() == challenge.expected_answer.lower())
+    elif challenge.challenge_type == 'code':
+        # Simulação: Normaliza espaços e quebras de linha para uma comparação mais flexível.
+        # Numa aplicação real, você executaria o código e compararia a saída.
+        normalized_submitted = "".join(submitted_answer.split())
+        normalized_expected = "".join(challenge.expected_answer.split())
+        is_correct = (normalized_submitted == normalized_expected)
+
+    if is_correct:
         existing_completion = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=challenge_id).first()
         if not existing_completion:
             current_user.points += challenge.points_reward
@@ -1155,58 +1171,41 @@ def admin_challenges():
         if not form.validate_on_submit():
             flash('Erro de validação CSRF.', 'error')
             return redirect(url_for('admin_challenges'))
-        action = request.form.get('action')
-        if action == 'create_challenge':
-            title = request.form['title']
-            description = request.form['description']
-            level_required = request.form['level_required']
-            points_reward = request.form['points_reward']
-            expected_answer = request.form['expected_answer']
-            hint = request.form.get('hint')
-            hint_cost = request.form.get('hint_cost', 5)
-            is_team_challenge = 'is_team_challenge' in request.form
-            challenge = Challenge(
-                title=title,
-                description=description,
-                level_required=level_required,
-                points_reward=points_reward,
-                expected_answer=expected_answer,
-                hint=hint,
-                hint_cost=hint_cost,
-                is_team_challenge=is_team_challenge
-            )
-            db.session.add(challenge)
-            db.session.commit()
-            flash('Desafio criado com sucesso!', 'success')
-        elif action == 'import_challenges':
-            file = request.files['challenge_file']
-            if file and file.filename.endswith('.json'):
-                try:
-                    data = json.load(file)
-                    for challenge_data in data:
-                        challenge = Challenge(
-                            title=challenge_data['title'],
-                            description=challenge_data['description'],
-                            level_required=challenge_data['level_required'],
-                            points_reward=challenge_data.get('points_reward', 10),
-                            expected_answer=challenge_data['expected_answer'],
-                            hint=challenge_data.get('hint'),
-                            hint_cost=challenge_data.get('hint_cost', 5),
-                            is_team_challenge=challenge_data.get('is_team_challenge', False)
-                        )
-                        db.session.add(challenge)
-                    db.session.commit()
-                    flash('Desafios importados com sucesso!', 'success')
-                except Exception as e:
-                    flash(f'Erro ao importar desafios: {str(e)}', 'error')
-            else:
-                flash('Por favor, envie um arquivo JSON válido.', 'error')
+        
+        title = request.form['title']
+        description = request.form['description']
+        level_required = request.form['level_required']
+        points_reward = request.form['points_reward']
+        hint = request.form.get('hint')
+        hint_cost = request.form.get('hint_cost', 5)
+        is_team_challenge = 'is_team_challenge' in request.form
+        challenge_type = request.form.get('challenge_type', 'text')
+        
+        challenge = Challenge(
+            title=title,
+            description=description,
+            level_required=level_required,
+            points_reward=points_reward,
+            hint=hint,
+            hint_cost=hint_cost,
+            is_team_challenge=is_team_challenge,
+            challenge_type=challenge_type
+        )
+        
+        if challenge_type == 'code':
+            challenge.expected_answer = request.form.get('expected_answer_code') # O código de exemplo
+            challenge.expected_output = request.form.get('expected_output') # A saída que o código deveria gerar
+        else:
+            challenge.expected_answer = request.form.get('expected_answer_text')
+
+        db.session.add(challenge)
+        db.session.commit()
+        flash('Desafio criado com sucesso!', 'success')
         return redirect(url_for('admin_challenges'))
+
     challenges = Challenge.query.all()
     levels = Level.query.all()
-    faqs = FAQ.query.all()
-    challenge_to_edit = None
-    return render_template('admin_challenges.html', challenges=challenges, levels=levels, faqs=faqs, challenge_to_edit=challenge_to_edit, form=form)
+    return render_template('admin_challenges.html', challenges=challenges, levels=levels, form=form)
 
 @app.route('/admin/paths', methods=['GET', 'POST'])
 @login_required
@@ -1245,7 +1244,6 @@ def admin_paths():
 
             path = LearningPath.query.get(path_id)
             if path and step is not None:
-                # Check if challenge is already in the path
                 existing = PathChallenge.query.filter_by(path_id=path_id, challenge_id=challenge_id).first()
                 if not existing:
                     path_challenge = PathChallenge(
@@ -1686,8 +1684,10 @@ def create_admin(name, email, password):
 
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
 with app.app_context():
+    db.create_all()
     initialize_database()
 
 # --- EXECUÇÃO DA APLICAÇÃO ---
 if __name__ == '__main__':
     app.run(debug=True)
+
