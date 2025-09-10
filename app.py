@@ -540,8 +540,10 @@ def admin_users():
     if not current_user.is_admin:
         flash('Acesso negado. Apenas administradores podem acessar esta página.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()  # Cria uma instância do formulário
     all_users = User.query.order_by(User.name).all()
-    return render_template('admin_users.html', users=all_users)
+    # Passa o objeto do formulário para o template
+    return render_template('admin_users.html', users=all_users, form=form)
 
 @app.route('/ranking')
 @login_required
