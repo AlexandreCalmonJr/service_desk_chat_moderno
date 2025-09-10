@@ -729,30 +729,28 @@ def register():
             is_admin=False,
             level_id=initial_level.id
         )
+        db.session.add(user)
+        db.session.commit() # Commit inicial para gerar o ID do usuário
         invitation.used = True
         invitation.used_by_user_id = user.id
-        db.session.add(user)
         db.session.commit()
-        login_user(user) # Log in the user after registration
-        invitation.used_by_user_id = user.id
-        db.session.commit()
-        flash('Registro concluído! Bem-vindo.', 'success')
-        return redirect(url_for('index'))
+        flash('Registro concluído! Faça login.', 'success')
+        return redirect(url_for('login'))
     return render_template('register.html', form=form)
 
 @app.route('/generate_invitation', methods=['POST'])
 @login_required
 def generate_invitation():
     if not current_user.is_admin:
-        return jsonify({'error': 'Acesso negado.'}), 403
-    
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
     form = BaseForm()
     if not form.validate_on_submit():
-        return jsonify({'error': 'Erro de validação CSRF.'}), 400
-
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_users'))
+    user_id = request.form.get('user_id')
     code = generate_invitation_code()
     return jsonify({'code': code})
-
 
 @app.route('/logout')
 @login_required
@@ -917,8 +915,12 @@ def admin_faq():
             else:
                 flash('Por favor, envie um arquivo válido.', 'error')
         return redirect(url_for('admin_faq'))
+    
+    # Lógica para GET
     categories = Category.query.all()
-    return render_template('admin_faq.html', categories=categories, form=form)
+    faqs = FAQ.query.order_by(FAQ.category_id, FAQ.question).all()
+    return render_template('admin_faq.html', faqs=faqs, categories=categories, form=form)
+
 
 @app.route('/admin/export/faqs')
 @login_required
@@ -1490,7 +1492,7 @@ def admin_boss_fights():
             boss_id = request.form['boss_id']
             name = request.form['name']
             order = request.form['order']
-            stage = BossStage(boss_id=boss_id, name=name, order=order)
+            stage = BossFightStage(boss_id=boss_id, name=name, order=order)
             db.session.add(stage)
             db.session.commit()
             flash('Etapa adicionada com sucesso!', 'success')
@@ -1498,7 +1500,7 @@ def admin_boss_fights():
             stage_id = request.form['stage_id']
             description = request.form['description']
             expected_answer = request.form['expected_answer']
-            step = BossStep(
+            step = BossFightStep(
                 stage_id=stage_id,
                 description=description,
                 expected_answer=expected_answer
@@ -1554,7 +1556,7 @@ def admin_delete_boss_stage(stage_id):
     if not form.validate_on_submit():
         flash('Erro de validação CSRF.', 'error')
         return redirect(url_for('admin_boss_fights'))
-    stage = BossStage.query.get_or_404(stage_id)
+    stage = BossFightStage.query.get_or_404(stage_id)
     db.session.delete(stage)
     db.session.commit()
     flash('Etapa excluída com sucesso!', 'success')
@@ -1570,7 +1572,7 @@ def admin_delete_boss_step(step_id):
     if not form.validate_on_submit():
         flash('Erro de validação CSRF.', 'error')
         return redirect(url_for('admin_boss_fights'))
-    step = BossStep.query.get_or_404(step_id)
+    step = BossFightStep.query.get_or_404(step_id)
     db.session.delete(step)
     db.session.commit()
     flash('Tarefa excluída com sucesso!', 'success')
