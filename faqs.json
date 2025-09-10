@@ -1,0 +1,37 @@
+[
+    {
+        "category": "Automation",
+        "question": "O que é uma variável em Python?",
+        "answer": "Uma variável é como uma 'caixa' na memória do computador onde você pode guardar um valor (um número, um texto, etc.) e dar um nome a ela. Por exemplo, `idade = 25` cria uma variável chamada 'idade' e guarda o número 25 nela.",
+        "image_url": "https://placehold.co/400x200/f59e0b/ffffff?text=idade+%3D+25",
+        "video_url": "https://www.youtube.com/watch?v=ZHQLmrOjKgA"
+    },
+    {
+        "category": "Automation",
+        "question": "Qual a diferença entre uma lista e uma tupla em Python?",
+        "answer": "Ambas guardam coleções de itens, mas a principal diferença é que as listas são 'mutáveis' (pode adicionar ou remover itens depois de criadas) e usam parênteses retos `[]`. Tuplas são 'imutáveis' (não pode alterá-las) e usam parênteses `()`. Tuplas são geralmente mais rápidas.",
+        "image_url": null,
+        "video_url": "https://www.youtube.com/watch?v=0zYuLLIzPIQ"
+    },
+    {
+        "category": "Automation",
+        "question": "Como se escreve um comentário em código Python?",
+        "answer": "Para escrever um comentário de uma linha em Python, use o símbolo de cardinal (#). Tudo o que vier depois do # naquela linha será ignorado pelo interpretador. Ex: `# Isto é um comentário.`",
+        "image_url": null,
+        "video_url": "http://youtube.com/watch?v=NttqIkFycb8"
+    },
+    {
+        "category": "Software",
+        "question": "Como instalo o Microsoft Office na minha máquina?",
+        "answer": "Para instalar o Office, acesse o portal da empresa, vá para a seção de downloads de software e siga o guia de instalação para Windows ou macOS. Você precisará de permissões de administrador.",
+        "image_url": "https://placehold.co/400x250/0078D4/ffffff?text=Guia+de+Instalação",
+        "video_url": null
+    },
+    {
+        "category": "Rede",
+        "question": "Como me conectar à VPN da empresa?",
+        "answer": "Abra o cliente VPN (ex: Cisco AnyConnect), digite o endereço do servidor fornecido pelo TI, e use seu utilizador e senha de rede para se conectar.",
+        "image_url": null,
+        "video_url": "https://www.youtube.com/watch?v=examplevideo"
+    }
+]

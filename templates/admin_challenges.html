@@ -18,8 +18,9 @@
     {% endwith %}
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Coluna do Formulário -->
-        <div class="lg:col-span-1">
+        <!-- Coluna do Formulário e Importação -->
+        <div class="lg:col-span-1 space-y-8">
+            <!-- Card de Criação -->
             <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
                 <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Criar Novo Desafio</h2>
                 <form method="POST" action="{{ url_for('admin_challenges') }}" id="createChallengeForm">
@@ -60,22 +61,43 @@
                     
                     <!-- Campo de Resposta para Texto -->
                     <div id="answer-text-group" class="mb-4">
-                        <label for="expected_answer" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">Resposta Esperada (Texto)</label>
-                        <input type="text" id="expected_answer" name="expected_answer" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                        <label for="expected_answer_text" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">Resposta Esperada (Texto)</label>
+                        <input type="text" id="expected_answer_text" name="expected_answer" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
                     </div>
 
-                    <!-- Campo de Resposta para Código -->
-                    <div id="answer-code-group" class="hidden mb-4">
-                        <label for="expected_output" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">Saída Esperada do Código</label>
-                        <textarea id="expected_output" name="expected_output" rows="4" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"></textarea>
+                    <!-- Campos de Resposta para Código -->
+                    <div id="answer-code-group" class="hidden mb-4 space-y-4">
+                         <div>
+                            <label for="expected_answer_code" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">Resposta Esperada (Código)</label>
+                            <textarea id="expected_answer_code" rows="4" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"></textarea>
+                        </div>
+                        <div>
+                            <label for="expected_output" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">Saída Esperada do Código (Texto de ajuda)</label>
+                            <textarea id="expected_output" name="expected_output" rows="2" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"></textarea>
+                        </div>
                     </div>
 
                     <div class="flex items-center mb-4">
                         <input id="is_team_challenge" name="is_team_challenge" type="checkbox" class="w-4 h-4 text-blue-600 bg-gray-100 rounded border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
-                        <label for="is_team_challenge" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">Desafio de Equipe</label>
+                        <label for="is_team_challenge" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">Desafio de Equipa</label>
                     </div>
                     
                     <button type="submit" class="w-full text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Criar Desafio</button>
+                </form>
+            </div>
+            
+            <!-- Card de Importação -->
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Importar Desafios via JSON</h2>
+                <form method="POST" action="{{ url_for('admin_challenges') }}" enctype="multipart/form-data">
+                    {{ form.csrf_token }}
+                    <input type="hidden" name="action" value="import_challenges">
+                    <div class="mb-4">
+                        <label for="challenge_file" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-300">Ficheiro JSON</label>
+                        <input type="file" name="challenge_file" id="challenge_file" required accept=".json" class="block w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">O ficheiro deve conter uma lista de desafios.</p>
+                    </div>
+                    <button type="submit" class="w-full text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Importar Desafios</button>
                 </form>
             </div>
         </div>
@@ -131,20 +153,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const challengeTypeSelect = document.getElementById('challenge_type');
     const textGroup = document.getElementById('answer-text-group');
     const codeGroup = document.getElementById('answer-code-group');
-    const textInput = document.getElementById('expected_answer');
-    const codeInput = document.getElementById('expected_output');
+    
+    const textInput = document.getElementById('expected_answer_text');
+    const codeAnswerInput = document.getElementById('expected_answer_code');
 
     function toggleAnswerFields() {
         if (challengeTypeSelect.value === 'code') {
             textGroup.classList.add('hidden');
             codeGroup.classList.remove('hidden');
+            
+            // Move the 'name' attribute to the code textarea
+            textInput.removeAttribute('name');
+            codeAnswerInput.setAttribute('name', 'expected_answer');
+
             textInput.required = false;
-            codeInput.required = true;
-        } else {
+            codeAnswerInput.required = true;
+        } else { // 'text'
             textGroup.classList.remove('hidden');
             codeGroup.classList.add('hidden');
+            
+            // Move the 'name' attribute to the text input
+            codeAnswerInput.removeAttribute('name');
+            textInput.setAttribute('name', 'expected_answer');
+            
+            codeAnswerInput.required = false;
             textInput.required = true;
-            codeInput.required = false;
         }
     }
 

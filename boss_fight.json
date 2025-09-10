@@ -1,0 +1,51 @@
+{
+    "name": "O Bug Tirano",
+    "description": "Um bug misterioso corrompeu os sistemas centrais! A vossa equipa de elite deve mergulhar no código, identificar e esmagar os erros em cada etapa para restaurar a ordem.",
+    "reward_points": 600,
+    "image_url": "https://placehold.co/600x400/ef4444/ffffff?text=BUG+DETECTED",
+    "is_active": true,
+    "stages": [
+        {
+            "name": "Depuração: Erros de Sintaxe",
+            "order": 1,
+            "steps": [
+                {
+                    "description": "O código 'if x > 5 print(\"Maior\")' tem um erro de sintaxe. Qual é o caracter que falta?",
+                    "expected_answer": ":"
+                },
+                {
+                    "description": "Uma função foi definida como 'def minha funcao():'. Qual é o erro no nome da função?",
+                    "expected_answer": "espaço"
+                }
+            ]
+        },
+        {
+            "name": "Depuração: Erros de Lógica",
+            "order": 2,
+            "steps": [
+                {
+                    "description": "O código 'if a = 10:' tenta comparar 'a' com 10, mas usa o operador errado. Qual é o operador de comparação correto?",
+                    "expected_answer": "=="
+                },
+                {
+                    "description": "Um loop 'for i in range(5):' irá executar quantas vezes?",
+                    "expected_answer": "5"
+                }
+            ]
+        },
+        {
+            "name": "Depuração: O Desafio Final",
+            "order": 3,
+            "steps": [
+                {
+                    "description": "A função `len()` serve para obter o quê de uma lista ou string?",
+                    "expected_answer": "comprimento"
+                },
+                {
+                    "description": "Para adicionar um item ao final de uma lista chamada `minha_lista`, qual método usamos? (ex: minha_lista.metodo(item))",
+                    "expected_answer": "append"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,32 @@
+{
+    "name": "Jornada do Conhecimento Python",
+    "description": "Domine os pilares da programação em Python, desde a sintaxe básica até a manipulação de estruturas de dados.",
+    "reward_points": 200,
+    "is_active": true,
+    "challenges": [
+        {
+            "title": "Olá, Mundo!",
+            "step": 1
+        },
+        {
+            "title": "Verificador de Idade (if/else)",
+            "step": 2
+        },
+        {
+            "title": "Contagem com Loop For",
+            "step": 3
+        },
+        {
+            "title": "Filtrar Números Pares (Listas)",
+            "step": 4
+        },
+        {
+            "title": "Acessar E-mail no Dicionário",
+            "step": 5
+        },
+        {
+            "title": "Verificador de Palíndromo (Strings)",
+            "step": 6
+        }
+    ]
+}

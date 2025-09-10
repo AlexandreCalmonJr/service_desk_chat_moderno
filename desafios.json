@@ -1,0 +1,65 @@
+[
+    {
+        "title": "Olá, Mundo!",
+        "description": "Escreva uma função em Python chamada 'ola_mundo' que use a função print() para exibir a mensagem 'Olá, Mundo!'.",
+        "level_required": "Iniciante",
+        "points_reward": 10,
+        "challenge_type": "code",
+        "expected_answer": "def ola_mundo():\n    print('Olá, Mundo!')",
+        "expected_output": "A saída no console deve ser exatamente: Olá, Mundo!"
+    },
+    {
+        "title": "Verificador de Idade (if/else)",
+        "description": "Escreva uma função 'pode_votar' que recebe uma idade e retorna 'Pode votar' se a idade for 16 ou mais, e 'Não pode votar' caso contrário.",
+        "level_required": "Iniciante",
+        "points_reward": 15,
+        "challenge_type": "code",
+        "expected_answer": "def pode_votar(idade):\n    if idade >= 16:\n        return 'Pode votar'\n    else:\n        return 'Não pode votar'",
+        "expected_output": "Para pode_votar(18) a saída deve ser 'Pode votar'."
+    },
+    {
+        "title": "Cérebro do Computador",
+        "description": "Qual componente de hardware é conhecido como o 'cérebro' do computador?",
+        "level_required": "Iniciante",
+        "points_reward": 10,
+        "challenge_type": "text",
+        "expected_answer": "CPU",
+        "expected_output": null
+    },
+    {
+        "title": "Filtrar Números Pares (Listas)",
+        "description": "Crie uma função 'filtra_pares' que recebe uma lista de números e retorna uma nova lista contendo apenas os números pares.",
+        "level_required": "Básico",
+        "points_reward": 25,
+        "challenge_type": "code",
+        "expected_answer": "def filtra_pares(numeros):\n    return [n for n in numeros if n % 2 == 0]",
+        "expected_output": "Para [1, 2, 3, 4, 5, 6] a saída deve ser [2, 4, 6]."
+    },
+    {
+        "title": "Contagem com Loop For",
+        "description": "Crie uma função 'contagem' que usa um loop 'for' para imprimir os números de 1 a 5, um por linha.",
+        "level_required": "Básico",
+        "points_reward": 20,
+        "challenge_type": "code",
+        "expected_answer": "def contagem():\n    for i in range(1, 6):\n        print(i)",
+        "expected_output": "A saída deve ser os números de 1 a 5 impressos em linhas separadas."
+    },
+    {
+        "title": "Acessar E-mail no Dicionário",
+        "description": "Dado um dicionário de utilizador, crie uma função 'get_email' que retorna o valor associado à chave 'email'.",
+        "level_required": "Intermediário",
+        "points_reward": 30,
+        "challenge_type": "code",
+        "expected_answer": "def get_email(utilizador):\n    return utilizador.get('email')",
+        "expected_output": "Para {'nome': 'Ana', 'email': 'ana@exemplo.com'} a saída deve ser 'ana@exemplo.com'."
+    },
+    {
+        "title": "Verificador de Palíndromo (Strings)",
+        "description": "Escreva uma função 'eh_palindromo' que verifica se uma palavra é um palíndromo (lê-se da mesma forma de trás para a frente), retornando True ou False.",
+        "level_required": "Intermediário",
+        "points_reward": 35,
+        "challenge_type": "code",
+        "expected_answer": "def eh_palindromo(palavra):\n    return palavra.lower() == palavra.lower()[::-1]",
+        "expected_output": "Para 'arara' a saída deve ser True. Para 'python' deve ser False."
+    }
+]
