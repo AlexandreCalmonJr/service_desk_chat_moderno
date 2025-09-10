@@ -1201,6 +1201,65 @@ def admin_challenges():
     challenge_to_edit = None
     return render_template('admin_challenges.html', challenges=challenges, levels=levels, faqs=faqs, challenge_to_edit=challenge_to_edit, form=form)
 
+@app.route('/admin/paths', methods=['GET', 'POST'])
+@login_required
+def admin_paths():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    form = BaseForm()
+    if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('admin_paths'))
+
+        action = request.form.get('action')
+        if action == 'create_path':
+            name = request.form['name']
+            description = request.form.get('description')
+            reward_points = request.form.get('reward_points', 100, type=int)
+            is_active = 'is_active' in request.form
+
+            new_path = LearningPath(
+                name=name,
+                description=description,
+                reward_points=reward_points,
+                is_active=is_active
+            )
+            db.session.add(new_path)
+            db.session.commit()
+            flash('Nova trilha de aprendizagem criada com sucesso!', 'success')
+
+        elif action == 'add_challenge_to_path':
+            path_id = request.form.get('path_id')
+            challenge_id = request.form.get('challenge_id')
+            step = request.form.get('step', type=int)
+
+            path = LearningPath.query.get(path_id)
+            if path and step is not None:
+                # Check if challenge is already in the path
+                existing = PathChallenge.query.filter_by(path_id=path_id, challenge_id=challenge_id).first()
+                if not existing:
+                    path_challenge = PathChallenge(
+                        path_id=path_id,
+                        challenge_id=challenge_id,
+                        step=step
+                    )
+                    db.session.add(path_challenge)
+                    db.session.commit()
+                    flash('Desafio adicionado à trilha com sucesso!', 'success')
+                else:
+                    flash('Este desafio já faz parte desta trilha.', 'warning')
+            else:
+                flash('Falha ao adicionar desafio. Trilha ou passo inválido.', 'error')
+        
+        return redirect(url_for('admin_paths'))
+
+    all_paths = LearningPath.query.all()
+    all_challenges = Challenge.query.all()
+    return render_template('admin_paths.html', paths=all_paths, challenges=all_challenges, form=form)
+
 @app.route('/admin/paths/edit/<int:path_id>', methods=['GET', 'POST'])
 @login_required
 def admin_edit_path(path_id):
