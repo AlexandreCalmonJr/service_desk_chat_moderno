@@ -95,7 +95,7 @@
             <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
                 <h2 class="text-2xl font-semibold mb-4">FAQs Cadastradas</h2>
                 <form action="{{ url_for('delete_multiple_faqs') }}" method="POST" id="bulk-delete-form">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    {{ form.csrf_token }}
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700">
@@ -125,7 +125,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex justify-end items-center space-x-2">
                                         <a href="{{ url_for('faqs', edit=faq.id) }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200">Editar</a>
                                         <form action="{{ url_for('delete_faq', faq_id=faq.id) }}" method="POST" class="inline" onsubmit="return confirm('Tem certeza que deseja apagar esta FAQ?');">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            {{ form.csrf_token }}
                                             <button type="submit" class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200">Apagar</button>
                                         </form>
                                     </td>
