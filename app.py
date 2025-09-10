@@ -20,6 +20,9 @@ import cloudinary.uploader
 import cloudinary.api
 from sqlalchemy import func
 import random
+from flask_wtf import FlaskForm
+from wtforms import HiddenField
+import uuid
 
 app = Flask(__name__)
 
@@ -27,7 +30,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'uma-chave-secreta-padrao-para-desenvolvimento')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///service_desk.db').replace('postgres://', 'postgresql://')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'uploads'  # Adicionado para corrigir erro em /admin/faq
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['WTF_CSRF_ENABLED'] = True
+app.config['WTF_CSRF_SECRET_KEY'] = os.getenv('CSRF_SECRET_KEY', app.config['SECRET_KEY'])
 
 # --- CONFIGURAÇÃO DO CLOUDINARY ---
 cloudinary.config(
@@ -57,6 +62,17 @@ except OSError:
     nlp = spacy.load('pt_core_news_sm')
 
 # --- MODELOS DA BASE DE DADOS ---
+class BaseForm(FlaskForm):
+    csrf_token = HiddenField()
+
+class InvitationCode(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(36), unique=True, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    used_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    used_by_user = db.relationship('User', backref='used_invitation_code')
+
 class Level(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
@@ -260,6 +276,14 @@ def initialize_database():
             db.session.add(category)
     
     db.session.commit()
+    
+def generate_invitation_code():
+    """Gera um código de convite único."""
+    code = str(uuid.uuid4())
+    invitation = InvitationCode(code=code)
+    db.session.add(invitation)
+    db.session.commit()
+    return code
 
 # --- FUNÇÕES DE UTILIDADE ---
 def process_ticket_command(message):
@@ -541,21 +565,20 @@ def ranking():
         monthly_leaders=monthly_leaders,
         weekly_leaders=weekly_leaders
     )
-
-@app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
+@app.route('/toggle_admin/<int:user_id>', methods=['POST'])
 @login_required
 def toggle_admin(user_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    user_to_modify = User.query.get_or_404(user_id)
-    if user_to_modify.id == current_user.id:
-        flash('Você não pode alterar sua própria permissão de administrador.', 'error')
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
         return redirect(url_for('admin_users'))
-    user_to_modify.is_admin = not user_to_modify.is_admin
+    user = User.query.get_or_404(user_id)
+    user.is_admin = not user.is_admin
     db.session.commit()
-    status = "administrador" if user_to_modify.is_admin else "usuário normal"
-    flash(f'O usuário {user_to_modify.name} é agora um {status}.', 'success')
+    flash(f'Usuário {"promovido a admin" if user.is_admin else "removido como admin"} com sucesso!', 'success')
     return redirect(url_for('admin_users'))
 
 @app.route('/chat-page')
@@ -654,7 +677,13 @@ def download(faq_id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    form = BaseForm()
     if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('login'))
         email = request.form['email']
         password = request.form['password']
         user = User.query.filter_by(email=email).first()
@@ -662,18 +691,28 @@ def login():
             user.last_login = datetime.utcnow()
             db.session.commit()
             login_user(user)
-            next_page = request.args.get('next')
             flash('Login realizado com sucesso!', 'success')
-            return redirect(next_page or url_for('index'))
+            return redirect(url_for('index'))
         flash('Email ou senha inválidos.', 'error')
-    return render_template('login.html')
+    return render_template('login.html', form=form)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    form = BaseForm()
     if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('register'))
         name = request.form['name']
         email = request.form['email']
-        password = generate_password_hash(request.form['password'])
+        password = request.form['password']
+        invitation_code = request.form['invitation_code']
+        invitation = InvitationCode.query.filter_by(code=invitation_code, used=False).first()
+        if not invitation:
+            flash('Código de convite inválido ou já utilizado.', 'error')
+            return redirect(url_for('register'))
         if User.query.filter_by(email=email).first():
             flash('Email já registrado.', 'error')
             return redirect(url_for('register'))
@@ -681,12 +720,34 @@ def register():
         if not initial_level:
             flash('Erro de sistema: Nenhum nível inicial encontrado. Contate o administrador.', 'error')
             return redirect(url_for('register'))
-        user = User(name=name, email=email, password=password, is_admin=False, level_id=initial_level.id)
+        user = User(
+            name=name,
+            email=email,
+            password=generate_password_hash(password),
+            is_admin=False,
+            level_id=initial_level.id
+        )
+        invitation.used = True
+        invitation.used_by_user_id = user.id
         db.session.add(user)
         db.session.commit()
         flash('Registro concluído! Faça login.', 'success')
         return redirect(url_for('login'))
-    return render_template('register.html')
+    return render_template('register.html', form=form)
+
+@app.route('/generate_invitation', methods=['POST'])
+@login_required
+def generate_invitation():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_users'))
+    user_id = request.form.get('user_id')
+    code = generate_invitation_code()
+    return jsonify({'code': code})
 
 @app.route('/logout')
 @login_required
@@ -760,89 +821,99 @@ def chat_feedback():
 @login_required
 def admin_faq():
     if not current_user.is_admin:
-        flash('Acesso negado. Apenas administradores podem gerenciar FAQs.', 'error')
+        flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    categories = Category.query.all()
+    form = BaseForm()
     if request.method == 'POST':
-        if 'add_question' in request.form:
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('admin_faq'))
+        action = request.form.get('action')
+        if action == 'create_faq':
             category_id = request.form['category']
             question = request.form['question']
             answer = request.form['answer']
             image_url = request.form.get('image_url')
             video_url = request.form.get('video_url')
             file = request.files.get('file')
-            file_name = file.filename if file else None
-            file_data = file.read() if file else None
-            if category_id and question and answer:
-                faq = FAQ(category_id=category_id, question=question, answer=answer, image_url=image_url, video_url=video_url, file_name=file_name, file_data=file_data)
-                db.session.add(faq)
-                db.session.commit()
-                flash('FAQ adicionada com sucesso!', 'success')
-            else:
-                flash('Preencha todos os campos obrigatórios.', 'error')
-        elif 'import_faqs' in request.form:
+            file_name = None
+            file_data = None
+            if file:
+                file_name = secure_filename(file.filename)
+                file_data = file.read()
+            faq = FAQ(
+                category_id=category_id,
+                question=question,
+                answer=answer,
+                image_url=image_url,
+                video_url=video_url,
+                file_name=file_name,
+                file_data=file_data
+            )
+            db.session.add(faq)
+            db.session.commit()
+            flash('FAQ criada com sucesso!', 'success')
+        elif action == 'import_faqs':
+            category_id = request.form['category_import']
             file = request.files['faq_file']
-            if file and file.filename.endswith(('.json', '.csv', '.pdf')):
-                filename = secure_filename(file.filename)
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)  # Garante que o diretório existe
-                file.save(file_path)
-                try:
-                    if file.filename.endswith('.json'):
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                            if not isinstance(data, list):
-                                flash('Arquivo JSON deve conter uma lista de FAQs.', 'error')
-                                os.remove(file_path)
-                                return redirect(url_for('admin_faq'))
-                            for item in data:
-                                category_name = item.get('category')
-                                question = item.get('question')
-                                answer = item.get('answer', '')
-                                image_url = item.get('image_url')
-                                video_url = item.get('video_url')
-                                file_name = item.get('file_name')
-                                file_data = item.get('file_data', None)
-                                if not category_name or not question:
-                                    flash('Cada FAQ no JSON deve ter "category" e "question".', 'error')
-                                    continue
-                                category = Category.query.filter_by(name=category_name).first()
-                                if not category:
-                                    category = Category(name=category_name)
-                                    db.session.add(category)
-                                    db.session.commit()
-                                faq = FAQ(category_id=category.id, question=question, answer=answer, image_url=image_url, video_url=video_url, file_name=file_name, file_data=file_data)
-                                db.session.add(faq)
-                    elif file.filename.endswith('.csv'):
-                        category_id = request.form['category_import']
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            reader = csv.DictReader(f)
-                            for row in reader:
-                                faq = FAQ(
-                                    category_id=category_id,
-                                    question=row.get('question'),
-                                    answer=row.get('answer', ''),
-                                    image_url=row.get('image_url'),
-                                    video_url=row.get('video_url'),
-                                    file_name=row.get('file_name'),
-                                    file_data=row.get('file_data')
-                                )
-                                db.session.add(faq)
-                    elif file.filename.endswith('.pdf'):
-                        category_id = request.form['category_import']
-                        faqs_extracted = extract_faqs_from_pdf(file_path)
-                        for faq in faqs_extracted:
-                            new_faq = FAQ(category_id=category_id, question=faq['question'], answer=faq['answer'], image_url=None, video_url=None, file_name=None, file_data=None)
-                            db.session.add(new_faq)
-                    db.session.commit()
-                    flash('FAQs importadas com sucesso!', 'success')
-                except Exception as e:
-                    flash(f'Erro ao importar FAQs: {str(e)}', 'error')
-                finally:
-                    os.remove(file_path)
+            if file:
+                if file.filename.endswith('.json'):
+                    try:
+                        data = json.load(file)
+                        for faq_data in data:
+                            faq = FAQ(
+                                category_id=category_id,
+                                question=faq_data['question'],
+                                answer=faq_data['answer'],
+                                image_url=faq_data.get('image_url'),
+                                video_url=faq_data.get('video_url')
+                            )
+                            db.session.add(faq)
+                        db.session.commit()
+                        flash('FAQs importadas com sucesso!', 'success')
+                    except Exception as e:
+                        flash(f'Erro ao importar FAQs: {str(e)}', 'error')
+                elif file.filename.endswith('.csv'):
+                    try:
+                        csv_data = csv.DictReader(file.stream.read().decode('utf-8').splitlines())
+                        for row in csv_data:
+                            faq = FAQ(
+                                category_id=category_id,
+                                question=row['question'],
+                                answer=row['answer'],
+                                image_url=row.get('image_url'),
+                                video_url=row.get('video_url')
+                            )
+                            db.session.add(faq)
+                        db.session.commit()
+                        flash('FAQs importadas com sucesso!', 'success')
+                    except Exception as e:
+                        flash(f'Erro ao importar FAQs: {str(e)}', 'error')
+                elif file.filename.endswith('.pdf'):
+                    try:
+                        pdf = PdfReader(file)
+                        text = ''
+                        for page in pdf.pages:
+                            text += page.extract_text()
+                        doc = nlp(text)
+                        for sent in doc.sents:
+                            faq = FAQ(
+                                category_id=category_id,
+                                question=sent.text[:200],
+                                answer=sent.text
+                            )
+                            db.session.add(faq)
+                        db.session.commit()
+                        flash('FAQs extraídas do PDF com sucesso!', 'success')
+                    except Exception as e:
+                        flash(f'Erro ao importar FAQs do PDF: {str(e)}', 'error')
+                else:
+                    flash('Formato de arquivo não suportado.', 'error')
             else:
-                flash('Formato de arquivo inválido. Use JSON, CSV ou PDF.', 'error')
-    return render_template('admin_faq.html', categories=categories)
+                flash('Por favor, envie um arquivo válido.', 'error')
+        return redirect(url_for('admin_faq'))
+    categories = Category.query.all()
+    return render_template('admin_faq.html', categories=categories, form=form)
 
 @app.route('/admin/export/faqs')
 @login_required
@@ -964,18 +1035,20 @@ def leave_team():
     flash(f'Você saiu da equipe "{team.name}".', 'success')
     return redirect(url_for('teams_list'))
 
-@app.route('/admin/teams/delete/<int:team_id>', methods=['POST'])
+@app.route('/admin/delete_team/<int:team_id>', methods=['POST'])
 @login_required
 def admin_delete_team(team_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    team_to_delete = Team.query.get_or_404(team_id)
-    for member in team_to_delete.members:
-        member.team_id = None
-    db.session.delete(team_to_delete)
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_teams'))
+    team = Team.query.get_or_404(team_id)
+    db.session.delete(team)
     db.session.commit()
-    flash(f'A equipe "{team_to_delete.name}" foi dissolvida com sucesso!', 'success')
+    flash('Time dissolvido com sucesso!', 'success')
     return redirect(url_for('admin_teams'))
 
 @app.route('/admin/dashboard')
@@ -992,28 +1065,30 @@ def admin_dashboard():
     }
     return render_template('admin_dashboard.html', stats=stats)
 
-@app.route('/admin/teams')
+@app.route('/admin/teams', methods=['GET'])
 @login_required
 def admin_teams():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()
     all_teams = Team.query.all()
-    return render_template('admin_teams.html', teams=all_teams)
+    return render_template('admin_teams.html', teams=all_teams, form=form)
 
-@app.route('/admin/levels/delete/<int:level_id>', methods=['POST'])
+@app.route('/admin/delete_level/<int:level_id>', methods=['POST'])
 @login_required
 def admin_delete_level(level_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    level_to_delete = Level.query.get_or_404(level_id)
-    if level_to_delete.users:
-        flash(f'Não é possível excluir o nível "{level_to_delete.name}", pois existem usuários associados a ele.', 'error')
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
         return redirect(url_for('admin_levels'))
-    db.session.delete(level_to_delete)
+    level = Level.query.get_or_404(level_id)
+    db.session.delete(level)
     db.session.commit()
-    flash(f'O nível "{level_to_delete.name}" foi excluído com sucesso!', 'success')
+    flash('Nível excluído com sucesso!', 'success')
     return redirect(url_for('admin_levels'))
 
 @app.route('/admin/levels', methods=['GET', 'POST'])
@@ -1022,36 +1097,45 @@ def admin_levels():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()
     if request.method == 'POST':
-        name = request.form.get('name')
-        min_points = request.form.get('min_points')
-        file = request.files.get('insignia_image')
-        existing_level_name = Level.query.filter_by(name=name).first()
-        if existing_level_name:
-            flash(f'Erro: Já existe um nível com o nome "{name}".', 'error')
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
             return redirect(url_for('admin_levels'))
-        existing_level_points = Level.query.filter_by(min_points=int(min_points)).first()
-        if existing_level_points:
-            flash(f'Erro: Já existe um nível com {min_points} pontos mínimos (Nível: {existing_level_points.name}).', 'error')
-            return redirect(url_for('admin_levels'))
-        insignia_url = None
-        if file and file.filename:
-            try:
-                upload_result = cloudinary.uploader.upload(file)
+        action = request.form.get('action')
+        if action == 'create_level':
+            name = request.form['name']
+            min_points = request.form['min_points']
+            insignia_file = request.files.get('insignia_image')
+            insignia_url = None
+            if insignia_file:
+                upload_result = cloudinary.uploader.upload(insignia_file)
                 insignia_url = upload_result['secure_url']
-            except Exception as e:
-                flash(f'Erro ao fazer upload da imagem: {e}', 'error')
-                return redirect(url_for('admin_levels'))
-        if name and min_points:
-            new_level = Level(name=name, min_points=int(min_points), insignia=insignia_url)
-            db.session.add(new_level)
+            level = Level(name=name, min_points=min_points, insignia=insignia_url)
+            db.session.add(level)
             db.session.commit()
-            flash('Nível adicionado com sucesso!', 'success')
-        else:
-            flash('Nome e pontos mínimos são obrigatórios.', 'error')
+            flash('Nível criado com sucesso!', 'success')
+        elif action == 'import_levels':
+            file = request.files['level_file']
+            if file and file.filename.endswith('.json'):
+                try:
+                    data = json.load(file)
+                    for level_data in data:
+                        level = Level(
+                            name=level_data['name'],
+                            min_points=level_data['min_points'],
+                            insignia=level_data.get('insignia')
+                        )
+                        db.session.add(level)
+                    db.session.commit()
+                    flash('Níveis importados com sucesso!', 'success')
+                except Exception as e:
+                    flash(f'Erro ao importar níveis: {str(e)}', 'error')
+            else:
+                flash('Por favor, envie um arquivo JSON válido.', 'error')
         return redirect(url_for('admin_levels'))
-    levels = Level.query.order_by(Level.min_points).all()
-    return render_template('admin_levels.html', levels=levels)
+    levels = Level.query.all()
+    return render_template('admin_levels.html', levels=levels, form=form)
 
 @app.route('/admin/challenges', methods=['GET', 'POST'])
 @login_required
@@ -1059,143 +1143,127 @@ def admin_challenges():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    challenge_to_edit = None
-    edit_id = request.args.get('edit_id', type=int)
-    if edit_id:
-        challenge_to_edit = Challenge.query.get_or_404(edit_id)
+    form = BaseForm()
     if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('admin_challenges'))
         action = request.form.get('action')
         if action == 'create_challenge':
-            title = request.form.get('title')
-            description = request.form.get('description')
-            level_required = request.form.get('level_required')
-            points_reward = request.form.get('points_reward')
-            expected_answer = request.form.get('expected_answer')
-            is_team_challenge = request.form.get('is_team_challenge') == 'on'
+            title = request.form['title']
+            description = request.form['description']
+            level_required = request.form['level_required']
+            points_reward = request.form['points_reward']
+            expected_answer = request.form['expected_answer']
             hint = request.form.get('hint')
-            hint_cost = request.form.get('hint_cost', 5, type=int)
-            if title and description and level_required and points_reward and expected_answer:
-                new_challenge = Challenge(
-                    title=title,
-                    description=description,
-                    level_required=level_required,
-                    points_reward=int(points_reward),
-                    expected_answer=expected_answer,
-                    is_team_challenge=is_team_challenge,
-                    hint=hint,
-                    hint_cost=hint_cost
-                )
-                db.session.add(new_challenge)
-                db.session.commit()
-                flash('Desafio adicionado com sucesso!', 'success')
-            else:
-                flash('Todos os campos obrigatórios devem ser preenchidos.', 'error')
+            hint_cost = request.form.get('hint_cost', 5)
+            is_team_challenge = 'is_team_challenge' in request.form
+            challenge = Challenge(
+                title=title,
+                description=description,
+                level_required=level_required,
+                points_reward=points_reward,
+                expected_answer=expected_answer,
+                hint=hint,
+                hint_cost=hint_cost,
+                is_team_challenge=is_team_challenge
+            )
+            db.session.add(challenge)
+            db.session.commit()
+            flash('Desafio criado com sucesso!', 'success')
         elif action == 'import_challenges':
-            file = request.files.get('challenge_file')
-            if not file or not file.filename.endswith('.json'):
-                flash('Por favor, envie um arquivo .json válido.', 'error')
-                return redirect(url_for('admin_challenges'))
-            try:
-                data = json.load(file.stream)
-                count = 0
-                for item in data:
-                    if item.get('title') and not Challenge.query.filter_by(title=item.get('title')).first():
-                        new_challenge = Challenge(
-                            title=item.get('title'),
-                            description=item.get('description'),
-                            expected_answer=item.get('expected_answer'),
-                            points_reward=item.get('points_reward', 10),
-                            level_required=item.get('level_required', 'Iniciante'),
-                            is_team_challenge=item.get('is_team_challenge', False),
-                            hint=item.get('hint'),
-                            hint_cost=item.get('hint_cost', 5)
+            file = request.files['challenge_file']
+            if file and file.filename.endswith('.json'):
+                try:
+                    data = json.load(file)
+                    for challenge_data in data:
+                        challenge = Challenge(
+                            title=challenge_data['title'],
+                            description=challenge_data['description'],
+                            level_required=challenge_data['level_required'],
+                            points_reward=challenge_data.get('points_reward', 10),
+                            expected_answer=challenge_data['expected_answer'],
+                            hint=challenge_data.get('hint'),
+                            hint_cost=challenge_data.get('hint_cost', 5),
+                            is_team_challenge=challenge_data.get('is_team_challenge', False)
                         )
-                        db.session.add(new_challenge)
-                        count += 1
-                db.session.commit()
-                flash(f'{count} novos desafios importados com sucesso!', 'success')
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Ocorreu um erro ao processar o arquivo JSON: {e}', 'error')
+                        db.session.add(challenge)
+                    db.session.commit()
+                    flash('Desafios importados com sucesso!', 'success')
+                except Exception as e:
+                    flash(f'Erro ao importar desafios: {str(e)}', 'error')
+            else:
+                flash('Por favor, envie um arquivo JSON válido.', 'error')
         return redirect(url_for('admin_challenges'))
-    all_levels = Level.query.order_by(Level.min_points).all()
-    all_faqs = FAQ.query.order_by(FAQ.question).all()
-    all_challenges = Challenge.query.order_by(Challenge.level_required).all()
-    return render_template('admin_challenges.html', challenges=all_challenges, levels=all_levels, faqs=all_faqs, challenge_to_edit=challenge_to_edit)
+    challenges = Challenge.query.all()
+    levels = Level.query.all()
+    faqs = FAQ.query.all()
+    challenge_to_edit = None
+    return render_template('admin_challenges.html', challenges=challenges, levels=levels, faqs=faqs, challenge_to_edit=challenge_to_edit, form=form)
 
-@app.route('/admin/challenges/delete/<int:challenge_id>', methods=['POST'])
+@app.route('/admin/challenges', methods=['GET', 'POST'])
 @login_required
-def admin_delete_challenge(challenge_id):
+def admin_challenges():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    challenge_to_delete = Challenge.query.get_or_404(challenge_id)
-    UserChallenge.query.filter_by(challenge_id=challenge_id).delete()
-    PathChallenge.query.filter_by(challenge_id=challenge_id).delete()
-    db.session.delete(challenge_to_delete)
-    db.session.commit()
-    flash(f'O desafio "{challenge_to_delete.title}" foi excluído com sucesso!', 'success')
-    return redirect(url_for('admin_challenges'))
-
-@app.route('/challenges/hint/<int:challenge_id>', methods=['POST'])
-@login_required
-def get_challenge_hint(challenge_id):
-    challenge = Challenge.query.get_or_404(challenge_id)
-    if not challenge.hint:
-        return jsonify({'error': 'Este desafio não tem uma dica disponível.'}), 404
-    if current_user.points < challenge.hint_cost:
-        return jsonify({'error': 'Você não tem pontos suficientes para comprar esta dica.'}), 403
-    current_user.points -= challenge.hint_cost
-    db.session.commit()
-    flash(f'Você gastou {challenge.hint_cost} pontos para ver uma dica!', 'info')
-    return jsonify({'hint': challenge.hint})
-
-@app.route('/admin/paths', methods=['GET', 'POST'])
-@login_required
-def admin_paths():
-    if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
+    form = BaseForm()
     if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('admin_challenges'))
         action = request.form.get('action')
-        if action == 'import_paths':
-            file = request.files.get('path_file')
-            if not file or not file.filename.endswith('.json'):
-                flash('Por favor, envie um arquivo .json válido.', 'error')
-                return redirect(url_for('admin_paths'))
-            try:
-                data = json.load(file.stream)
-                count = 0
-                for item in data:
-                    path_name = item.get('name')
-                    if path_name and not LearningPath.query.filter_by(name=path_name).first():
-                        new_path = LearningPath(
-                            name=path_name,
-                            description=item.get('description'),
-                            reward_points=item.get('reward_points', 100)
+        if action == 'create_challenge':
+            title = request.form['title']
+            description = request.form['description']
+            level_required = request.form['level_required']
+            points_reward = request.form['points_reward']
+            expected_answer = request.form['expected_answer']
+            hint = request.form.get('hint')
+            hint_cost = request.form.get('hint_cost', 5)
+            is_team_challenge = 'is_team_challenge' in request.form
+            challenge = Challenge(
+                title=title,
+                description=description,
+                level_required=level_required,
+                points_reward=points_reward,
+                expected_answer=expected_answer,
+                hint=hint,
+                hint_cost=hint_cost,
+                is_team_challenge=is_team_challenge
+            )
+            db.session.add(challenge)
+            db.session.commit()
+            flash('Desafio criado com sucesso!', 'success')
+        elif action == 'import_challenges':
+            file = request.files['challenge_file']
+            if file and file.filename.endswith('.json'):
+                try:
+                    data = json.load(file)
+                    for challenge_data in data:
+                        challenge = Challenge(
+                            title=challenge_data['title'],
+                            description=challenge_data['description'],
+                            level_required=challenge_data['level_required'],
+                            points_reward=challenge_data.get('points_reward', 10),
+                            expected_answer=challenge_data['expected_answer'],
+                            hint=challenge_data.get('hint'),
+                            hint_cost=challenge_data.get('hint_cost', 5),
+                            is_team_challenge=challenge_data.get('is_team_challenge', False)
                         )
-                        db.session.add(new_path)
-                        db.session.flush()
-                        for challenge_data in item.get('challenges', []):
-                            challenge_title = challenge_data.get('title')
-                            challenge = Challenge.query.filter_by(title=challenge_title).first()
-                            if challenge:
-                                new_path_challenge = PathChallenge(
-                                    path_id=new_path.id,
-                                    challenge_id=challenge.id,
-                                    step=challenge_data.get('step')
-                                )
-                                db.session.add(new_path_challenge)
-                        count += 1
-                db.session.commit()
-                flash(f'{count} novas trilhas importadas com sucesso!', 'success')
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Ocorreu um erro ao processar o arquivo: {e}', 'error')
-        return redirect(url_for('admin_paths'))
-    all_paths = LearningPath.query.all()
-    all_challenges = Challenge.query.all()
-    return render_template('admin_paths.html', paths=all_paths, challenges=all_challenges)
+                        db.session.add(challenge)
+                    db.session.commit()
+                    flash('Desafios importados com sucesso!', 'success')
+                except Exception as e:
+                    flash(f'Erro ao importar desafios: {str(e)}', 'error')
+            else:
+                flash('Por favor, envie um arquivo JSON válido.', 'error')
+        return redirect(url_for('admin_challenges'))
+    challenges = Challenge.query.all()
+    levels = Level.query.all()
+    faqs = FAQ.query.all()
+    challenge_to_edit = None
+    return render_template('admin_challenges.html', challenges=challenges, levels=levels, faqs=faqs, challenge_to_edit=challenge_to_edit, form=form)
 
 @app.route('/admin/paths/edit/<int:path_id>', methods=['GET', 'POST'])
 @login_required
@@ -1226,12 +1294,16 @@ def admin_delete_path(path_id):
     flash('Trilha de aprendizagem excluída com sucesso!', 'success')
     return redirect(url_for('admin_paths'))
 
-@app.route('/admin/paths/remove_challenge/<int:path_id>/<int:challenge_id>', methods=['POST'])
+@app.route('/admin/remove_challenge_from_path/<int:path_id>/<int:challenge_id>', methods=['POST'])
 @login_required
 def admin_remove_challenge_from_path(path_id, challenge_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_paths'))
     path_challenge = PathChallenge.query.filter_by(path_id=path_id, challenge_id=challenge_id).first_or_404()
     db.session.delete(path_challenge)
     db.session.commit()
@@ -1290,63 +1362,55 @@ def admin_achievements():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()
     if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('admin_achievements'))
         action = request.form.get('action')
         if action == 'create_achievement':
-            name = request.form.get('name')
-            description = request.form.get('description')
-            trigger_type = request.form.get('trigger_type')
-            trigger_value = request.form.get('trigger_value', type=int)
-            file = request.files.get('icon_image')
+            name = request.form['name']
+            description = request.form['description']
+            trigger_type = request.form['trigger_type']
+            trigger_value = request.form['trigger_value']
+            icon_file = request.files.get('icon_image')
             icon_url = None
-            if file and file.filename:
-                try:
-                    upload_result = cloudinary.uploader.upload(file)
-                    icon_url = upload_result['secure_url']
-                except Exception as e:
-                    flash(f'Erro ao fazer upload da imagem: {e}', 'error')
-                    return redirect(url_for('admin_achievements'))
-            if name and description and trigger_type and trigger_value is not None:
-                new_achievement = Achievement(
-                    name=name,
-                    description=description,
-                    icon=icon_url,
-                    trigger_type=trigger_type,
-                    trigger_value=trigger_value
-                )
-                db.session.add(new_achievement)
-                db.session.commit()
-                flash('Conquista criada com sucesso!', 'success')
-            else:
-                flash('Erro ao criar conquista. Verifique os campos.', 'error')
+            if icon_file:
+                upload_result = cloudinary.uploader.upload(icon_file)
+                icon_url = upload_result['secure_url']
+            achievement = Achievement(
+                name=name,
+                description=description,
+                trigger_type=trigger_type,
+                trigger_value=trigger_value,
+                icon=icon_url
+            )
+            db.session.add(achievement)
+            db.session.commit()
+            flash('Conquista criada com sucesso!', 'success')
         elif action == 'import_achievements':
-            file = request.files.get('achievement_file')
-            if not file or not file.filename.endswith('.json'):
-                flash('Por favor, envie um arquivo .json válido.', 'error')
-                return redirect(url_for('admin_achievements'))
-            try:
-                data = json.load(file.stream)
-                count = 0
-                for item in data:
-                    name = item.get('name')
-                    if name and not Achievement.query.filter_by(name=name).first():
-                        new_achievement = Achievement(
-                            name=name,
-                            description=item.get('description'),
-                            icon=item.get('icon', 'fas fa-star'),
-                            trigger_type=item.get('trigger_type'),
-                            trigger_value=item.get('trigger_value')
+            file = request.files['achievement_file']
+            if file and file.filename.endswith('.json'):
+                try:
+                    data = json.load(file)
+                    for ach_data in data:
+                        achievement = Achievement(
+                            name=ach_data['name'],
+                            description=ach_data.get('description'),
+                            trigger_type=ach_data['trigger_type'],
+                            trigger_value=ach_data['trigger_value'],
+                            icon=ach_data.get('icon')
                         )
-                        db.session.add(new_achievement)
-                        count += 1
-                db.session.commit()
-                flash(f'{count} novas conquistas importadas com sucesso!', 'success')
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Ocorreu um erro ao processar o arquivo: {e}', 'error')
+                        db.session.add(achievement)
+                    db.session.commit()
+                    flash('Conquistas importadas com sucesso!', 'success')
+                except Exception as e:
+                    flash(f'Erro ao importar conquistas: {str(e)}', 'error')
+            else:
+                flash('Por favor, envie um arquivo JSON válido.', 'error')
         return redirect(url_for('admin_achievements'))
     achievements = Achievement.query.all()
-    return render_template('admin_achievements.html', achievements=achievements)
+    return render_template('admin_achievements.html', achievements=achievements, form=form)
 
 @app.route('/admin/daily_challenges')
 @login_required
@@ -1357,33 +1421,37 @@ def admin_daily_challenges():
     history = DailyChallenge.query.order_by(DailyChallenge.day.desc()).all()
     return render_template('admin_daily_challenges.html', history=history)
 
-@app.route('/admin/achievements/edit/<int:achievement_id>', methods=['GET', 'POST'])
+@app.route('/admin/edit_achievement/<int:achievement_id>', methods=['POST'])
 @login_required
 def admin_edit_achievement(achievement_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    achievement_to_edit = Achievement.query.get_or_404(achievement_id)
-    if request.method == 'POST':
-        achievement_to_edit.name = request.form.get('name')
-        achievement_to_edit.description = request.form.get('description')
-        achievement_to_edit.icon = request.form.get('icon')
-        achievement_to_edit.trigger_type = request.form.get('trigger_type')
-        achievement_to_edit.trigger_value = request.form.get('trigger_value', type=int)
-        db.session.commit()
-        flash('Conquista atualizada com sucesso!', 'success')
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
         return redirect(url_for('admin_achievements'))
-    return render_template('admin_edit_achievement.html', achievement=achievement_to_edit)
+    achievement = Achievement.query.get_or_404(achievement_id)
+    achievement.name = request.form['name']
+    achievement.description = request.form['description']
+    achievement.trigger_type = request.form['trigger_type']
+    achievement.trigger_value = request.form['trigger_value']
+    db.session.commit()
+    flash('Conquista atualizada com sucesso!', 'success')
+    return redirect(url_for('admin_achievements'))
 
-@app.route('/admin/achievements/delete/<int:achievement_id>', methods=['POST'])
+@app.route('/admin/delete_achievement/<int:achievement_id>', methods=['POST'])
 @login_required
 def admin_delete_achievement(achievement_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    achievement_to_delete = Achievement.query.get_or_404(achievement_id)
-    UserAchievement.query.filter_by(achievement_id=achievement_id).delete()
-    db.session.delete(achievement_to_delete)
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_achievements'))
+    achievement = Achievement.query.get_or_404(achievement_id)
+    db.session.delete(achievement)
     db.session.commit()
     flash('Conquista excluída com sucesso!', 'success')
     return redirect(url_for('admin_achievements'))
@@ -1394,94 +1462,115 @@ def admin_boss_fights():
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()
     if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('admin_boss_fights'))
         action = request.form.get('action')
         if action == 'create_boss':
-            name = request.form.get('name')
-            description = request.form.get('description')
-            reward_points = request.form.get('reward_points', type=int)
-            file = request.files.get('boss_image')
+            name = request.form['name']
+            description = request.form['description']
+            reward_points = request.form['reward_points']
+            boss_image = request.files.get('boss_image')
             image_url = None
-            if file and file.filename:
-                try:
-                    upload_result = cloudinary.uploader.upload(file, folder="boss_fights")
-                    image_url = upload_result['secure_url']
-                except Exception as e:
-                    flash(f'Erro ao fazer upload da imagem: {e}', 'error')
-                    return redirect(url_for('admin_boss_fights'))
-            if name and description and reward_points:
-                new_boss = BossFight(name=name, description=description, reward_points=reward_points, image_url=image_url, is_active=True)
-                db.session.add(new_boss)
-                db.session.commit()
-                flash('Boss Fight criado com sucesso!', 'success')
+            if boss_image:
+                upload_result = cloudinary.uploader.upload(boss_image)
+                image_url = upload_result['secure_url']
+            boss = BossFight(
+                name=name,
+                description=description,
+                reward_points=reward_points,
+                image_url=image_url
+            )
+            db.session.add(boss)
+            db.session.commit()
+            flash('Boss Fight criado com sucesso!', 'success')
+        elif action == 'create_stage':
+            boss_id = request.form['boss_id']
+            name = request.form['name']
+            order = request.form['order']
+            stage = BossStage(boss_id=boss_id, name=name, order=order)
+            db.session.add(stage)
+            db.session.commit()
+            flash('Etapa adicionada com sucesso!', 'success')
         elif action == 'create_step':
-            stage_id = request.form.get('stage_id', type=int)
-            description = request.form.get('description')
-            expected_answer = request.form.get('expected_answer')
-            if stage_id and description and expected_answer:
-                new_step = BossFightStep(stage_id=stage_id, description=description, expected_answer=expected_answer)
-                db.session.add(new_step)
-                db.session.commit()
-                flash('Tarefa adicionada à etapa!', 'success')
+            stage_id = request.form['stage_id']
+            description = request.form['description']
+            expected_answer = request.form['expected_answer']
+            step = BossStep(
+                stage_id=stage_id,
+                description=description,
+                expected_answer=expected_answer
+            )
+            db.session.add(step)
+            db.session.commit()
+            flash('Tarefa adicionada com sucesso!', 'success')
         return redirect(url_for('admin_boss_fights'))
-    all_boss_fights = BossFight.query.all()
-    return render_template('admin_boss_fights.html', boss_fights=all_boss_fights)
+    boss_fights = BossFight.query.all()
+    return render_template('admin_boss_fights.html', boss_fights=boss_fights, form=form)
 
-@app.route('/admin/bossfights/edit/<int:boss_id>', methods=['GET', 'POST'])
+@app.route('/admin/edit_boss_fight/<int:boss_id>', methods=['POST'])
 @login_required
 def admin_edit_boss_fight(boss_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    boss_to_edit = BossFight.query.get_or_404(boss_id)
-    if request.method == 'POST':
-        boss_to_edit.name = request.form.get('name')
-        boss_to_edit.description = request.form.get('description')
-        boss_to_edit.reward_points = request.form.get('reward_points', type=int)
-        boss_to_edit.is_active = request.form.get('is_active') == 'on'
-        file = request.files.get('boss_image')
-        if file and file.filename:
-            try:
-                upload_result = cloudinary.uploader.upload(file, folder="boss_fights")
-                boss_to_edit.image_url = upload_result['secure_url']
-            except Exception as e:
-                flash(f'Erro ao atualizar a imagem: {e}', 'error')
-        db.session.commit()
-        flash('Boss Fight atualizado com sucesso!', 'success')
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
         return redirect(url_for('admin_boss_fights'))
-    return render_template('admin_edit_boss_fight.html', boss=boss_to_edit)
-
-@app.route('/admin/bossfights/delete/<int:boss_id>', methods=['POST'])
+    boss = BossFight.query.get_or_404(boss_id)
+    boss.name = request.form['name']
+    boss.description = request.form['description']
+    boss.reward_points = request.form['reward_points']
+    boss.is_active = 'is_active' in request.form
+    db.session.commit()
+    flash('Boss Fight atualizado com sucesso!', 'success')
+    return redirect(url_for('admin_boss_fights'))
+@app.route('/admin/delete_boss_fight/<int:boss_id>', methods=['POST'])
 @login_required
 def admin_delete_boss_fight(boss_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_boss_fights'))
     boss = BossFight.query.get_or_404(boss_id)
     db.session.delete(boss)
     db.session.commit()
     flash('Boss Fight excluído com sucesso!', 'success')
     return redirect(url_for('admin_boss_fights'))
 
-@app.route('/admin/bossfights/stage/delete/<int:stage_id>', methods=['POST'])
+@app.route('/admin/delete_boss_stage/<int:stage_id>', methods=['POST'])
 @login_required
 def admin_delete_boss_stage(stage_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    stage = BossFightStage.query.get_or_404(stage_id)
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_boss_fights'))
+    stage = BossStage.query.get_or_404(stage_id)
     db.session.delete(stage)
     db.session.commit()
     flash('Etapa excluída com sucesso!', 'success')
     return redirect(url_for('admin_boss_fights'))
 
-@app.route('/admin/bossfights/step/delete/<int:step_id>', methods=['POST'])
+@app.route('/admin/delete_boss_step/<int:step_id>', methods=['POST'])
 @login_required
 def admin_delete_boss_step(step_id):
     if not current_user.is_admin:
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-    step = BossFightStep.query.get_or_404(step_id)
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_boss_fights'))
+    step = BossStep.query.get_or_404(step_id)
     db.session.delete(step)
     db.session.commit()
     flash('Tarefa excluída com sucesso!', 'success')
@@ -1533,22 +1622,38 @@ def submit_boss_step(step_id):
         flash('Resposta incorreta. Tente novamente!', 'error')
     return redirect(url_for('view_boss_fight', boss_id=boss.id))
 
-@app.route('/admin/challenges/edit/<int:challenge_id>', methods=['POST'])
+@app.route('/admin/edit_challenge/<int:challenge_id>', methods=['POST'])
 @login_required
 def admin_edit_challenge(challenge_id):
     if not current_user.is_admin:
-        return jsonify({'error': 'Acesso negado'}), 403
-    challenge_to_edit = Challenge.query.get_or_404(challenge_id)
-    challenge_to_edit.title = request.form.get('title')
-    challenge_to_edit.description = request.form.get('description')
-    challenge_to_edit.level_required = request.form.get('level_required')
-    challenge_to_edit.points_reward = request.form.get('points_reward', type=int)
-    challenge_to_edit.expected_answer = request.form.get('expected_answer')
-    challenge_to_edit.is_team_challenge = request.form.get('is_team_challenge') == 'true'
-    challenge_to_edit.hint = request.form.get('hint')
-    challenge_to_edit.hint_cost = request.form.get('hint_cost', type=int)
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_challenges'))
+    challenge = Challenge.query.get_or_404(challenge_id)
+    challenge.title = request.form['title']
+    challenge.level_required = request.form['level_required']
     db.session.commit()
-    return jsonify({'success': 'Desafio atualizado com sucesso!'})
+    flash('Desafio atualizado com sucesso!', 'success')
+    return redirect(url_for('admin_challenges'))
+
+@app.route('/admin/delete_challenge/<int:challenge_id>', methods=['POST'])
+@login_required
+def admin_delete_challenge(challenge_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_challenges'))
+    challenge = Challenge.query.get_or_404(challenge_id)
+    db.session.delete(challenge)
+    db.session.commit()
+    flash('Desafio excluído com sucesso!', 'success')
+    return redirect(url_for('admin_challenges'))
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')

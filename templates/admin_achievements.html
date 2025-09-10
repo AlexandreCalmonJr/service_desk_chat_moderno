@@ -4,160 +4,111 @@
 {% block page_title %}Gerenciar Conquistas{% endblock %}
 
 {% block content %}
-    <div class="mb-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h2 class="text-xl font-semibold mb-4">Criar Nova Conquista</h2>
-        <form method="POST" enctype="multipart/form-data">
-            <div class="mb-4">
-                <label for="name" class="block text-sm font-medium">Nome da Conquista</label>
-                <input type="text" id="name" name="name" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold mb-4">Criar Nova Conquista</h2>
+        <form method="POST" action="{{ url_for('admin_achievements') }}" enctype="multipart/form-data" class="space-y-4">
+            {{ form.csrf_token }}
+            <input type="hidden" name="action" value="create_achievement">
+            <div>
+                <label for="name" class="block text-gray-700">Nome da Conquista</label>
+                <input type="text" id="name" name="name" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
             </div>
-            <div class="mb-4">
-                <label for="description" class="block text-sm font-medium">Descrição</label>
-                <textarea id="description" name="description" rows="2" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required></textarea>
+            <div>
+                <label for="description" class="block text-gray-700">Descrição</label>
+                <textarea id="description" name="description" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required></textarea>
             </div>
-            <div class="mb-4">
-                <label for="icon_image" class="block text-sm font-medium">Imagem da Conquista</label>
-                <input type="file" id="icon_image" name="icon_image" class="w-full mt-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-300 dark:hover:file:bg-gray-600" accept="image/*">
+            <div>
+                <label for="icon_image" class="block text-gray-700">Imagem da Conquista</label>
+                <input type="file" id="icon_image" name="icon_image" accept="image/*" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300">
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                    <label for="trigger_type" class="block text-sm font-medium">Tipo de Gatilho</label>
-                    <select id="trigger_type" name="trigger_type" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-                        <option value="challenges_completed">Nº de Desafios Completados</option>
-                        <option value="points_earned">Nº de Pontos Ganhos</option>
-                        <option value="paths_completed">Nº de Trilhas Completadas</option>
-                        <option value="first_team_join">Entrar num Time</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="trigger_value" class="block text-sm font-medium">Valor para Ativar</label>
-                    <input type="number" id="trigger_value" name="trigger_value" class="w-full p-2 mt-1 border rounded dark:bg-gray-700 dark:border-gray-600" required>
-                </div>
+            <div>
+                <label for="trigger_type" class="block text-gray-700">Tipo de Gatilho</label>
+                <select id="trigger_type" name="trigger_type" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+                    <option value="challenges_completed">Nº de Desafios Completados</option>
+                    <option value="points_earned">Nº de Pontos Ganhos</option>
+                    <option value="paths_completed">Nº de Trilhas Completadas</option>
+                    <option value="first_team_join">Entrar num Time</option>
+                </select>
             </div>
-            <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">Criar Conquista</button>
+            <div>
+                <label for="trigger_value" class="block text-gray-700">Valor para Ativar</label>
+                <input type="number" id="trigger_value" name="trigger_value" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
+            </div>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Criar Conquista</button>
+        </form>
 
-            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4">Importar Conquistas</h2>
-                <form method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="action" value="import_achievements">
-                    <div class="mb-4">
-                        <label for="achievement_file" class="block text-sm font-medium">Ficheiro JSON</label>
-                        <input type="file" id="achievement_file" name="achievement_file" class="w-full mt-1 text-sm" accept=".json" required>
-                    </div>
-                    <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Importar</button>
-                </form>
+        <h3 class="text-xl font-semibold mt-6 mb-4">Importar Conquistas</h3>
+        <form method="POST" action="{{ url_for('admin_achievements') }}" enctype="multipart/form-data" class="space-y-4">
+            {{ form.csrf_token }}
+            <input type="hidden" name="action" value="import_achievements">
+            <div>
+                <label for="achievement_file" class="block text-gray-700">Ficheiro JSON</label>
+                <input type="file" id="achievement_file" name="achievement_file" accept=".json" class="w-full px-3 py-2 border rounded focus:outline-none focus:ring focus:ring-blue-300" required>
             </div>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Importar</button>
         </form>
     </div>
 
     <div>
-        <h2 class="text-xl font-semibold mb-4">Conquistas Criadas</h2>
-        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md">
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="bg-gray-200 dark:bg-gray-700">
-                            <th class="p-3 text-left">Ícone</th>
-                            <th class="p-3 text-left">Nome</th>
-                            <th class="p-3 text-left">Descrição</th>
-                            <th class="p-3 text-left">Gatilho</th>
-                            <th class="p-3 text-left">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for achievement in achievements %}
-                        <tr class="border-b dark:border-gray-600" id="achievement-{{ achievement.id }}">
-                            <td class="p-3">
-                                {% if achievement.icon %}
-                                    <img src="{{ achievement.icon }}" alt="{{ achievement.name }}" class="w-10 h-10 rounded-full object-cover">
-                                {% endif %}
-                            </td>
-                            <td class="p-3">
-                                <div class="achievement-display">
-                                    <span class="font-bold">{{ achievement.name }}</span>
-                                </div>
-                                <div class="achievement-edit hidden">
-                                    <input type="text" name="name" value="{{ achievement.name }}" class="w-full p-1 border rounded dark:bg-gray-700 dark:border-gray-600">
-                                </div>
-                            </td>
-                            <td class="p-3">
-                                <div class="achievement-display">
-                                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ achievement.description }}</span>
-                                </div>
-                                <div class="achievement-edit hidden">
-                                    <textarea name="description" rows="2" class="w-full p-1 border rounded dark:bg-gray-700 dark:border-gray-600">{{ achievement.description }}</textarea>
-                                </div>
-                            </td>
-                            <td class="p-3">
-                                <div class="achievement-display">
-                                    <span class="font-mono text-sm">{{ achievement.trigger_type }} ({{ achievement.trigger_value }})</span>
-                                </div>
-                                <div class="achievement-edit hidden">
-                                    <select name="trigger_type" class="w-full p-1 mb-1 border rounded dark:bg-gray-700 dark:border-gray-600">
-                                        <option value="challenges_completed" {% if achievement.trigger_type == 'challenges_completed' %}selected{% endif %}>Nº de Desafios Completados</option>
-                                        <option value="points_earned" {% if achievement.trigger_type == 'points_earned' %}selected{% endif %}>Nº de Pontos Ganhos</option>
-                                        <option value="paths_completed" {% if achievement.trigger_type == 'paths_completed' %}selected{% endif %}>Nº de Trilhas Completadas</option>
-                                        <option value="first_team_join" {% if achievement.trigger_type == 'first_team_join' %}selected{% endif %}>Entrar num Time</option>
-                                    </select>
-                                    <input type="number" name="trigger_value" value="{{ achievement.trigger_value }}" class="w-full p-1 border rounded dark:bg-gray-700 dark:border-gray-600">
-                                </div>
-                            </td>
-                            <td class="p-3">
-                                <div class="achievement-display flex space-x-2">
-                                    <button onclick="editAchievement({{ achievement.id }})" class="text-blue-500 hover:underline">Editar</button>
-                                    <form method="POST" action="{{ url_for('admin_delete_achievement', achievement_id=achievement.id) }}" class="inline" onsubmit="return confirm('Tem a certeza que quer excluir esta conquista?');">
-                                        <button type="submit" class="text-red-500 hover:underline">Excluir</button>
-                                    </form>
-                                </div>
-                                <div class="achievement-edit hidden flex space-x-2">
-                                    <button onclick="saveAchievement({{ achievement.id }})" class="text-green-500 hover:underline">Salvar</button>
-                                    <button onclick="cancelEditAchievement({{ achievement.id }})" class="text-gray-500 hover:underline">Cancelar</button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <h2 class="text-2xl font-bold mb-4">Conquistas Criadas</h2>
+        <table class="w-full border-collapse">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="border p-2">Ícone</th>
+                    <th class="border p-2">Nome</th>
+                    <th class="border p-2">Descrição</th>
+                    <th class="border p-2">Gatilho</th>
+                    <th class="border p-2">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for achievement in achievements %}
+                    <tr>
+                        <td class="border p-2">
+                            {% if achievement.icon %}
+                                <img src="{{ achievement.icon }}" alt="Ícone" class="w-6 h-6">
+                            {% endif %}
+                        </td>
+                        <td class="border p-2">
+                            <span class="display">{{ achievement.name }}</span>
+                            <input type="text" name="name" value="{{ achievement.name }}" class="edit hidden w-full px-2 py-1 border rounded">
+                        </td>
+                        <td class="border p-2">
+                            <span class="display">{{ achievement.description }}</span>
+                            <textarea name="description" class="edit hidden w-full px-2 py-1 border rounded">{{ achievement.description }}</textarea>
+                        </td>
+                        <td class="border p-2">
+                            <span class="display">{{ achievement.trigger_type }} ({{ achievement.trigger_value }})</span>
+                            <select name="trigger_type" class="edit hidden w-full px-2 py-1 border rounded">
+                                <option value="challenges_completed" {% if achievement.trigger_type == 'challenges_completed' %}selected{% endif %}>Nº de Desafios Completados</option>
+                                <option value="points_earned" {% if achievement.trigger_type == 'points_earned' %}selected{% endif %}>Nº de Pontos Ganhos</option>
+                                <option value="paths_completed" {% if achievement.trigger_type == 'paths_completed' %}selected{% endif %}>Nº de Trilhas Completadas</option>
+                                <option value="first_team_join" {% if achievement.trigger_type == 'first_team_join' %}selected{% endif %}>Entrar num Time</option>
+                            </select>
+                            <input type="number" name="trigger_value" value="{{ achievement.trigger_value }}" class="edit hidden w-full px-2 py-1 border rounded">
+                        </td>
+                        <td class="border p-2">
+                            <form method="POST" action="{{ url_for('admin_edit_achievement', achievement_id=achievement.id) }}" class="inline">
+                                {{ form.csrf_token }}
+                                <button type="button" onclick="toggleEdit(this)" class="text-blue-500 hover:underline">Editar</button>
+                                <button type="submit" class="edit hidden text-green-500 hover:underline">Salvar</button>
+                                <button type="button" onclick="toggleEdit(this)" class="edit hidden text-gray-500 hover:underline">Cancelar</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('admin_delete_achievement', achievement_id=achievement.id) }}" class="inline">
+                                {{ form.csrf_token }}
+                                <button type="submit" class="text-red-500 hover:underline">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <script>
+            function toggleEdit(button) {
+                const row = button.closest('tr');
+                row.querySelectorAll('.display').forEach(el => el.classList.toggle('hidden'));
+                row.querySelectorAll('.edit').forEach(el => el.classList.toggle('hidden'));
+            }
+        </script>
     </div>
-
-    <script>
-        function editAchievement(id) {
-            const row = document.getElementById(`achievement-${id}`);
-            row.querySelectorAll('.achievement-display').forEach(el => el.classList.add('hidden'));
-            row.querySelectorAll('.achievement-edit').forEach(el => el.classList.remove('hidden'));
-        }
-
-        function cancelEditAchievement(id) {
-            const row = document.getElementById(`achievement-${id}`);
-            row.querySelectorAll('.achievement-display').forEach(el => el.classList.remove('hidden'));
-            row.querySelectorAll('.achievement-edit').forEach(el => el.classList.add('hidden'));
-        }
-
-        function saveAchievement(id) {
-            const row = document.getElementById(`achievement-${id}`);
-            const formData = new FormData();
-            
-            formData.append('name', row.querySelector('input[name="name"]').value);
-            formData.append('description', row.querySelector('textarea[name="description"]').value);
-            formData.append('trigger_type', row.querySelector('select[name="trigger_type"]').value);
-            formData.append('trigger_value', row.querySelector('input[name="trigger_value"]').value);
-
-            fetch(`/admin/achievements/edit/${id}`, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    location.reload();
-                } else {
-                    alert('Erro ao salvar alterações');
-                }
-            })
-            .catch(error => {
-                alert('Erro ao salvar alterações');
-            });
-        }
-    </script>
 {% endblock %}
