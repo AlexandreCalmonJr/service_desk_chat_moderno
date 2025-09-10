@@ -16,38 +16,38 @@
             <p class="mt-2 text-gray-400">Crie a sua conta para começar a jogar.</p>
         </div>
 
-        % with messages = get_flashed_messages(with_categories=true) %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">
+                    <div class="p-4 rounded-md text-sm {% if category == 'error' %}bg-red-500/20 text-red-300{% else %}bg-green-500/20 text-green-300{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('register') }}">
+        <form method="POST" action="{{ url_for('register') }}" class="space-y-6">
             {{ form.csrf_token }}
-            <div class="textbox">
-                <label for="name">Nome de Utilizador</label>
-                <input type="text" id="name" name="name" required>
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-300">Nome de Utilizador</label>
+                <input type="text" id="name" name="name" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
             </div>
-            <div class="textbox">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-300">Email</label>
+                <input type="email" id="email" name="email" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
             </div>
-            <div class="textbox">
-                <label for="password">Senha</label>
-                <input type="password" id="password" name="password" required>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-300">Senha</label>
+                <input type="password" id="password" name="password" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
             </div>
-            <div class="textbox">
-                <label for="invitation_code">Código de Convite</label>
-                <input type="text" id="invitation_code" name="invitation_code" required>
+            <div>
+                <label for="invitation_code" class="block text-sm font-medium text-gray-300">Código de Convite</label>
+                <input type="text" id="invitation_code" name="invitation_code" required class="mt-1 block w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500">
             </div>
-            <button type="submit" class="btn">Criar Conta</button>
+            <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800">Criar Conta</button>
         </form>
-        <p class="signup-link">
-            Já tem uma conta? <a href="{{ url_for('login') }}">Faça login</a>
+        <p class="text-center text-sm text-gray-400">
+            Já tem uma conta? <a href="{{ url_for('login') }}" class="font-medium text-green-400 hover:text-green-300">Faça login</a>
         </p>
     </div>
 </body>
