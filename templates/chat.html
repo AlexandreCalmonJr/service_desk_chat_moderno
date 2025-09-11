@@ -255,7 +255,10 @@
     </div>
     
     <div class="chat-footer-modern">
-        <form class="chat-form-modern" id="chat-form" action="javascript:void(0);">
+        <!-- MUDANÇA 1: Adicionei os atributos data-* aqui para guardar as URLs -->
+        <form class="chat-form-modern" id="chat-form" action="javascript:void(0);"
+              data-chat-url="{{ url_for('chat') }}"
+              data-faq-url="{{ url_for('chat_faq_select') }}">
             <textarea id="chatInput" class="chat-input-modern" rows="1" placeholder="Digite sua mensagem..."></textarea>
             <button type="submit" id="sendButton" class="send-button-modern" aria-label="Enviar mensagem">
                 <i class="fas fa-paper-plane"></i>
@@ -271,6 +274,10 @@
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendButton');
         const typingIndicator = document.getElementById('typingIndicator');
+        
+        // MUDANÇA 2: Lemos as URLs dos atributos data-* que colocámos no formulário.
+        const chatUrl = chatForm.dataset.chatUrl;
+        const faqUrl = chatForm.dataset.faqUrl;
     
         // Função para adicionar mensagem ao chat
         function addMessage(sender, message, isHtml = false) {
@@ -320,7 +327,8 @@
             sendButton.disabled = true;
     
             const isFaqSelection = extraData.is_faq_selection || false;
-            const url = isFaqSelection ? `{{ url_for("chat_faq_select") }}` : `{{ url_for("chat") }}`;
+            // MUDANÇA 3: Usamos as variáveis que lemos dos atributos data-*.
+            const url = isFaqSelection ? faqUrl : chatUrl;
             
             delete extraData.is_faq_selection;
     
@@ -332,6 +340,12 @@
                     },
                     body: JSON.stringify({ mensagem: message, ...extraData }),
                 });
+
+                if (!response.ok) {
+                    // Se a resposta não for OK (ex: 404, 500), lança um erro para ser apanhado pelo catch.
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
     
                 let botMessage = data.text;
@@ -383,4 +397,4 @@
         // Adiciona a primeira mensagem do bot
         addMessage('bot', 'Olá! Como posso ajudar você hoje?', true);
     });
-    </script
+    </script>
