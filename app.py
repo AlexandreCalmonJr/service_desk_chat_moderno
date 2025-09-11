@@ -688,7 +688,6 @@ def chat():
         resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
     return jsonify(resposta)
 
-
 @app.route('/chat/faq_select', methods=['POST'])
 @login_required
 def chat_faq_select():
