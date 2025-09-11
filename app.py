@@ -647,30 +647,47 @@ def chat():
     mensagem = data.get('mensagem', '').strip()
     resposta = {
         'text': "Desculpe, não entendi. Tente reformular a pergunta.",
-        'html': True, # Mudado para True para suportar Markdown
+        'html': False,
         'state': 'normal',
-        'options': []
+        'options': [],
+        'suggestion': None
     }
-
+    ticket_response = process_ticket_command(mensagem)
+    if ticket_response:
+        resposta['text'] = ticket_response
+        return jsonify(resposta)
+    solution_response = suggest_solution(mensagem)
+    if solution_response:
+        resposta['text'] = solution_response
+        return jsonify(resposta)
     faq_matches = find_faq_by_nlp(mensagem)
-
     if faq_matches:
-        if len(faq_matches) > 1:
+        if len(faq_matches) == 1:
+            faq = faq_matches[0]
+            resposta['text'] = format_faq_response(faq.id, faq.question, faq.answer, faq.image_url, faq.video_url, faq.file_name)
+            resposta['html'] = True
+            doc = nlp(faq.question.lower())
+            keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ == 'NOUN'}
+            if keywords:
+                relevant_challenge = Challenge.query.filter(Challenge.title.ilike(f'%{next(iter(keywords))}%')).first()
+                if relevant_challenge:
+                    is_completed = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=relevant_challenge.id).first()
+                    if not is_completed:
+                        resposta['suggestion'] = {
+                            'text': f"Parece que você está interessado neste tópico! Que tal tentar o desafio '{relevant_challenge.title}' e ganhar {relevant_challenge.points_reward} pontos?",
+                            'challenge_id': relevant_challenge.id
+                        }
+        else:
             faq_ids = [faq.id for faq in faq_matches]
             session['faq_selection'] = faq_ids
             resposta['state'] = 'faq_selection'
             resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
+            resposta['html'] = True
             resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5]
-        else:
-            faq = faq_matches[0]
-            resposta['text'] = format_faq_response(
-                faq.id, faq.question, faq.answer,
-                faq.image_url, faq.video_url, faq.file_name
-            )
     else:
         resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
-
     return jsonify(resposta)
+
 
 @app.route('/chat/faq_select', methods=['POST'])
 @login_required

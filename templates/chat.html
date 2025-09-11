@@ -255,10 +255,7 @@
     </div>
     
     <div class="chat-footer-modern">
-        <!-- MUDANÇA 1: Adicionei os atributos data-* aqui para guardar as URLs -->
-        <form class="chat-form-modern" id="chat-form" action="javascript:void(0);"
-              data-chat-url="{{ url_for('chat') }}"
-              data-faq-url="{{ url_for('chat_faq_select') }}">
+        <form class="chat-form-modern" id="chat-form" action="javascript:void(0);">
             <textarea id="chatInput" class="chat-input-modern" rows="1" placeholder="Digite sua mensagem..."></textarea>
             <button type="submit" id="sendButton" class="send-button-modern" aria-label="Enviar mensagem">
                 <i class="fas fa-paper-plane"></i>
@@ -268,133 +265,117 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const chatBox = document.getElementById('chatBox');
-        const chatForm = document.getElementById('chat-form');
-        const chatInput = document.getElementById('chatInput');
-        const sendButton = document.getElementById('sendButton');
-        const typingIndicator = document.getElementById('typingIndicator');
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.chatScriptLoaded) {
+        return;
+    }
+    window.chatScriptLoaded = true;
+
+    const chatContainer = document.querySelector('.chat-container-modern');
+    if (!chatContainer) return;
+
+    const chatBox = chatContainer.querySelector('#chatBox');
+    const chatForm = chatContainer.querySelector('#chat-form');
+    const chatInput = chatContainer.querySelector('#chatInput');
+    const sendButton = chatContainer.querySelector('#sendButton');
+    const typingIndicator = chatContainer.querySelector('#typingIndicator');
+
+    function addMessage(sender, message, isHtml = false) {
+        const messageWrapper = document.createElement('div');
+        messageWrapper.classList.add('chat-message-modern', sender);
+
+        const avatar = document.createElement('div');
+        avatar.classList.add('avatar-modern', sender === 'user' ? 'user-avatar' : 'bot-avatar');
+        const iconClass = sender === 'user' ? 'fa-user' : 'fa-robot';
+        avatar.innerHTML = `<i class="fas ${iconClass}"></i>`;
+
+        const messageContent = document.createElement('div');
+        messageContent.classList.add('message-content-modern');
+
+        if (isHtml) {
+            messageContent.innerHTML = message;
+        } else {
+            messageContent.textContent = message;
+        }
         
-        // MUDANÇA 2: Lemos as URLs dos atributos data-* que colocámos no formulário.
-        const chatUrl = chatForm.dataset.chatUrl;
-        const faqUrl = chatForm.dataset.faqUrl;
-    
-        // Função para adicionar mensagem ao chat
-        function addMessage(sender, message, isHtml = false) {
-            const messageWrapper = document.createElement('div');
-            messageWrapper.classList.add('chat-message-modern', sender);
-    
-            const avatar = document.createElement('div');
-            avatar.classList.add('avatar-modern', sender === 'user' ? 'user-avatar' : 'bot-avatar');
-            const iconClass = sender === 'user' ? 'fa-user' : 'fa-robot';
-            avatar.innerHTML = `<i class="fas ${iconClass}"></i>`;
-    
-            const messageContent = document.createElement('div');
-            messageContent.classList.add('message-content-modern');
-    
-            if (isHtml) {
-                // Usa o marked.js para converter Markdown em HTML seguro
-                messageContent.innerHTML = marked.parse(message);
-            } else {
-                messageContent.textContent = message;
-            }
-            
-            messageWrapper.appendChild(avatar);
-            messageWrapper.appendChild(messageContent);
-            chatBox.appendChild(messageWrapper);
-    
-            // Auto-scroll para a última mensagem
-            chatBox.scrollTop = chatBox.scrollHeight;
-            
-            // Adicionar listeners para opções de FAQ, se houver
-            if (sender === 'bot' && isHtml) {
-                const faqButtons = messageContent.querySelectorAll('.faq-option-button');
-                faqButtons.forEach(button => {
-                    button.addEventListener('click', () => {
-                        const question = button.textContent;
-                        const faqId = button.dataset.faqId;
-                        addMessage('user', question);
-                        // Modificação: Chama o novo endpoint para obter a resposta da FAQ
-                        sendMessageToServer(question, { faq_id: faqId, is_faq_selection: true });
-                    });
-                });
-            }
-        }
-    
-        // Função para enviar mensagem para o servidor
-        async function sendMessageToServer(message, extraData = {}) {
-            typingIndicator.style.display = 'flex';
-            sendButton.disabled = true;
-    
-            const isFaqSelection = extraData.is_faq_selection || false;
-            // MUDANÇA 3: Usamos as variáveis que lemos dos atributos data-*.
-            const url = isFaqSelection ? faqUrl : chatUrl;
-            
-            delete extraData.is_faq_selection;
-    
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ mensagem: message, ...extraData }),
-                });
+        messageWrapper.appendChild(avatar);
+        messageWrapper.appendChild(messageContent);
+        chatBox.appendChild(messageWrapper);
 
-                if (!response.ok) {
-                    // Se a resposta não for OK (ex: 404, 500), lança um erro para ser apanhado pelo catch.
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-    
-                let botMessage = data.text;
-                if (data.state === 'faq_selection' && data.options) {
-                        botMessage += '<div class="faq-options">';
-                        data.options.forEach(opt => {
-                        botMessage += `<button class="faq-option-button" data-faq-id="${opt.id}">${opt.question}</button>`;
-                        });
-                        botMessage += '</div>';
-                }
-                
-                addMessage('bot', botMessage, true); // Sempre processa como HTML por causa do marked.js
-    
-            } catch (error) {
-                console.error('Erro ao enviar mensagem:', error);
-                addMessage('bot', 'Desculpe, ocorreu um erro de conexão.');
-            } finally {
-                typingIndicator.style.display = 'none';
-                sendButton.disabled = false;
-            }
+        chatBox.scrollTop = chatBox.scrollHeight;
+        
+        if (sender === 'bot' && isHtml) {
+            const faqButtons = messageContent.querySelectorAll('.faq-option-button');
+            faqButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const question = button.textContent;
+                    const faqId = button.dataset.faqId;
+                    addMessage('user', question);
+                    sendMessageToServer(question, { faq_id: faqId });
+                });
+            });
         }
-    
-        // Event listener para o envio do formulário
-        chatForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const message = chatInput.value.trim();
-            if (message) {
-                addMessage('user', message);
-                sendMessageToServer(message);
-                chatInput.value = '';
-                chatInput.style.height = 'auto'; // Reset height
+    }
+
+    async function sendMessageToServer(message, extraData = {}) {
+        typingIndicator.style.display = 'flex';
+        sendButton.disabled = true;
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ mensagem: message, ...extraData }),
+            });
+            const data = await response.json();
+
+            let botMessage = data.text;
+            if (data.state === 'faq_selection' && data.options) {
+                 botMessage += '<div class="faq-options">';
+                 data.options.forEach(opt => {
+                     botMessage += `<button class="faq-option-button" data-faq-id="${opt.id}">${opt.question}</button>`;
+                 });
+                 botMessage += '</div>';
             }
-        });
-    
-        // Enviar com Enter, nova linha com Shift+Enter
-        chatInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                chatForm.dispatchEvent(new Event('submit'));
-            }
-        });
-    
-        // Ajuste automático da altura do textarea
-        chatInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
-        });
-    
-        // Adiciona a primeira mensagem do bot
-        addMessage('bot', 'Olá! Como posso ajudar você hoje?', true);
+            
+            addMessage('bot', botMessage, data.html);
+
+        } catch (error) {
+            console.error('Erro ao enviar mensagem:', error);
+            addMessage('bot', 'Desculpe, ocorreu um erro de conexão.');
+        } finally {
+            typingIndicator.style.display = 'none';
+            sendButton.disabled = false;
+        }
+    }
+
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const message = chatInput.value.trim();
+        if (message) {
+            addMessage('user', message);
+            sendMessageToServer(message);
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+        }
     });
-    </script>
+
+    chatInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+    
+    if(chatBox.children.length === 0) {
+        addMessage('bot', 'Olá! Como posso ajudar você hoje?');
+    }
+});
+</script>
