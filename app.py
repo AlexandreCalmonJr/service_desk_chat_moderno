@@ -586,11 +586,94 @@ def toggle_admin(user_id):
     flash(f'Usuário {"promovido a admin" if user.is_admin else "removido como admin"} com sucesso!', 'success')
     return redirect(url_for('admin_users'))
 
+# --- ROTAS DO CHAT ---
 @app.route('/chat-page')
 @login_required
 def chat_page():
+    """
+    Renderiza a página principal do chat, limpando qualquer seleção de FAQ
+    que possa ter ficado guardada na sessão do utilizador.
+    """
     session.pop('faq_selection', None)
     return render_template('chat.html')
+
+@app.route('/chat', methods=['POST'])
+@login_required
+def chat():
+    """
+    Endpoint principal do chat. Recebe a mensagem do utilizador,
+    usa NLP para encontrar FAQs correspondentes e decide o que responder.
+    """
+    # Obtém a mensagem enviada pelo frontend
+    data = request.get_json()
+    mensagem = data.get('mensagem', '').strip()
+
+    # Prepara uma resposta padrão
+    resposta = {
+        'text': "Desculpe, não entendi. Tente reformular a pergunta.",
+        'html': True, # Mudado para True para suportar Markdown
+        'state': 'normal',
+        'options': []
+    }
+
+    # Procura por FAQs que correspondam à mensagem do utilizador
+    faq_matches = find_faq_by_nlp(mensagem)
+
+    if faq_matches:
+        # Se encontrar mais do que uma FAQ, devolve uma lista de opções
+        if len(faq_matches) > 1:
+            faq_ids = [faq.id for faq in faq_matches]
+            session['faq_selection'] = faq_ids
+            resposta['state'] = 'faq_selection'
+            resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
+            resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5]
+        # Se encontrar apenas uma FAQ, devolve a resposta completa
+        else:
+            faq = faq_matches[0]
+            resposta['text'] = format_faq_response(
+                faq.id, faq.question, faq.answer,
+                faq.image_url, faq.video_url, faq.file_name
+            )
+    else:
+        # Se não encontrar nenhuma FAQ, informa o utilizador
+        resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
+
+    return jsonify(resposta)
+
+@app.route('/chat/faq_select', methods=['POST'])
+@login_required
+def chat_faq_select():
+    """
+    Endpoint chamado quando o utilizador clica numa das opções de FAQ.
+    Recebe o ID da FAQ escolhida e devolve a sua resposta formatada.
+    """
+    # Obtém o ID da FAQ enviado pelo frontend
+    data = request.get_json()
+    faq_id = data.get('faq_id')
+
+    if not faq_id:
+        return jsonify({'text': 'ID da FAQ não fornecido.', 'html': True}), 400
+
+    # Procura a FAQ na base de dados
+    faq = FAQ.query.get(faq_id)
+    if not faq:
+        return jsonify({'text': 'FAQ não encontrada.', 'html': True}), 404
+
+    # Formata a resposta da FAQ encontrada
+    response_text = format_faq_response(
+        faq.id, faq.question, faq.answer,
+        faq.image_url, faq.video_url, faq.file_name
+    )
+
+    # Devolve a resposta formatada para o frontend
+    return jsonify({
+        'text': response_text,
+        'html': True,
+        'state': 'normal',
+        'options': []
+    })
+# --- FIM DAS ROTAS DO CHAT ---
+
 
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -763,54 +846,6 @@ def logout():
     logout_user()
     flash('Você saiu com sucesso.', 'success')
     return redirect(url_for('login'))
-
-@app.route('/chat', methods=['POST'])
-@login_required
-def chat():
-    data = request.get_json()
-    mensagem = data.get('mensagem', '').strip()
-    resposta = {
-        'text': "Desculpe, não entendi. Tente reformular a pergunta.",
-        'html': False,
-        'state': 'normal',
-        'options': [],
-        'suggestion': None
-    }
-    ticket_response = process_ticket_command(mensagem)
-    if ticket_response:
-        resposta['text'] = ticket_response
-        return jsonify(resposta)
-    solution_response = suggest_solution(mensagem)
-    if solution_response:
-        resposta['text'] = solution_response
-        return jsonify(resposta)
-    faq_matches = find_faq_by_nlp(mensagem)
-    if faq_matches:
-        if len(faq_matches) == 1:
-            faq = faq_matches[0]
-            resposta['text'] = format_faq_response(faq.id, faq.question, faq.answer, faq.image_url, faq.video_url, faq.file_name)
-            resposta['html'] = True
-            doc = nlp(faq.question.lower())
-            keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct and token.pos_ == 'NOUN'}
-            if keywords:
-                relevant_challenge = Challenge.query.filter(Challenge.title.ilike(f'%{next(iter(keywords))}%')).first()
-                if relevant_challenge:
-                    is_completed = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=relevant_challenge.id).first()
-                    if not is_completed:
-                        resposta['suggestion'] = {
-                            'text': f"Parece que você está interessado neste tópico! Que tal tentar o desafio '{relevant_challenge.title}' e ganhar {relevant_challenge.points_reward} pontos?",
-                            'challenge_id': relevant_challenge.id
-                        }
-        else:
-            faq_ids = [faq.id for faq in faq_matches]
-            session['faq_selection'] = faq_ids
-            resposta['state'] = 'faq_selection'
-            resposta['text'] = "Encontrei várias FAQs relacionadas. Clique na que você deseja:"
-            resposta['html'] = True
-            resposta['options'] = [{'id': faq.id, 'question': faq.question} for faq in faq_matches][:5]
-    else:
-        resposta['text'] = "Nenhuma FAQ encontrada para a sua busca. Tente reformular a pergunta."
-    return jsonify(resposta)
 
 @app.route('/chat/feedback', methods=['POST'])
 @login_required
