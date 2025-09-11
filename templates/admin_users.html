@@ -4,96 +4,96 @@
 {% block page_title %}Gerir Utilizadores{% endblock %}
 
 {% block content %}
-    <div class="space-y-8">
-        <!-- Gerador de Código de Convite -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
-            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Gerar Código de Convite Avulso</h2>
-            <form method="POST" action="{{ url_for('generate_invitation') }}" class="inline" onsubmit="return handleGenerateSingleCode(event)">
-                {{ form.csrf_token }}
-                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                    Gerar Novo Código
-                </button>
-            </form>
-            <div class="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg inline-flex items-center">
-                <span class="font-semibold text-gray-700 dark:text-gray-300 mr-2">Código Gerado:</span>
-                <code id="single-invitation-code" class="text-gray-900 dark:text-gray-100 font-mono">Clique no botão para gerar...</code>
-            </div>
-        </div>
-
-        <!-- Lista de Utilizadores -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
-            <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lista de Utilizadores</h2>
-            <div class="overflow-x-auto relative">
-                <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                        <tr>
-                            <th scope="col" class="py-3 px-6">Nome</th>
-                            <th scope="col" class="py-3 px-6">Email</th>
-                            <th scope="col" class="py-3 px-6">Pontos</th>
-                            <th scope="col" class="py-3 px-6">Nível</th>
-                            <th scope="col" class="py-3 px-6">Admin</th>
-                            <th scope="col" class="py-3 px-6">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                            <td class="py-4 px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{ user.name }}</td>
-                            <td class="py-4 px-6">{{ user.email }}</td>
-                            <td class="py-4 px-6">{{ user.points }}</td>
-                            <td class="py-4 px-6">{{ user.level.name if user.level else 'N/A' }}</td>
-                            <td class="py-4 px-6">{{ 'Sim' if user.is_admin else 'Não' }}</td>
-                            <td class="py-4 px-6 flex items-center space-x-4">
-                                {% if user.id != current_user.id %}
-                                    <!-- Tornar/Remover Admin -->
-                                    <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}" class="inline">
-                                        {{ form.csrf_token }}
-                                        <button type="submit" class="font-medium text-blue-600 dark:text-blue-500 hover:underline">
-                                            {{ 'Remover Admin' if user.is_admin else 'Tornar Admin' }}
-                                        </button>
-                                    </form>
-                                    <!-- Apagar Utilizador -->
-                                    <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}" onsubmit="return confirm('Tem a certeza que quer apagar este utilizador? Esta ação é irreversível.');" class="inline">
-                                        {{ form.csrf_token }}
-                                        <button type="submit" class="font-medium text-red-600 dark:text-red-500 hover:underline">
-                                            Apagar
-                                        </button>
-                                    </form>
-                                {% else %}
-                                    <span class="text-xs text-gray-400 italic">Sua conta</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+<div class="space-y-8">
+    <!-- Gerador de Código de Convite -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+        <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Gerar Código de Convite Avulso</h2>
+        <form method="POST" action="{{ url_for('generate_invitation') }}" class="inline" onsubmit="return handleGenerateSingleCode(event)">
+            {{ form.csrf_token }}
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                Gerar Novo Código
+            </button>
+        </form>
+        <div class="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg inline-flex items-center">
+            <span class="font-semibold text-gray-700 dark:text-gray-300 mr-2">Código Gerado:</span>
+            <code id="single-invitation-code" class="text-gray-900 dark:text-gray-100 font-mono">Clique no botão para gerar...</code>
         </div>
     </div>
 
-    <script>
-        async function handleGenerateSingleCode(event) {
-            event.preventDefault();
-            const form = event.target;
-            const codeSpan = document.getElementById('single-invitation-code');
-            codeSpan.textContent = 'A gerar...';
-            try {
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    body: new FormData(form)
-                });
-                const data = await response.json();
-                if (data.code) {
-                    codeSpan.textContent = data.code;
-                } else {
-                    codeSpan.textContent = data.error || 'Erro ao gerar código.';
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                codeSpan.textContent = 'Erro de comunicação com o servidor.';
+    <!-- Lista de Utilizadores -->
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+        <h2 class="text-xl font-bold mb-4 text-gray-800 dark:text-gray-200">Lista de Utilizadores</h2>
+        <div class="overflow-x-auto relative">
+            <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th scope="col" class="py-3 px-6">Nome</th>
+                        <th scope="col" class="py-3 px-6">Email</th>
+                        <th scope="col" class="py-3 px-6">Pontos</th>
+                        <th scope="col" class="py-3 px-6">Nível</th>
+                        <th scope="col" class="py-3 px-6">Admin</th>
+                        <th scope="col" class="py-3 px-6">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                        <td class="py-4 px-6 font-medium text-gray-900 whitespace-nowrap dark:text-white">{{ user.name }}</td>
+                        <td class="py-4 px-6">{{ user.email }}</td>
+                        <td class="py-4 px-6">{{ user.points }}</td>
+                        <td class="py-4 px-6">{{ user.level.name if user.level else 'N/A' }}</td>
+                        <td class="py-4 px-6">{{ 'Sim' if user.is_admin else 'Não' }}</td>
+                        <td class="py-4 px-6 flex items-center space-x-4">
+                            {% if user.id != current_user.id %}
+                                <!-- Tornar/Remover Admin -->
+                                <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}" class="inline">
+                                    {{ form.csrf_token }}
+                                    <button type="submit" class="font-medium text-blue-600 dark:text-blue-500 hover:underline">
+                                        {{ 'Remover Admin' if user.is_admin else 'Tornar Admin' }}
+                                    </button>
+                                </form>
+                                <!-- Apagar Utilizador -->
+                                <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}" onsubmit="return confirm('Tem a certeza que quer apagar este utilizador? Esta ação é irreversível.');" class="inline">
+                                    {{ form.csrf_token }}
+                                    <button type="submit" class="font-medium text-red-600 dark:text-red-500 hover:underline">
+                                        Apagar
+                                    </button>
+                                </form>
+                            {% else %}
+                                <span class="text-xs text-gray-400 italic">Sua conta</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function handleGenerateSingleCode(event) {
+        event.preventDefault();
+        const form = event.target;
+        const codeSpan = document.getElementById('single-invitation-code');
+        codeSpan.textContent = 'A gerar...';
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            });
+            const data = await response.json();
+            if (data.code) {
+                codeSpan.textContent = data.code;
+            } else {
+                codeSpan.textContent = data.error || 'Erro ao gerar código.';
             }
-            return false;
+        } catch (error) {
+            console.error('Fetch error:', error);
+            codeSpan.textContent = 'Erro de comunicação com o servidor.';
         }
-    </script>
+        return false;
+    }
+</script>
 {% endblock %}
 

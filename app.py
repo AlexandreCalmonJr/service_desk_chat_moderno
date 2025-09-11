@@ -1786,6 +1786,67 @@ def admin_delete_challenge(challenge_id):
     flash('Desafio e todas as suas referências foram excluídos com sucesso!', 'success')
     return redirect(url_for('admin_challenges'))
 
+app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+def admin_delete_user(user_id):
+    """Apaga um utilizador e todos os seus dados associados de forma segura."""
+    if not current_user.is_admin or current_user.id == user_id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('admin_users'))
+
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_users'))
+
+    user_to_delete = User.query.get_or_404(user_id)
+
+    # 1. Lidar com a posse da equipa
+    owned_team = Team.query.filter_by(owner_id=user_to_delete.id).first()
+    if owned_team:
+        other_members = owned_team.members.filter(User.id != user_to_delete.id).order_by(User.registered_at).all()
+        if other_members:
+            # Transfere a posse para o membro mais antigo
+            new_owner = other_members[0]
+            owned_team.owner_id = new_owner.id
+            flash(f"A posse da equipa '{owned_team.name}' foi transferida para {new_owner.name}.", 'info')
+        else:
+            # Apaga a equipa se for o único membro
+            TeamBossCompletion.query.filter_by(team_id=owned_team.id).delete()
+            TeamBossProgress.query.filter_by(team_id=owned_team.id).delete()
+            db.session.delete(owned_team)
+            flash(f"A equipa '{owned_team.name}' foi dissolvida pois o dono foi apagado.", 'info')
+
+    # 2. Apagar todas as dependências
+    UserChallenge.query.filter_by(user_id=user_to_delete.id).delete()
+    UserPathProgress.query.filter_by(user_id=user_to_delete.id).delete()
+    UserAchievement.query.filter_by(user_id=user_to_delete.id).delete()
+    TeamBossProgress.query.filter_by(completed_by_user_id=user_to_delete.id).delete()
+    ChatMessage.query.filter_by(user_id=user_to_delete.id).delete()
+    
+    # Desvincula o código de convite em vez de apagar
+    InvitationCode.query.filter_by(used_by_user_id=user_to_delete.id).update({'used_by_user_id': None, 'used': False})
+    
+    # 3. Apagar o utilizador
+    db.session.delete(user_to_delete)
+    db.session.commit()
+
+    flash(f'Utilizador {user_to_delete.name} e todos os seus dados foram apagados com sucesso.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/path/<int:path_id>')
+@login_required
+def view_path(path_id):
+    """Mostra os detalhes de uma trilha de aprendizagem específica."""
+    path = LearningPath.query.get_or_404(path_id)
+    if not path.is_active and not current_user.is_admin:
+        flash('Esta trilha de aprendizagem não está ativa no momento.', 'warning')
+        return redirect(url_for('list_paths'))
+    
+    user_completed_challenges = {uc.challenge_id for uc in current_user.completed_challenges}
+    
+    return render_template('view_path.html', path=path, user_completed_challenges=user_completed_challenges)
+
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')
