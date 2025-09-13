@@ -1305,7 +1305,12 @@ def submit_challenge(challenge_id):
 @app.route('/teams', methods=['GET', 'POST'])
 @login_required
 def teams_list():
+    form = BaseForm() # Cria a instância do formulário
     if request.method == 'POST':
+        if not form.validate_on_submit(): # Valida o CSRF
+            flash('Erro de validação.', 'error')
+            return redirect(url_for('teams_list'))
+            
         if current_user.team_id:
             flash('Você já pertence a uma equipe. Saia da sua equipe atual para criar uma nova.', 'error')
             return redirect(url_for('teams_list'))
@@ -1320,9 +1325,11 @@ def teams_list():
             db.session.commit() # Atualiza o usuário
             flash(f'Equipe "{team_name}" criada com sucesso!', 'success')
             return redirect(url_for('teams_list'))
+            
     all_teams = Team.query.all()
     team_challenges = Challenge.query.filter_by(is_team_challenge=True).all()
-    return render_template('teams.html', teams=all_teams, team_challenges=team_challenges)
+    # Passe o 'form' para o template
+    return render_template('teams.html', teams=all_teams, team_challenges=team_challenges, form=form)
 
 @app.route('/team/<int:team_id>')
 @login_required
@@ -2071,7 +2078,6 @@ def admin_hunts():
             is_active = 'is_active' in request.form
             
             if is_active:
-                # Garante que apenas uma caça esteja ativa por vez
                 ScavengerHunt.query.update({ScavengerHunt.is_active: False})
 
             new_hunt = ScavengerHunt(name=name, description=description, reward_points=reward_points, is_active=is_active)
@@ -2080,13 +2086,13 @@ def admin_hunts():
             flash('Evento de Caça ao Tesouro criado com sucesso!', 'success')
 
         elif action == 'create_step':
+            # ... (Lógica para criar um passo, como já tinha)
             hunt_id = request.form['hunt_id']
             step_number = request.form['step_number']
             clue_text = request.form['clue_text']
             target_type = request.form['target_type']
             target_identifier = request.form['target_identifier']
             hidden_clue = request.form['hidden_clue']
-
             new_step = ScavengerHuntStep(
                 hunt_id=hunt_id,
                 step_number=step_number,
@@ -2105,42 +2111,16 @@ def admin_hunts():
     return render_template('admin_hunts.html', hunts=hunts, form=form)
 
 
-@app.route('/admin/hunts/delete/<int:hunt_id>', methods=['POST'])
-@login_required
-def delete_hunt(hunt_id):
-    if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
-    
-    form = BaseForm()
-    if not form.validate_on_submit():
-        flash('Erro de validação CSRF.', 'error')
-        return redirect(url_for('admin_hunts'))
-
-    hunt_to_delete = ScavengerHunt.query.get_or_404(hunt_id)
-
-    db.session.delete(hunt_to_delete)
-    db.session.commit()
-    flash(f'O evento "{hunt_to_delete.name}" e todos os seus passos foram apagados.', 'success')
-    return redirect(url_for('admin_hunts'))
-
-# Adicione este bloco inteiro ao seu ficheiro app.py
-
 @app.route('/admin/hunts/edit/<int:hunt_id>', methods=['GET', 'POST'])
 @login_required
 def admin_edit_hunt(hunt_id):
     if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
     
     hunt = ScavengerHunt.query.get_or_404(hunt_id)
     form = BaseForm()
     
-    if request.method == 'POST':
-        if not form.validate_on_submit():
-            flash('Erro de validação CSRF.', 'error')
-            return redirect(url_for('admin_edit_hunt', hunt_id=hunt.id))
-            
+    if form.validate_on_submit():
         hunt.name = request.form['name']
         hunt.description = request.form['description']
         hunt.reward_points = request.form['reward_points']
@@ -2156,22 +2136,19 @@ def admin_edit_hunt(hunt_id):
 
     return render_template('admin_edit_hunt.html', hunt=hunt, form=form)
 
+
 @app.route('/admin/hunts/delete/<int:hunt_id>', methods=['POST'])
 @login_required
 def delete_hunt(hunt_id):
     if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
     
     form = BaseForm()
-    if not form.validate_on_submit():
-        flash('Erro de validação CSRF.', 'error')
-        return redirect(url_for('admin_hunts'))
-
-    hunt_to_delete = ScavengerHunt.query.get_or_404(hunt_id)
-    db.session.delete(hunt_to_delete)
-    db.session.commit()
-    flash(f'O evento "{hunt_to_delete.name}" foi apagado.', 'success')
+    if form.validate_on_submit():
+        hunt_to_delete = ScavengerHunt.query.get_or_404(hunt_id)
+        db.session.delete(hunt_to_delete)
+        db.session.commit()
+        flash(f'O evento "{hunt_to_delete.name}" foi apagado.', 'success')
     return redirect(url_for('admin_hunts'))
 
 
@@ -2179,39 +2156,15 @@ def delete_hunt(hunt_id):
 @login_required
 def delete_hunt_step(step_id):
     if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
-        
+    
     form = BaseForm()
-    if not form.validate_on_submit():
-        flash('Erro de validação CSRF.', 'error')
-        return redirect(url_for('admin_hunts'))
-
-    step_to_delete = ScavengerHuntStep.query.get_or_404(step_id)
-    db.session.delete(step_to_delete)
-    db.session.commit()
-    flash(f'O passo {step_to_delete.step_number} foi apagado com sucesso.', 'success')
+    if form.validate_on_submit():
+        step_to_delete = ScavengerHuntStep.query.get_or_404(step_id)
+        db.session.delete(step_to_delete)
+        db.session.commit()
+        flash(f'O passo {step_to_delete.step_number} foi apagado com sucesso.', 'success')
     return redirect(url_for('admin_hunts'))
-
-@app.route('/admin/hunts/step/delete/<int:step_id>', methods=['POST'])
-@login_required
-def delete_hunt_step(step_id):
-    if not current_user.is_admin:
-        flash('Acesso negado.', 'error')
-        return redirect(url_for('index'))
-        
-    form = BaseForm()
-    if not form.validate_on_submit():
-        flash('Erro de validação CSRF.', 'error')
-        return redirect(url_for('admin_hunts'))
-
-    step_to_delete = ScavengerHuntStep.query.get_or_404(step_id)
-    db.session.delete(step_to_delete)
-    db.session.commit()
-    flash(f'O passo {step_to_delete.step_number} foi apagado com sucesso.', 'success')
-    return redirect(url_for('admin_hunts'))
-
-# Adicionar em app.py, junto com as outras rotas de admin
 
 @app.route('/admin/events', methods=['GET', 'POST'])
 @login_required
