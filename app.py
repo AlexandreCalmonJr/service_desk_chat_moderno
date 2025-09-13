@@ -275,6 +275,27 @@ class UserHuntProgress(db.Model):
     user = db.relationship('User', backref='hunt_progress')
     hunt = db.relationship('ScavengerHunt')
 
+class GlobalEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    total_hp = db.Column(db.BigInteger, nullable=False) # Usamos BigInteger para vidas muito grandes
+    current_hp = db.Column(db.BigInteger, nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    end_date = db.Column(db.DateTime, nullable=False)
+    is_active = db.Column(db.Boolean, default=False)
+    reward_points_on_win = db.Column(db.Integer, default=200)
+    # Poderíamos adicionar uma conquista aqui também no futuro
+    
+class GlobalEventContribution(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('global_event.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    contribution_points = db.Column(db.Integer, nullable=False) # Quantos "pontos de dano" o user causou
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    event = db.relationship('GlobalEvent', backref=db.backref('contributions', cascade='all, delete-orphan'))
+    user = db.relationship('User', backref='event_contributions')
+    
 # Constante de níveis
 LEVELS = {
     'Iniciante': {'min_points': 0, 'insignia': '🌱'},
@@ -1962,6 +1983,45 @@ def admin_hunts():
 
     hunts = ScavengerHunt.query.order_by(ScavengerHunt.id.desc()).all()
     return render_template('admin_hunts.html', hunts=hunts, form=form)
+
+
+@app.route('/admin/hunts/delete/<int:hunt_id>', methods=['POST'])
+@login_required
+def delete_hunt(hunt_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_hunts'))
+
+    hunt_to_delete = ScavengerHunt.query.get_or_404(hunt_id)
+
+    db.session.delete(hunt_to_delete)
+    db.session.commit()
+    flash(f'O evento "{hunt_to_delete.name}" e todos os seus passos foram apagados.', 'success')
+    return redirect(url_for('admin_hunts'))
+
+
+@app.route('/admin/hunts/step/delete/<int:step_id>', methods=['POST'])
+@login_required
+def delete_hunt_step(step_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+        
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_hunts'))
+
+    step_to_delete = ScavengerHuntStep.query.get_or_404(step_id)
+    db.session.delete(step_to_delete)
+    db.session.commit()
+    flash(f'O passo {step_to_delete.step_number} foi apagado com sucesso.', 'success')
+    return redirect(url_for('admin_hunts'))
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')
