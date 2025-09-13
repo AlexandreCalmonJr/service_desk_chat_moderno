@@ -249,6 +249,32 @@ class TeamBossCompletion(db.Model):
     team = db.relationship('Team')
     boss_fight = db.relationship('BossFight')
 
+class ScavengerHunt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    is_active = db.Column(db.Boolean, default=False)
+    reward_points = db.Column(db.Integer, default=100)
+    steps = db.relationship('ScavengerHuntStep', backref='hunt', lazy='dynamic', order_by='ScavengerHuntStep.step_number', cascade='all, delete-orphan')
+
+class ScavengerHuntStep(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    hunt_id = db.Column(db.Integer, db.ForeignKey('scavenger_hunt.id'), nullable=False)
+    step_number = db.Column(db.Integer, nullable=False)
+    clue_text = db.Column(db.Text, nullable=False) # A pista que o bot dá ao utilizador
+    target_type = db.Column(db.String(50), nullable=False) # Ex: 'FAQ', 'CHALLENGE'
+    target_identifier = db.Column(db.String(200), nullable=False) # Ex: O título do desafio ou parte da pergunta da FAQ
+    hidden_clue = db.Column(db.Text, nullable=False) # A próxima pista a ser revelada
+
+class UserHuntProgress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    hunt_id = db.Column(db.Integer, db.ForeignKey('scavenger_hunt.id'), nullable=False)
+    current_step = db.Column(db.Integer, default=1, nullable=False)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    user = db.relationship('User', backref='hunt_progress')
+    hunt = db.relationship('ScavengerHunt')
+
 # Constante de níveis
 LEVELS = {
     'Iniciante': {'min_points': 0, 'insignia': '🌱'},
@@ -536,7 +562,29 @@ def inject_gamification_progress():
 @login_required
 def index():
     daily_challenge = get_or_create_daily_challenge()
-    return render_template('dashboard.html', daily_challenge=daily_challenge)
+    
+    # ### NOVO ###
+    active_hunt = ScavengerHunt.query.filter_by(is_active=True).first()
+    hunt_progress = None
+    if active_hunt:
+        hunt_progress = UserHuntProgress.query.filter_by(user_id=current_user.id, hunt_id=active_hunt.id).first()
+
+    return render_template('dashboard.html', 
+                            daily_challenge=daily_challenge,
+                            active_hunt=active_hunt, 
+                            hunt_progress=hunt_progress)
+
+@app.route('/hunt/start/<int:hunt_id>', methods=['POST'])
+@login_required
+def start_hunt(hunt_id):
+    hunt = ScavengerHunt.query.get_or_404(hunt_id)
+    existing_progress = UserHuntProgress.query.filter_by(user_id=current_user.id, hunt_id=hunt.id).first()
+    if not existing_progress:
+        new_progress = UserHuntProgress(user_id=current_user.id, hunt_id=hunt.id, current_step=1)
+        db.session.add(new_progress)
+        db.session.commit()
+        flash('Você começou a caça ao tesouro! Boa sorte!', 'success')
+    return redirect(url_for('index'))
 
 @app.route('/admin/users')
 @login_required
@@ -645,6 +693,32 @@ def chat_page():
 def chat():
     data = request.get_json()
     mensagem = data.get('mensagem', '').strip()
+    
+    active_hunt = ScavengerHunt.query.filter_by(is_active=True).first()
+    if active_hunt:
+        progress = UserHuntProgress.query.filter_by(user_id=current_user.id, hunt_id=active_hunt.id).first()
+        if progress and not progress.completed_at:
+            current_step_info = ScavengerHuntStep.query.filter_by(hunt_id=active_hunt.id, step_number=progress.current_step).first()
+            
+            # Verifica se a mensagem do utilizador resolve o passo atual
+            if current_step_info and current_step_info.target_identifier.lower() in mensagem.lower():
+                next_step_info = ScavengerHuntStep.query.filter_by(hunt_id=active_hunt.id, step_number=progress.current_step + 1).first()
+                
+                if next_step_info:
+                    progress.current_step += 1
+                    db.session.commit()
+                    resposta_caca = f"🎉 **Pista Encontrada!**<br><br>{current_step_info.hidden_clue}<br><br><strong>Próxima Pista:</strong> {next_step_info.clue_text}"
+                    return jsonify({'text': resposta_caca, 'html': True, 'state': 'normal', 'options': []})
+                else:
+                    # O aluno encontrou a última pista e completou a caça!
+                    progress.completed_at = datetime.utcnow()
+                    current_user.points += active_hunt.reward_points
+                    update_user_level(current_user)
+                    check_and_award_achievements(current_user)
+                    db.session.commit()
+                    resposta_final = f"🏆 **Parabéns!** Você completou a caça ao tesouro '{active_hunt.name}' e ganhou {active_hunt.reward_points} pontos! A última pista era: {current_step_info.hidden_clue}"
+                    return jsonify({'text': resposta_final, 'html': True, 'state': 'normal', 'options': []})
+                
     resposta = {
         'text': "Desculpe, não entendi. Tente reformular a pergunta.",
         'html': False,
@@ -1834,6 +1908,60 @@ def admin_delete_challenge(challenge_id):
     flash('Desafio e todas as suas referências foram excluídos com sucesso!', 'success')
     return redirect(url_for('admin_challenges'))
 
+@app.route('/admin/hunts', methods=['GET', 'POST'])
+@login_required
+def admin_hunts():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    form = BaseForm()
+    if request.method == 'POST':
+        if not form.validate_on_submit():
+            flash('Erro de validação CSRF.', 'error')
+            return redirect(url_for('admin_hunts'))
+
+        action = request.form.get('action')
+        
+        if action == 'create_hunt':
+            name = request.form['name']
+            description = request.form['description']
+            reward_points = request.form['reward_points']
+            is_active = 'is_active' in request.form
+            
+            if is_active:
+                # Garante que apenas uma caça esteja ativa por vez
+                ScavengerHunt.query.update({ScavengerHunt.is_active: False})
+
+            new_hunt = ScavengerHunt(name=name, description=description, reward_points=reward_points, is_active=is_active)
+            db.session.add(new_hunt)
+            db.session.commit()
+            flash('Evento de Caça ao Tesouro criado com sucesso!', 'success')
+
+        elif action == 'create_step':
+            hunt_id = request.form['hunt_id']
+            step_number = request.form['step_number']
+            clue_text = request.form['clue_text']
+            target_type = request.form['target_type']
+            target_identifier = request.form['target_identifier']
+            hidden_clue = request.form['hidden_clue']
+
+            new_step = ScavengerHuntStep(
+                hunt_id=hunt_id,
+                step_number=step_number,
+                clue_text=clue_text,
+                target_type=target_type,
+                target_identifier=target_identifier,
+                hidden_clue=hidden_clue
+            )
+            db.session.add(new_step)
+            db.session.commit()
+            flash('Passo adicionado com sucesso!', 'success')
+            
+        return redirect(url_for('admin_hunts'))
+
+    hunts = ScavengerHunt.query.order_by(ScavengerHunt.id.desc()).all()
+    return render_template('admin_hunts.html', hunts=hunts, form=form)
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')

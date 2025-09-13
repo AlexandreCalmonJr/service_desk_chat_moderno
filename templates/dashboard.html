@@ -4,6 +4,30 @@
 
 {% block content %}
 <div class="w-full max-w-7xl mx-auto">
+    {% if active_hunt %}
+    <div class="mb-8 bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-6 rounded-2xl shadow-lg">
+        <h2 class="text-2xl font-bold text-center">🌟 Evento Ativo: {{ active_hunt.name }} 🌟</h2>
+        <p class="mt-2 text-center">{{ active_hunt.description }}</p>
+        
+        {% if hunt_progress and not hunt_progress.completed_at %}
+            {% set current_step = active_hunt.steps.filter_by(step_number=hunt_progress.current_step).first() %}
+            <div class="mt-4 bg-white/20 p-4 rounded-lg">
+                <p class="font-semibold text-lg">Sua pista atual (Passo {{ hunt_progress.current_step }}):</p>
+                <p class="text-md italic">"{{ current_step.clue_text }}"</p>
+            </div>
+        {% elif hunt_progress and hunt_progress.completed_at %}
+            <p class="mt-4 text-center font-bold text-green-300">Você já completou este evento. Parabéns!</p>
+        {% else %}
+            <div class="mt-4 text-center">
+                <form method="POST" action="{{ url_for('start_hunt', hunt_id=active_hunt.id) }}">
+                    <button type="submit" class="px-6 py-3 bg-white text-gray-900 font-bold rounded-lg hover:bg-gray-200 transition">
+                        Começar a Caça!
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
 
     {% if daily_challenge %}
     <div class="mb-8 bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-6 rounded-2xl shadow-lg text-center">
