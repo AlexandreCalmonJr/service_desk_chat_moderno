@@ -1,0 +1,58 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Admin - Importar Conteúdo{% endblock %}
+{% block page_title %}Importação de Conteúdo em Massa{% endblock %}
+
+{% block content %}
+<div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg max-w-2xl mx-auto">
+    <h2 class="text-xl font-semibold mb-4">Importar Conteúdo via JSON</h2>
+    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Envie o ficheiro `conteudo_completo.json` para popular ou atualizar a plataforma. O sistema irá ignorar itens que já existem (baseado no nome/título) e adicionar apenas os novos.
+    </p>
+
+    <form method="POST" action="{{ url_for('admin_import_content') }}" enctype="multipart/form-data" class="space-y-4">
+        {{ form.csrf_token }}
+        <div>
+            <label for="content_file" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ficheiro de Conteúdo Unificado</label>
+            <input type="file" name="content_file" id="content_file" required accept=".json" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-gray-700 dark:file:text-gray-200 dark:hover:file:bg-gray-600">
+        </div>
+        
+        <div class="bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-lg">
+            <h4 class="font-bold text-yellow-800 dark:text-yellow-300">Atenção:</h4>
+            <p class="text-xs text-yellow-700 dark:text-yellow-400">Marque as caixas abaixo para o tipo de conteúdo que deseja importar. Apenas os tipos selecionados serão processados.</p>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="flex items-center">
+                <input id="import_faqs" name="import_faqs" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <label for="import_faqs" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">FAQs</label>
+            </div>
+            <div class="flex items-center">
+                <input id="import_desafios" name="import_desafios" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <label for="import_desafios" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Desafios</label>
+            </div>
+            <div class="flex items-center">
+                <input id="import_trilhas" name="import_trilhas" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <label for="import_trilhas" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Trilhas</label>
+            </div>
+            <div class="flex items-center">
+                <input id="import_boss_fights" name="import_boss_fights" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <label for="import_boss_fights" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Boss Fights</label>
+            </div>
+            <div class="flex items-center">
+                <input id="import_caca_tesouros" name="import_caca_tesouros" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <label for="import_caca_tesouros" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Caça ao Tesouro</label>
+            </div>
+            <div class="flex items-center">
+                <input id="import_eventos_globais" name="import_eventos_globais" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                <label for="import_eventos_globais" class="ml-2 block text-sm text-gray-900 dark:text-gray-200">Eventos Globais</label>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition">
+            <i class="fas fa-upload mr-2"></i> Iniciar Importação
+        </button>
+    </form>
+</div>
+{% endblock %}
+
