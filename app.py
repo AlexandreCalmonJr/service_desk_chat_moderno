@@ -2385,6 +2385,127 @@ def trigger_finalize_battles():
         
     return redirect(url_for('admin_battles'))
 
+# Adicione esta nova rota ao seu ficheiro app.py, junto com as outras rotas de admin.
+
+@app.route('/admin/import', methods=['GET', 'POST'])
+@login_required
+def admin_import_content():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    form = BaseForm()
+    if form.validate_on_submit():
+        file = request.files.get('content_file')
+        if not file or not file.filename.endswith('.json'):
+            flash('Por favor, envie um ficheiro JSON válido.', 'error')
+            return redirect(url_for('admin_import_content'))
+        
+        try:
+            content = json.load(file.stream)
+            counts = {'faqs': 0, 'desafios': 0, 'trilhas': 0, 'boss_fights': 0, 'caca_tesouros': 0, 'eventos_globais': 0}
+
+            # --- Processar FAQs ---
+            if 'import_faqs' in request.form and 'faqs' in content:
+                existing_questions = {f.question for f in FAQ.query.all()}
+                for faq_data in content['faqs']:
+                    if faq_data['question'] not in existing_questions:
+                        category = Category.query.filter_by(name=faq_data['category']).first()
+                        if not category:
+                            category = Category(name=faq_data['category'])
+                            db.session.add(category)
+                            db.session.flush()
+                        
+                        new_faq = FAQ(category_id=category.id, **{k: v for k, v in faq_data.items() if k != 'category'})
+                        db.session.add(new_faq)
+                        counts['faqs'] += 1
+
+            # --- Processar Desafios ---
+            if 'import_desafios' in request.form and 'desafios' in content:
+                existing_titles = {c.title for c in Challenge.query.all()}
+                for challenge_data in content['desafios']:
+                    if challenge_data['title'] not in existing_titles:
+                        new_challenge = Challenge(**challenge_data)
+                        db.session.add(new_challenge)
+                        counts['desafios'] += 1
+
+            # --- Processar Trilhas ---
+            if 'import_trilhas' in request.form and 'trilhas' in content:
+                existing_names = {p.name for p in LearningPath.query.all()}
+                for path_data in content['trilhas']:
+                    if path_data['name'] not in existing_names:
+                        challenges_in_path_data = path_data.pop('challenges', [])
+                        new_path = LearningPath(**path_data)
+                        db.session.add(new_path)
+                        db.session.flush()
+                        for c_data in challenges_in_path_data:
+                            challenge = Challenge.query.filter_by(title=c_data['title']).first()
+                            if challenge:
+                                pc = PathChallenge(path_id=new_path.id, challenge_id=challenge.id, step=c_data['step'])
+                                db.session.add(pc)
+                        counts['trilhas'] += 1
+
+            # --- Processar Boss Fights ---
+            if 'import_boss_fights' in request.form and 'boss_fights' in content:
+                existing_names = {b.name for b in BossFight.query.all()}
+                for boss_data in content['boss_fights']:
+                    if boss_data['name'] not in existing_names:
+                        stages_data = boss_data.pop('stages', [])
+                        new_boss = BossFight(**boss_data)
+                        db.session.add(new_boss)
+                        db.session.flush()
+                        for s_data in stages_data:
+                            steps_data = s_data.pop('steps', [])
+                            new_stage = BossFightStage(boss_fight_id=new_boss.id, **s_data)
+                            db.session.add(new_stage)
+                            db.session.flush()
+                            for step_data in steps_data:
+                                new_step = BossFightStep(stage_id=new_stage.id, **step_data)
+                                db.session.add(new_step)
+                        counts['boss_fights'] += 1
+
+            # --- Processar Caça ao Tesouro ---
+            if 'import_caca_tesouros' in request.form and 'caca_tesouros' in content:
+                existing_names = {h.name for h in ScavengerHunt.query.all()}
+                for hunt_data in content['caca_tesouros']:
+                    if hunt_data['name'] not in existing_names:
+                        steps_data = hunt_data.pop('steps', [])
+                        new_hunt = ScavengerHunt(**hunt_data)
+                        db.session.add(new_hunt)
+                        db.session.flush()
+                        for step_data in steps_data:
+                            new_step = ScavengerHuntStep(hunt_id=new_hunt.id, **step_data)
+                            db.session.add(new_step)
+                        counts['caca_tesouros'] += 1
+            
+            # --- Processar Eventos Globais ---
+            if 'import_eventos_globais' in request.form and 'eventos_globais' in content:
+                existing_names = {e.name for e in GlobalEvent.query.all()}
+                for event_data in content['eventos_globais']:
+                    if event_data['name'] not in existing_names:
+                        event_data['start_date'] = datetime.fromisoformat(event_data['start_date'])
+                        event_data['end_date'] = datetime.fromisoformat(event_data['end_date'])
+                        event_data['current_hp'] = event_data['total_hp']
+                        
+                        new_event = GlobalEvent(**event_data)
+                        db.session.add(new_event)
+                        counts['eventos_globais'] += 1
+
+            db.session.commit()
+            flash(f"Importação concluída! Adicionados: {counts['faqs']} FAQs, {counts['desafios']} Desafios, "
+                f"{counts['trilhas']} Trilhas, {counts['boss_fights']} Boss Fights, "
+                f"{counts['caca_tesouros']} Caças ao Tesouro, {counts['eventos_globais']} Eventos Globais.", 'success')
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ocorreu um erro durante a importação: {e}', 'error')
+        
+        return redirect(url_for('admin_import_content'))
+    
+    return render_template('admin_import.html', form=form)
+
+
+
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')
 @with_appcontext
