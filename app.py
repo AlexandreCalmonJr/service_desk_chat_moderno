@@ -1305,9 +1305,9 @@ def submit_challenge(challenge_id):
 @app.route('/teams', methods=['GET', 'POST'])
 @login_required
 def teams_list():
-    form = BaseForm() # Cria a instância do formulário
+    form = BaseForm()
     if request.method == 'POST':
-        if not form.validate_on_submit(): # Valida o CSRF
+        if not form.validate_on_submit():
             flash('Erro de validação.', 'error')
             return redirect(url_for('teams_list'))
             
@@ -1320,16 +1320,24 @@ def teams_list():
         else:
             new_team = Team(name=team_name, owner_id=current_user.id)
             db.session.add(new_team)
-            db.session.commit() # Salva a equipe para obter um ID
+            db.session.commit()
             current_user.team = new_team
-            db.session.commit() # Atualiza o usuário
+            db.session.commit()
             flash(f'Equipe "{team_name}" criada com sucesso!', 'success')
-            return redirect(url_for('teams_list'))
+        return redirect(url_for('teams_list'))
             
     all_teams = Team.query.all()
-    team_challenges = Challenge.query.filter_by(is_team_challenge=True).all()
-    # Passe o 'form' para o template
-    return render_template('teams.html', teams=all_teams, team_challenges=team_challenges, form=form)
+    
+    # Adicionado: Buscar batalhas ativas para o utilizador atual
+    active_battles = []
+    if current_user.team:
+        active_battles = TeamBattle.query.filter(
+            (TeamBattle.challenging_team_id == current_user.team_id) | (TeamBattle.challenged_team_id == current_user.team_id),
+            TeamBattle.status == 'active'
+        ).all()
+
+    return render_template('teams.html', teams=all_teams, form=form, active_battles=active_battles)
+
 
 @app.route('/team/<int:team_id>')
 @login_required
@@ -2256,8 +2264,12 @@ def admin_delete_event(event_id):
 def challenge_team(team_id):
     challenger_team = current_user.team
     challenged_team = Team.query.get_or_404(team_id)
+    form = BaseForm()
 
-    # Validações
+    if not form.validate_on_submit():
+        flash('Erro de validação.', 'error')
+        return redirect(url_for('teams_list'))
+
     if not challenger_team:
         flash('Você precisa de estar numa equipa para desafiar outras.', 'error')
         return redirect(url_for('teams_list'))
@@ -2265,10 +2277,9 @@ def challenge_team(team_id):
         flash('Apenas o líder da equipa pode iniciar batalhas.', 'error')
         return redirect(url_for('teams_list'))
     if challenger_team.id == challenged_team.id:
-        flash('Você не pode desafiar a sua própria equipa.', 'error')
-        return redirect(url_for('view_battle', battle_id=new_battle.id))
+        flash('Você não pode desafiar a sua própria equipa.', 'error')
+        return redirect(url_for('teams_list'))
 
-    # Verifica se já existe uma batalha ativa entre estas equipas
     existing_battle = TeamBattle.query.filter(
         ((TeamBattle.challenging_team_id == challenger_team.id) & (TeamBattle.challenged_team_id == challenged_team.id) |
         (TeamBattle.challenging_team_id == challenged_team.id) & (TeamBattle.challenged_team_id == challenger_team.id)) &
@@ -2279,8 +2290,6 @@ def challenge_team(team_id):
         flash('Já existe uma batalha ativa entre estas duas equipas.', 'warning')
         return redirect(url_for('teams_list'))
 
-    # Lógica para selecionar desafios
-    # Seleciona 5 desafios aleatórios que não sejam de equipa e que ambas as equipas possam aceder
     num_challenges = 5
     available_challenges = Challenge.query.filter_by(is_team_challenge=False).all()
     if len(available_challenges) < num_challenges:
@@ -2289,8 +2298,7 @@ def challenge_team(team_id):
     
     selected_challenges = random.sample(available_challenges, num_challenges)
     
-    # Cria a batalha
-    end_time = datetime.utcnow() + timedelta(days=2) # Batalha dura 48 horas
+    end_time = datetime.utcnow() + timedelta(days=2)
     new_battle = TeamBattle(
         challenging_team_id=challenger_team.id,
         challenged_team_id=challenged_team.id,
@@ -2298,7 +2306,7 @@ def challenge_team(team_id):
         status='active'
     )
     db.session.add(new_battle)
-    db.session.flush() # Para obter o ID da batalha antes de fazer commit
+    db.session.flush()
 
     for challenge in selected_challenges:
         battle_challenge = TeamBattleChallenge(battle_id=new_battle.id, challenge_id=challenge.id)
@@ -2306,8 +2314,9 @@ def challenge_team(team_id):
     
     db.session.commit()
 
-    flash(f'Desafio enviado para a equipa "{challenged_team.name}"! A batalha termina em 48 horas. Boa sorte!', 'success')
-    return redirect(url_for('teams_list'))
+    flash(f'Desafio enviado para a equipa "{challenged_team.name}"! A batalha termina em 48 horas.', 'success')
+    # Alterado para redirecionar para a página da batalha
+    return redirect(url_for('view_battle', battle_id=new_battle.id))
 
 @app.route('/admin/battles')
 @login_required
@@ -2332,6 +2341,10 @@ def admin_delete_battle(battle_id):
         return redirect(url_for('admin_battles'))
 
     battle = TeamBattle.query.get_or_404(battle_id)
+    
+    # Apagar os desafios ligados a esta batalha PRIMEIRO
+    TeamBattleChallenge.query.filter_by(battle_id=battle.id).delete()
+
     db.session.delete(battle)
     db.session.commit()
     flash(f'A batalha entre "{battle.challenging_team.name}" e "{battle.challenged_team.name}" foi apagada.', 'success')
@@ -2339,12 +2352,10 @@ def admin_delete_battle(battle_id):
 
 
 
-# Adicionar em app.py
 @app.route('/battle/<int:battle_id>')
 @login_required
 def view_battle(battle_id):
     battle = TeamBattle.query.get_or_404(battle_id)
-    # Garante que o user pertence a uma das equipas da batalha
     if current_user.team_id not in [battle.challenging_team_id, battle.challenged_team_id]:
         flash('A sua equipa não faz parte desta batalha.', 'error')
         return redirect(url_for('teams_list'))

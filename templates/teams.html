@@ -9,6 +9,7 @@
         <p class="text-gray-500 dark:text-gray-400 mt-2">Encontre uma equipa para colaborar e competir!</p>
     </div>
 
+    <!-- PAINEL DA EQUIPA ATUAL DO UTILIZADOR -->
     <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
         {% if current_user.team %}
             <h3 class="text-xl font-semibold mb-2">Você faz parte do Time:</h3>
@@ -23,58 +24,83 @@
         {% else %}
             <h3 class="text-xl font-semibold mb-4">Crie o seu Próprio Time!</h3>
             <form action="{{ url_for('teams_list') }}" method="POST" class="flex flex-col sm:flex-row gap-2">
+                {{ form.csrf_token }}
                 <input type="text" name="team_name" required class="flex-grow p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600" placeholder="Digite o nome do novo time...">
                 <button type="submit" class="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-500 transition">Criar Time</button>
             </form>
         {% endif %}
     </div>
 
+    <!-- PAINEL DE BATALHAS ATIVAS -->
+    {% if active_battles %}
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl">
+        <h3 class="text-xl font-semibold mb-4 text-red-500 animate-pulse">Batalhas Ativas!</h3>
+        <div class="space-y-4">
+            {% for battle in active_battles %}
+                <div class="p-4 bg-gray-100 dark:bg-gray-900/50 rounded-lg flex justify-between items-center">
+                    <div>
+                        <p class="font-semibold">
+                            {{ battle.challenging_team.name }} 
+                            <span class="text-sm text-gray-500 dark:text-gray-400 mx-2">vs</span> 
+                            {{ battle.challenged_team.name }}
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Termina em: {{ battle.end_time.strftime('%d/%m/%Y às %H:%M') }}</p>
+                    </div>
+                    <a href="{{ url_for('view_battle', battle_id=battle.id) }}" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-500 transition text-sm">
+                        Ver Batalha
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- LISTA DE EQUIPAS DISPONÍVEIS -->
     <div>
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Times Disponíveis</h2>
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">Times Disponíveis para Desafiar</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for team in teams %}
-            {# Apenas mostra as equipas que não são a do utilizador atual #}
-            {% if team.id != current_user.team_id %}
-                <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md flex flex-col">
-                    <div class="flex-grow">
-                        <h3 class="font-bold text-lg">{{ team.name }}</h3>
-                        
-                        {# ### CORREÇÃO 1: Adicionada verificação para o dono ### #}
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            Dono: {{ team.owner.name if team.owner else 'Dono Desconhecido' }}
-                        </p>
-                        
-                        <div class="my-4 flex justify-around text-center">
-                            <div>
-                                <p class="font-bold text-xl">{{ team.members.count() }}</p>
-                                <p class="text-xs text-gray-400">Membros</p>
-                            </div>
-                            <div>
-                                <p class="font-bold text-xl">{{ team.total_points }}</p>
-                                <p class="text-xs text-gray-400">Pontos</p>
+                {# Apenas mostra as equipas que não são a do utilizador atual #}
+                {% if team.id != current_user.team_id %}
+                    <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md flex flex-col">
+                        <div class="flex-grow">
+                            <h3 class="font-bold text-lg">{{ team.name }}</h3>
+                            
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                Dono: {{ team.owner.name if team.owner else 'Dono Desconhecido' }}
+                            </p>
+                            
+                            <div class="my-4 flex justify-around text-center">
+                                <div>
+                                    <p class="font-bold text-xl">{{ team.members.count() }}</p>
+                                    <p class="text-xs text-gray-400">Membros</p>
+                                </div>
+                                <div>
+                                    <p class="font-bold text-xl">{{ team.total_points }}</p>
+                                    <p class="text-xs text-gray-400">Pontos</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    {# ### CORREÇÃO 2: Adicionados os botões de ação ### #}
-                    <div class="mt-2 flex flex-col gap-2">
-                        <a href="{{ url_for('view_team', team_id=team.id) }}" class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 text-sm font-semibold transition text-center">
-                            Ver Detalhes
-                        </a>
                         
-                        {# O botão só aparece se o utilizador for dono de uma equipa #}
-                        {% if current_user.team and current_user.id == current_user.team.owner_id %}
-                        <form method="POST" action="{{ url_for('challenge_team', team_id=team.id) }}">
-                            {{ form.csrf_token }} {# Garante a segurança CSRF #}
-                            <button type="submit" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold transition text-center">
-                                <i class="fas fa-fist-raised"></i> Desafiar Equipa
-                            </button>
-                        </form>
-                        {% endif %}
+                        <div class="mt-2 flex flex-col gap-2">
+                            <a href="{{ url_for('view_team', team_id=team.id) }}" class="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 text-sm font-semibold transition text-center">
+                                Ver Detalhes
+                            </a>
+                            
+                            {# O botão só aparece se o utilizador for dono de uma equipa #}
+                            {% if current_user.team and current_user.id == current_user.team.owner_id %}
+                            <form method="POST" action="{{ url_for('challenge_team', team_id=team.id) }}">
+                                {{ form.csrf_token }}
+                                <button type="submit" class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold transition text-center">
+                                    <i class="fas fa-fist-raised"></i> Desafiar Equipa
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
-            {% endif %}
-        {% endfor %}
+                {% endif %}
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endblock %}
