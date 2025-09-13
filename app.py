@@ -583,17 +583,28 @@ def inject_gamification_progress():
 @login_required
 def index():
     daily_challenge = get_or_create_daily_challenge()
-    
-    # ### NOVO ###
     active_hunt = ScavengerHunt.query.filter_by(is_active=True).first()
     hunt_progress = None
     if active_hunt:
         hunt_progress = UserHuntProgress.query.filter_by(user_id=current_user.id, hunt_id=active_hunt.id).first()
 
+    
+    active_event = GlobalEvent.query.filter(
+        GlobalEvent.is_active == True,
+        GlobalEvent.end_date >= datetime.utcnow(),
+        GlobalEvent.current_hp > 0
+    ).first()
+
+    event_progress = 0
+    if active_event:
+        event_progress = ((active_event.total_hp - active_event.current_hp) / active_event.total_hp) * 100
+
     return render_template('dashboard.html', 
                             daily_challenge=daily_challenge,
                             active_hunt=active_hunt, 
-                            hunt_progress=hunt_progress)
+                            hunt_progress=hunt_progress,
+                            active_event=active_event,      
+                            event_progress=event_progress)
 
 @app.route('/hunt/start/<int:hunt_id>', methods=['POST'])
 @login_required
@@ -1153,7 +1164,7 @@ def submit_challenge(challenge_id):
     
     is_correct = False
     if challenge.challenge_type == 'code':
-        # Para desafios de código, comparamos a resposta exata (pode ser melhorado no futuro)
+        # Para desafios de código, comparamos a resposta exata
         is_correct = submitted_answer == challenge.expected_answer
     else:
         # Para texto, ignoramos maiúsculas/minúsculas
@@ -1162,24 +1173,65 @@ def submit_challenge(challenge_id):
     if is_correct:
         existing_completion = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=challenge_id).first()
         if not existing_completion:
+            # 1. Atribuir pontos ao aluno e preparar a mensagem de sucesso
             current_user.points += challenge.points_reward
             flash_message = f'Parabéns! Completou o desafio "{challenge.title}" e ganhou {challenge.points_reward} pontos!'
+            
+            # Adicionar bónus do desafio diário, se aplicável
             today_challenge_entry = DailyChallenge.query.filter_by(day=date.today()).first()
             if today_challenge_entry and today_challenge_entry.challenge_id == challenge.id:
                 current_user.points += today_challenge_entry.bonus_points
-                flash_message += f' Você ganhou {today_challenge_entry.bonus_points} pontos de bônus por completar o desafio do dia!'
+                flash_message += f' Você ganhou {today_challenge_entry.bonus_points} pontos de bónus por completar o desafio do dia!'
+            
             completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
             db.session.add(completion)
+
+            # ### NOVO: LÓGICA DO EVENTO GLOBAL (WORLD BOSS) ###
+            active_event = GlobalEvent.query.filter(
+                GlobalEvent.is_active == True,
+                GlobalEvent.start_date <= datetime.utcnow(),
+                GlobalEvent.end_date >= datetime.utcnow(),
+                GlobalEvent.current_hp > 0
+            ).first()
+
+            if active_event:
+                damage = challenge.points_reward  # O dano causado é igual aos pontos do desafio
+                
+                # Garante que a vida não fique negativa
+                active_event.current_hp = max(0, active_event.current_hp - damage)
+                
+                # Regista a contribuição do aluno
+                contribution = GlobalEventContribution.query.filter_by(event_id=active_event.id, user_id=current_user.id).first()
+                if contribution:
+                    contribution.contribution_points += damage
+                else:
+                    contribution = GlobalEventContribution(event_id=active_event.id, user_id=current_user.id, contribution_points=damage)
+                    db.session.add(contribution)
+                
+                # Adiciona uma mensagem flash específica sobre o dano
+                flash(f'Você causou {damage} de dano ao Boss Global "{active_event.name}"!', 'success')
+
+                # Verifica se o boss foi derrotado neste ataque
+                if active_event.current_hp == 0:
+                    flash(f'Parabéns a todos! O Boss Global "{active_event.name}" foi derrotado!', 'success')
+                    # No futuro, aqui entraria a lógica para distribuir as recompensas a todos que participaram.
+            
+            # ### FIM DA LÓGICA DO EVENTO GLOBAL ###
+
+            # 2. Atualizar o progresso do aluno e guardar tudo na base de dados
             check_and_complete_paths(current_user, challenge_id)
             update_user_level(current_user)
-            db.session.commit()
+            db.session.commit() # Commit inicial para salvar pontos e progresso do desafio
+            
             check_and_award_achievements(current_user)
-            db.session.commit()
+            db.session.commit() # Commit final para salvar conquistas e alterações do evento
+            
             flash(flash_message, 'success')
         else:
             flash('Você já completou este desafio.', 'info')
     else:
         flash('Resposta incorreta. Tente novamente!', 'error')
+        
     return redirect(url_for('list_challenges'))
 
 @app.route('/teams', methods=['GET', 'POST'])
@@ -2022,6 +2074,90 @@ def delete_hunt_step(step_id):
     db.session.commit()
     flash(f'O passo {step_to_delete.step_number} foi apagado com sucesso.', 'success')
     return redirect(url_for('admin_hunts'))
+
+# Adicionar em app.py, junto com as outras rotas de admin
+
+@app.route('/admin/events', methods=['GET', 'POST'])
+@login_required
+def admin_events():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    form = BaseForm()
+    if request.method == 'POST':
+        if not form.validate_on_submit():
+            return redirect(url_for('admin_events'))
+
+        start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%dT%H:%M')
+        end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%dT%H:%M')
+        total_hp = int(request.form['total_hp'])
+
+        new_event = GlobalEvent(
+            name=request.form['name'],
+            description=request.form['description'],
+            total_hp=total_hp,
+            current_hp=total_hp, # Começa com a vida cheia
+            start_date=start_date,
+            end_date=end_date,
+            reward_points_on_win=int(request.form['reward_points_on_win']),
+            is_active='is_active' in request.form
+        )
+        db.session.add(new_event)
+        db.session.commit()
+        flash('Evento Global criado com sucesso!', 'success')
+        return redirect(url_for('admin_events'))
+
+    events = GlobalEvent.query.order_by(GlobalEvent.start_date.desc()).all()
+    return render_template('admin_events.html', events=events, form=form, now=datetime.utcnow())
+
+@app.route('/admin/events/edit/<int:event_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_event(event_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    event = GlobalEvent.query.get_or_404(event_id)
+    form = BaseForm()
+    
+    if request.method == 'POST':
+        if not form.validate_on_submit():
+            return redirect(url_for('admin_edit_event', event_id=event.id))
+            
+        event.name = request.form['name']
+        event.description = request.form['description']
+        event.total_hp = int(request.form['total_hp'])
+        event.start_date = datetime.strptime(request.form['start_date'], '%Y-%m-%dT%H:%M')
+        event.end_date = datetime.strptime(request.form['end_date'], '%Y-%m-%dT%H:%M')
+        event.reward_points_on_win = int(request.form['reward_points_on_win'])
+        event.is_active = 'is_active' in request.form
+        
+        # Opcional: Resetar a vida se o total for alterado
+        # event.current_hp = event.total_hp
+        
+        db.session.commit()
+        flash('Evento Global atualizado com sucesso!', 'success')
+        return redirect(url_for('admin_events'))
+
+    return render_template('admin_edit_event.html', event=event, form=form)
+
+@app.route('/admin/events/delete/<int:event_id>', methods=['POST'])
+@login_required
+def admin_delete_event(event_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    form = BaseForm()
+    if not form.validate_on_submit():
+        return redirect(url_for('admin_events'))
+
+    event = GlobalEvent.query.get_or_404(event_id)
+    db.session.delete(event) # As contribuições serão apagadas em cascata
+    db.session.commit()
+    flash('Evento Global apagado com sucesso.', 'success')
+    return redirect(url_for('admin_events'))
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')

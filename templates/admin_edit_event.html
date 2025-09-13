@@ -1,0 +1,46 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Editar Evento Global{% endblock %}
+{% block page_title %}Editar Evento: {{ event.name }}{% endblock %}
+
+{% block content %}
+<div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg max-w-2xl mx-auto">
+    <form method="POST" action="{{ url_for('admin_edit_event', event_id=event.id) }}" class="space-y-4">
+        {{ form.csrf_token }}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium">Nome</label>
+                <input type="text" name="name" value="{{ event.name }}" required class="mt-1 w-full rounded-md dark:bg-gray-700 border-gray-600">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Vida Total (HP)</label>
+                <input type="number" name="total_hp" value="{{ event.total_hp }}" required class="mt-1 w-full rounded-md dark:bg-gray-700 border-gray-600">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Data de Início</label>
+                <input type="datetime-local" name="start_date" value="{{ event.start_date.strftime('%Y-%m-%dT%H:%M') }}" required class="mt-1 w-full rounded-md dark:bg-gray-700 border-gray-600">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Data de Fim</label>
+                <input type="datetime-local" name="end_date" value="{{ event.end_date.strftime('%Y-%m-%dT%H:%M') }}" required class="mt-1 w-full rounded-md dark:bg-gray-700 border-gray-600">
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Recompensa (Pontos)</label>
+                <input type="number" name="reward_points_on_win" value="{{ event.reward_points_on_win }}" required class="mt-1 w-full rounded-md dark:bg-gray-700 border-gray-600">
+            </div>
+            <div class="flex items-center pt-6">
+                <input type="checkbox" name="is_active" {% if event.is_active %}checked{% endif %} class="h-4 w-4 rounded text-indigo-600">
+                <label class="ml-2">Ativo</label>
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium">Descrição</label>
+            <textarea name="description" rows="3" required class="mt-1 w-full rounded-md dark:bg-gray-700 border-gray-600">{{ event.description }}</textarea>
+        </div>
+        <div class="flex justify-end gap-4">
+            <a href="{{ url_for('admin_events') }}" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 transition">Cancelar</a>
+            <button type="submit" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition">Salvar Alterações</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
