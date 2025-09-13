@@ -2146,6 +2146,7 @@ def delete_hunt(hunt_id):
     form = BaseForm()
     if form.validate_on_submit():
         hunt_to_delete = ScavengerHunt.query.get_or_404(hunt_id)
+        UserHuntProgress.query.filter_by(hunt_id=hunt_to_delete.id).delete()
         db.session.delete(hunt_to_delete)
         db.session.commit()
         flash(f'O evento "{hunt_to_delete.name}" foi apagado.', 'success')
@@ -2265,7 +2266,7 @@ def challenge_team(team_id):
         return redirect(url_for('teams_list'))
     if challenger_team.id == challenged_team.id:
         flash('Você не pode desafiar a sua própria equipa.', 'error')
-        return redirect(url_for('teams_list'))
+        return redirect(url_for('view_battle', battle_id=new_battle.id))
 
     # Verifica se já existe uma batalha ativa entre estas equipas
     existing_battle = TeamBattle.query.filter(
@@ -2349,6 +2350,29 @@ def view_battle(battle_id):
         return redirect(url_for('teams_list'))
     
     return render_template('view_battle.html', battle=battle)
+
+# Adicione esta rota ao seu ficheiro app.py
+
+@app.route('/admin/battles/finalize', methods=['POST'])
+@login_required
+def trigger_finalize_battles():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    # Adicione o form para validação de CSRF
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_battles'))
+    
+    count = finalize_ended_battles()
+    if count > 0:
+        flash(f'{count} batalha(s) foram finalizadas e as recompensas distribuídas.', 'success')
+    else:
+        flash('Nenhuma batalha ativa precisava de ser finalizada.', 'info')
+        
+    return redirect(url_for('admin_battles'))
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')
