@@ -296,6 +296,28 @@ class GlobalEventContribution(db.Model):
     event = db.relationship('GlobalEvent', backref=db.backref('contributions', cascade='all, delete-orphan'))
     user = db.relationship('User', backref='event_contributions')
     
+class TeamBattle(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    challenging_team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    challenged_team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime, nullable=False)
+    status = db.Column(db.String(50), default='active')  # 'active', 'completed', 'expired'
+    winner_team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)  
+    reward_points = db.Column(db.Integer, default=150) # Pontos para cada membro da equipa vencedora
+    challenging_team = db.relationship('Team', foreign_keys=[challenging_team_id])
+    challenged_team = db.relationship('Team', foreign_keys=[challenged_team_id])
+    winner_team = db.relationship('Team', foreign_keys=[winner_team_id])
+
+class TeamBattleChallenge(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    battle_id = db.Column(db.Integer, db.ForeignKey('team_battle.id'), nullable=False)
+    challenge_id = db.Column(db.Integer, db.ForeignKey('challenge.id'), nullable=False)
+    completed_by_team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    battle = db.relationship('TeamBattle', backref=db.backref('battle_challenges', cascade='all, delete-orphan'))
+    challenge = db.relationship('Challenge')
+    
 # Constante de níveis
 LEVELS = {
     'Iniciante': {'min_points': 0, 'insignia': '🌱'},
@@ -553,6 +575,53 @@ def check_and_complete_paths(user, completed_challenge_id):
             db.session.commit()
             check_and_award_achievements(user)
             flash(f'Trilha "{path.name}" concluída! Você ganhou {path.reward_points} pontos de bônus!', 'success')
+
+def finalize_ended_battles():
+    """
+    Verifica todas as batalhas ativas, finaliza as que já terminaram,
+    calcula o vencedor e distribui os prémios.
+    """
+    ended_battles = TeamBattle.query.filter(
+        TeamBattle.status == 'active',
+        TeamBattle.end_time <= datetime.utcnow()
+    ).all()
+
+    battles_finalized_count = 0
+    for battle in ended_battles:
+        # Contar quantos desafios cada equipa completou
+        challenger_score = TeamBattleChallenge.query.filter(
+            TeamBattleChallenge.battle_id == battle.id,
+            TeamBattleChallenge.completed_by_team_id == battle.challenging_team_id
+        ).count()
+        
+        challenged_score = TeamBattleChallenge.query.filter(
+            TeamBattleChallenge.battle_id == battle.id,
+            TeamBattleChallenge.completed_by_team_id == battle.challenged_team_id
+        ).count()
+
+        # Determinar o vencedor
+        winner = None
+        if challenger_score > challenged_score:
+            winner = battle.challenging_team
+        elif challenged_score > challenger_score:
+            winner = battle.challenged_team
+        # Em caso de empate, ninguém vence
+
+        if winner:
+            battle.winner_team_id = winner.id
+            # Distribuir os pontos para cada membro da equipa vencedora
+            for member in winner.members:
+                member.points += battle.reward_points
+                update_user_level(member) # Atualiza o nível do membro, se aplicável
+            flash(f'A equipa "{winner.name}" venceu a batalha contra "{battle.challenged_team.name if winner.id == battle.challenging_team_id else battle.challenging_team.name}"!', 'success')
+        
+        battle.status = 'completed'
+        battles_finalized_count += 1
+    
+    if battles_finalized_count > 0:
+        db.session.commit()
+    
+    return battles_finalized_count
 
 # --- CONTEXT PROCESSORS ---
 @app.context_processor
@@ -1164,29 +1233,25 @@ def submit_challenge(challenge_id):
     
     is_correct = False
     if challenge.challenge_type == 'code':
-        # Para desafios de código, comparamos a resposta exata
         is_correct = submitted_answer == challenge.expected_answer
     else:
-        # Para texto, ignoramos maiúsculas/minúsculas
         is_correct = submitted_answer.lower() == challenge.expected_answer.lower()
 
     if is_correct:
         existing_completion = UserChallenge.query.filter_by(user_id=current_user.id, challenge_id=challenge_id).first()
         if not existing_completion:
-            # 1. Atribuir pontos ao aluno e preparar a mensagem de sucesso
             current_user.points += challenge.points_reward
             flash_message = f'Parabéns! Completou o desafio "{challenge.title}" e ganhou {challenge.points_reward} pontos!'
             
-            # Adicionar bónus do desafio diário, se aplicável
             today_challenge_entry = DailyChallenge.query.filter_by(day=date.today()).first()
             if today_challenge_entry and today_challenge_entry.challenge_id == challenge.id:
                 current_user.points += today_challenge_entry.bonus_points
-                flash_message += f' Você ganhou {today_challenge_entry.bonus_points} pontos de bónus por completar o desafio do dia!'
+                flash_message += f' Você ganhou {today_challenge_entry.bonus_points} pontos de bônus por completar o desafio do dia!'
             
             completion = UserChallenge(user_id=current_user.id, challenge_id=challenge_id)
             db.session.add(completion)
 
-            # ### NOVO: LÓGICA DO EVENTO GLOBAL (WORLD BOSS) ###
+            # Lógica do Evento Global (World Boss) - já implementada
             active_event = GlobalEvent.query.filter(
                 GlobalEvent.is_active == True,
                 GlobalEvent.start_date <= datetime.utcnow(),
@@ -1195,37 +1260,40 @@ def submit_challenge(challenge_id):
             ).first()
 
             if active_event:
-                damage = challenge.points_reward  # O dano causado é igual aos pontos do desafio
-                
-                # Garante que a vida não fique negativa
+                damage = challenge.points_reward
                 active_event.current_hp = max(0, active_event.current_hp - damage)
-                
-                # Regista a contribuição do aluno
                 contribution = GlobalEventContribution.query.filter_by(event_id=active_event.id, user_id=current_user.id).first()
                 if contribution:
                     contribution.contribution_points += damage
                 else:
                     contribution = GlobalEventContribution(event_id=active_event.id, user_id=current_user.id, contribution_points=damage)
                     db.session.add(contribution)
-                
-                # Adiciona uma mensagem flash específica sobre o dano
-                flash(f'Você causou {damage} de dano ao Boss Global "{active_event.name}"!', 'success')
-
-                # Verifica se o boss foi derrotado neste ataque
+                flash(f'Você causou {damage} de dano ao Boss Global!', 'success')
                 if active_event.current_hp == 0:
-                    flash(f'Parabéns a todos! O Boss Global "{active_event.name}" foi derrotado!', 'success')
-                    # No futuro, aqui entraria a lógica para distribuir as recompensas a todos que participaram.
-            
-            # ### FIM DA LÓGICA DO EVENTO GLOBAL ###
+                    flash(f'O Boss Global "{active_event.name}" foi derrotado!', 'success')
 
-            # 2. Atualizar o progresso do aluno e guardar tudo na base de dados
+            # ### NOVO: LÓGICA DA BATALHA DE EQUIPAS ###
+            if current_user.team:
+                active_battles = TeamBattle.query.filter(
+                    (TeamBattle.challenging_team_id == current_user.team_id) | (TeamBattle.challenged_team_id == current_user.team_id),
+                    TeamBattle.status == 'active'
+                ).all()
+
+                for battle in active_battles:
+                    battle_challenge = TeamBattleChallenge.query.filter_by(battle_id=battle.id, challenge_id=challenge_id).first()
+                    # Se o desafio faz parte desta batalha e ainda não foi completado por nenhuma equipa na batalha
+                    if battle_challenge and not battle_challenge.completed_by_team_id:
+                        battle_challenge.completed_by_team_id = current_user.team_id
+                        battle_challenge.completed_at = datetime.utcnow()
+                        flash(f'A sua equipa marcou pontos na batalha contra "{battle.challenged_team.name if battle.challenging_team_id == current_user.team_id else battle.challenging_team.name}"!', 'info')
+
+            # ### FIM DA LÓGICA DA BATALHA ###
+
             check_and_complete_paths(current_user, challenge_id)
             update_user_level(current_user)
-            db.session.commit() # Commit inicial para salvar pontos e progresso do desafio
-            
+            db.session.commit()
             check_and_award_achievements(current_user)
-            db.session.commit() # Commit final para salvar conquistas e alterações do evento
-            
+            db.session.commit()
             flash(flash_message, 'success')
         else:
             flash('Você já completou este desafio.', 'info')
@@ -2158,6 +2226,121 @@ def admin_delete_event(event_id):
     db.session.commit()
     flash('Evento Global apagado com sucesso.', 'success')
     return redirect(url_for('admin_events'))
+
+# Adicionar em app.py
+
+@app.route('/teams/challenge/<int:team_id>', methods=['POST'])
+@login_required
+def challenge_team(team_id):
+    challenger_team = current_user.team
+    challenged_team = Team.query.get_or_404(team_id)
+
+    # Validações
+    if not challenger_team:
+        flash('Você precisa de estar numa equipa para desafiar outras.', 'error')
+        return redirect(url_for('teams_list'))
+    if challenger_team.owner_id != current_user.id:
+        flash('Apenas o líder da equipa pode iniciar batalhas.', 'error')
+        return redirect(url_for('teams_list'))
+    if challenger_team.id == challenged_team.id:
+        flash('Você не pode desafiar a sua própria equipa.', 'error')
+        return redirect(url_for('teams_list'))
+
+    # Verifica se já existe uma batalha ativa entre estas equipas
+    existing_battle = TeamBattle.query.filter(
+        ((TeamBattle.challenging_team_id == challenger_team.id) & (TeamBattle.challenged_team_id == challenged_team.id) |
+        (TeamBattle.challenging_team_id == challenged_team.id) & (TeamBattle.challenged_team_id == challenger_team.id)) &
+        (TeamBattle.status == 'active')
+    ).first()
+
+    if existing_battle:
+        flash('Já existe uma batalha ativa entre estas duas equipas.', 'warning')
+        return redirect(url_for('teams_list'))
+
+    # Lógica para selecionar desafios
+    # Seleciona 5 desafios aleatórios que não sejam de equipa e que ambas as equipas possam aceder
+    num_challenges = 5
+    available_challenges = Challenge.query.filter_by(is_team_challenge=False).all()
+    if len(available_challenges) < num_challenges:
+        flash('Não há desafios suficientes na plataforma para iniciar uma batalha.', 'error')
+        return redirect(url_for('teams_list'))
+    
+    selected_challenges = random.sample(available_challenges, num_challenges)
+    
+    # Cria a batalha
+    end_time = datetime.utcnow() + timedelta(days=2) # Batalha dura 48 horas
+    new_battle = TeamBattle(
+        challenging_team_id=challenger_team.id,
+        challenged_team_id=challenged_team.id,
+        end_time=end_time,
+        status='active'
+    )
+    db.session.add(new_battle)
+    db.session.flush() # Para obter o ID da batalha antes de fazer commit
+
+    for challenge in selected_challenges:
+        battle_challenge = TeamBattleChallenge(battle_id=new_battle.id, challenge_id=challenge.id)
+        db.session.add(battle_challenge)
+    
+    db.session.commit()
+
+    flash(f'Desafio enviado para a equipa "{challenged_team.name}"! A batalha termina em 48 horas. Boa sorte!', 'success')
+    return redirect(url_for('teams_list'))
+
+@app.route('/admin/battles')
+@login_required
+def admin_battles():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    battles = TeamBattle.query.order_by(TeamBattle.start_time.desc()).all()
+    return render_template('admin_battles.html', battles=battles, form=BaseForm())
+
+@app.route('/admin/battles/delete/<int:battle_id>', methods=['POST'])
+@login_required
+def admin_delete_battle(battle_id):
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('admin_battles'))
+    
+    form = BaseForm()
+    if not form.validate_on_submit():
+        flash('Erro de validação CSRF.', 'error')
+        return redirect(url_for('admin_battles'))
+
+    battle = TeamBattle.query.get_or_404(battle_id)
+    db.session.delete(battle)
+    db.session.commit()
+    flash(f'A batalha entre "{battle.challenging_team.name}" e "{battle.challenged_team.name}" foi apagada.', 'success')
+    return redirect(url_for('admin_battles'))
+
+@app.route('/admin/battles/finalize', methods=['POST'])
+@login_required
+def trigger_finalize_battles():
+    if not current_user.is_admin:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    count = finalize_ended_battles()
+    if count > 0:
+        flash(f'{count} batalha(s) foram finalizadas e as recompensas distribuídas.', 'success')
+    else:
+        flash('Nenhuma batalha ativa precisava de ser finalizada.', 'info')
+        
+    return redirect(url_for('admin_battles'))
+
+# Adicionar em app.py
+@app.route('/battle/<int:battle_id>')
+@login_required
+def view_battle(battle_id):
+    battle = TeamBattle.query.get_or_404(battle_id)
+    # Garante que o user pertence a uma das equipas da batalha
+    if current_user.team_id not in [battle.challenging_team_id, battle.challenged_team_id]:
+        flash('A sua equipa não faz parte desta batalha.', 'error')
+        return redirect(url_for('teams_list'))
+    
+    return render_template('view_battle.html', battle=battle)
 
 # --- COMANDO CLI ---
 @app.cli.command(name='create-admin')

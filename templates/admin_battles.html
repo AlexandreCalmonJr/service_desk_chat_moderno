@@ -1,0 +1,57 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Admin - Batalhas de Times{% endblock %}
+{% block page_title %}Gerir Batalhas de Times{% endblock %}
+
+{% block content %}
+<div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+
+    <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+        <h3 class="font-semibold">Finalizar Batalhas Terminadas</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Clique no botão abaixo para verificar se alguma batalha ativa já passou do seu tempo limite. O sistema irá calcular os vencedores e distribuir os pontos de recompensa.</p>
+        <form method="POST" action="{{ url_for('trigger_finalize_battles') }}">
+            {{ form.csrf_token }}
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                Verificar e Finalizar Batalhas Agora
+            </button>
+        </form>
+    </div>
+
+    <h2 class="text-xl font-semibold mb-4">Histórico de Batalhas</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead class="text-xs uppercase bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="py-3 px-6">Equipa Desafiante</th>
+                    <th class="py-3 px-6">Equipa Desafiada</th>
+                    <th class="py-3 px-6">Estado</th>
+                    <th class="py-3 px-6">Termina em</th>
+                    <th class="py-3 px-6">Vencedor</th>
+                    <th class="py-3 px-6">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for battle in battles %}
+                <tr class="border-b dark:border-gray-700">
+                    <td class="py-4 px-6 font-medium">{{ battle.challenging_team.name }}</td>
+                    <td class="py-4 px-6 font-medium">{{ battle.challenged_team.name }}</td>
+                    <td class="py-4 px-6">{{ battle.status }}</td>
+                    <td class="py-4 px-6">{{ battle.end_time.strftime('%d/%m/%y %H:%M') }}</td>
+                    <td class="py-4 px-6">{{ battle.winner_team.name if battle.winner_team else 'N/A' }}</td>
+                    <td class="py-4 px-6">
+                        <form method="POST" action="{{ url_for('admin_delete_battle', battle_id=battle.id) }}" onsubmit="return confirm('Tem a certeza?');">
+                            {{ form.csrf_token }}
+                            <button type="submit" class="font-medium text-red-500 hover:underline">Apagar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="py-4 px-6 text-center text-gray-500">Nenhuma batalha registada.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

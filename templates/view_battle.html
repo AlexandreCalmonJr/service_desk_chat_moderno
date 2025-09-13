@@ -1,0 +1,48 @@
+{% extends "base_user.html" %}
+{% block title %}Detalhes da Batalha{% endblock %}
+{% block content %}
+<div class="w-full max-w-4xl mx-auto">
+    <div class="text-center">
+        <h1 class="text-3xl font-bold">Batalha de Equipas</h1>
+        <p class="text-xl">{{ battle.challenging_team.name }} vs {{ battle.challenged_team.name }}</p>
+    </div>
+    
+    <div class="mt-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-bold mb-4">Desafios da Batalha</h2>
+        <ul class="space-y-3">
+            {% for bc in battle.battle_challenges %}
+                <li class="p-4 rounded-lg flex justify-between items-center 
+                    {% if bc.completed_by_team_id == battle.challenging_team_id %} bg-blue-100 dark:bg-blue-900/50 
+                    {% elif bc.completed_by_team_id == battle.challenged_team_id %} bg-green-100 dark:bg-green-900/50 
+                    {% else %} bg-gray-100 dark:bg-gray-700/50 {% endif %}">
+                    {% if battle.status == 'completed' %}
+            <div class="mt-4 p-3 rounded-lg 
+                {% if battle.winner_team %} bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 {% else %} bg-gray-100 dark:bg-gray-700/50 {% endif %}">
+                <p class="font-bold">
+                    {% if battle.winner_team %}
+                        Vencedor: {{ battle.winner_team.name }}!
+                    {% else %}
+                        A batalha terminou em empate!
+                    {% endif %}
+                </p>
+            </div>
+        {% else %}
+            <p class="text-sm text-gray-500 mt-2">A batalha termina em: {{ battle.end_time.strftime('%d/%m/%y às %H:%M') }}</p>
+        {% endif %}
+                    <div>
+                        <p class="font-semibold">{{ bc.challenge.title }}</p>
+                        <p class="text-xs">{{ bc.challenge.description }}</p>
+                    </div>
+                    <div>
+                        {% if bc.completed_by_team_id %}
+                            <span class="text-sm font-bold">Completo por: {{ bc.battle.challenging_team.name if bc.completed_by_team_id == bc.battle.challenging_team_id else bc.battle.challenged_team.name }}</span>
+                        {% else %}
+                            <a href="{{ url_for('list_challenges') }}" class="text-sm text-red-500 hover:underline">Resolver!</a>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}
