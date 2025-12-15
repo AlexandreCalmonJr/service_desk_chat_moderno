@@ -6,8 +6,8 @@ Flask-Login==0.6.2
 Werkzeug==2.3.6
 PyPDF2==3.0.1
 gunicorn==20.1.0
-psycopg2-binary==2.9.6
-spacy==3.7.2
-Pillow==10.1.0
-cloudinary==1.36.0
-Flask-WTF==1.2.1
+psycopg2-binary
+spacy
+Pillow
+cloudinary
+Flask-WTF

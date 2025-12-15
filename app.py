@@ -9,8 +9,14 @@ import json
 import re
 from PyPDF2 import PdfReader
 from datetime import datetime, date, timedelta
-import spacy
-import spacy.cli
+try:
+    import spacy
+    import spacy.cli
+    SPACY_AVAILABLE = True
+except ImportError:
+    SPACY_AVAILABLE = False
+    print("spaCy não está disponível. Algumas funcionalidades de NLP estarão desabilitadas.")
+    
 import click
 from flask.cli import with_appcontext
 from flask_caching import Cache
@@ -55,12 +61,13 @@ else:
     cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 # Configuração do spaCy
-try:
-    nlp = spacy.load('pt_core_news_sm')
-except OSError:
-    print("Modelo pt_core_news_sm não encontrado. Fazendo download...")
-    spacy.cli.download('pt_core_news_sm')
-    nlp = spacy.load('pt_core_news_sm')
+nlp = None
+if SPACY_AVAILABLE:
+    try:
+        nlp = spacy.load('pt_core_news_sm')
+    except OSError:
+        print("Modelo pt_core_news_sm não encontrado. Funcionalidades de NLP estarão desabilitadas.")
+        nlp = None
 
 # --- MODELOS DA BASE DE DADOS ---
 class BaseForm(FlaskForm):
@@ -490,6 +497,9 @@ def find_faqs_by_keywords(message):
     return [match[0] for match in matches]
 
 def find_faq_by_nlp(message):
+    if nlp is None:
+        # Fallback to keyword search if spacy is not available
+        return find_faqs_by_keywords(message)
     doc = nlp(message.lower())
     keywords = {token.lemma_ for token in doc if not token.is_stop and not token.is_punct}
     if not keywords:
